@@ -1,6 +1,7 @@
 import type { ContentPart, JsonSchema, ToolCall } from "./types.js";
 import type { TraceContext } from "./tracing.js";
 
+/** @experimental */
 export type ToolProgressUpdate =
   | {
       type: "output.delta";
@@ -14,6 +15,7 @@ export type ToolProgressUpdate =
       data?: unknown;
     };
 
+/** @experimental */
 export interface ToolExecutionContext {
   /** Trusted host routing labels, never derived from model/tool arguments. */
   readonly scope?: Readonly<Record<string, string>>;
@@ -28,6 +30,7 @@ export interface ToolExecutionContext {
   report(update: ToolProgressUpdate): void;
 }
 
+/** @public */
 export interface Tool<TInput = unknown, TOutput = unknown> {
   readonly name: string;
   readonly description: string;
@@ -38,7 +41,7 @@ export interface Tool<TInput = unknown, TOutput = unknown> {
   readonly workspaceEffect?: "read" | "write";
 
   /** Optional runtime validation/coercion hook. Throw to reject the input. */
-  parse?(input: unknown): TInput;
+  parse?(input: unknown): TInput | Promise<TInput>;
 
   execute(input: TInput, context: ToolExecutionContext): Promise<TOutput>;
 
@@ -46,16 +49,19 @@ export interface Tool<TInput = unknown, TOutput = unknown> {
   resultContent?(output: TOutput): ContentPart[];
 }
 
+/** @experimental */
 export interface ToolExecution<TInput = unknown, TOutput = unknown> {
   readonly tool: Tool<TInput, TOutput>;
   readonly input: TInput;
   readonly context: ToolExecutionContext;
 }
 
+/** @experimental */
 export interface ToolExecutor {
   execute<TInput, TOutput>(execution: ToolExecution<TInput, TOutput>): Promise<TOutput>;
 }
 
+/** @experimental */
 export function freezeToolInput<T>(input: T): T {
   const visited = new WeakSet<object>();
   const values: object[] = [];
@@ -90,6 +96,7 @@ export function freezeToolInput<T>(input: T): T {
   return input;
 }
 
+/** @experimental */
 export interface ToolOperation<T> {
   readonly call: ToolCall;
   readonly tool: Tool | undefined;
@@ -98,22 +105,26 @@ export interface ToolOperation<T> {
   isTerminal?(result: T): boolean;
 }
 
+/** @experimental */
 export interface ToolSchedulingContext {
   readonly runId: string;
   readonly step: number;
   readonly signal: AbortSignal;
 }
 
+/** @experimental */
 export interface ToolScheduler {
   schedule<T>(operations: readonly ToolOperation<T>[], context: ToolSchedulingContext): Promise<readonly T[]>;
 }
 
+/** @experimental */
 export const directToolExecutor: ToolExecutor = {
   execute({ tool, input, context }) {
     return tool.execute(input, context);
   },
 };
 
+/** @experimental */
 export const sequentialToolScheduler: ToolScheduler = {
   async schedule<T>(operations: readonly ToolOperation<T>[], context: ToolSchedulingContext): Promise<T[]> {
     const results: T[] = [];
@@ -127,7 +138,9 @@ export const sequentialToolScheduler: ToolScheduler = {
   },
 };
 
-/** Use only when every selected tool is safe to run concurrently. */
+/** Use only when every selected tool is safe to run concurrently.
+ * @experimental
+ */
 export const parallelToolScheduler: ToolScheduler = {
   async schedule<T>(operations: readonly ToolOperation<T>[], context: ToolSchedulingContext): Promise<T[]> {
     context.signal.throwIfAborted();

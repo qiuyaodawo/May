@@ -1,7 +1,9 @@
 import { omitUndefined, type Tool } from "../core/index.js";
 import { sessionHistoryEventContent, type SessionHistorySource } from "./session-history.js";
 
-/** Search bounded batches of complete events, then read matching records in chunks. */
+/** Search bounded batches of complete events, then read matching records in chunks.
+ * @experimental
+ */
 export function createSessionHistoryRetrievalTools(options: { source: () => SessionHistorySource }): Tool[] {
   return [
     {

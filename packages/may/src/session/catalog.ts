@@ -4,6 +4,7 @@ import { omitUndefined } from "../core/omit-undefined.js";
 import { writeFileDurable } from "../storage/index.js";
 import { join, resolve } from "node:path";
 
+/** @experimental */
 export interface SessionSummary {
   readonly id: string;
   readonly workspace: string;
@@ -14,6 +15,7 @@ export interface SessionSummary {
   readonly turnCount?: number;
 }
 
+/** @experimental */
 export interface SessionCatalog {
   list(workspace: string): Promise<readonly SessionSummary[]>;
   record(summary: SessionSummary): Promise<void>;
@@ -21,6 +23,7 @@ export interface SessionCatalog {
   remove?(sessionId: string, workspace: string): Promise<boolean>;
 }
 
+/** @experimental */
 export class InMemorySessionCatalog implements SessionCatalog {
   private readonly sessions = new Map<string, SessionSummary>();
 
@@ -57,6 +60,7 @@ export class InMemorySessionCatalog implements SessionCatalog {
  * The legacy JSON snapshot at `path` is treated as a base snapshot. Updates are
  * committed under `${path}.operations` and replayed in filename order, so
  * independent catalog instances do not overwrite one another's changes.
+ * @experimental
  */
 export class FileSessionCatalog implements SessionCatalog {
   readonly path: string;
@@ -275,6 +279,7 @@ function isCatalogOperation(value: unknown): value is CatalogOperation {
   return value.type === "remove" || ("title" in value && typeof value.title === "string" && value.title !== "");
 }
 
+/** @experimental */
 export async function latestSession(catalog: SessionCatalog, workspace: string): Promise<SessionSummary | undefined> {
   return (await catalog.list(workspace))[0];
 }

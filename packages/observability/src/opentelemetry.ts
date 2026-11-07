@@ -35,6 +35,7 @@ import type {
   TraceSpanEventData,
 } from "./types.js";
 
+/** @experimental */
 export class OpenTelemetryMetricRecorder implements MetricRecorder {
   private readonly instruments = new Map<
     string,
@@ -87,6 +88,7 @@ export class OpenTelemetryMetricRecorder implements MetricRecorder {
   }
 }
 
+/** @experimental */
 export interface OpenTelemetryTracerOptions {
   readonly tracer: OtelTracer;
   readonly metrics?: MetricRecorder;
@@ -96,6 +98,7 @@ export interface OpenTelemetryTracerOptions {
   readonly onError?: ObservabilityErrorHandler;
 }
 
+/** @experimental */
 export class OpenTelemetryTracer implements Tracer {
   private readonly limits: Required<TelemetryLimits>;
   private readonly observers: readonly SpanObserver[];
@@ -203,6 +206,7 @@ function otelAttributes(attributes: TraceAttributes): Attributes {
   ) as Attributes;
 }
 
+/** @experimental */
 export interface OtlpTelemetryOptions {
   readonly serviceName: string;
   readonly serviceVersion?: string;
@@ -219,6 +223,7 @@ export interface OtlpTelemetryOptions {
   readonly onError?: ObservabilityErrorHandler;
 }
 
+/** @experimental */
 export interface OtlpDiagnostics {
   readonly traceExportFailures: number;
   readonly metricExportFailures: number;
@@ -284,6 +289,7 @@ class ReportingMetricExporter extends OTLPMetricExporter {
   }
 }
 
+/** @experimental */
 export function createOtlpTelemetry(options: OtlpTelemetryOptions): {
   readonly tracer: OpenTelemetryTracer;
   readonly metrics: OpenTelemetryMetricRecorder;

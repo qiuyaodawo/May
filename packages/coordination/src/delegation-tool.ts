@@ -3,6 +3,7 @@ import type { Tool } from "@sortedyuan/may/core";
 import type { TaskExecutionContext, TaskSpec } from "./types.js";
 import { validateTaskFiles } from "./validation.js";
 
+/** @experimental */
 export interface DelegationToolOptions {
   /** 宿主当前授权的角色；模型在描述中可以直接看到它们。 */
   readonly agents?: readonly string[];
@@ -14,7 +15,9 @@ export interface DelegationToolOptions {
 
 const MAX_CHILDREN = 8;
 
-/** 能力对象携带身份；发送方和命令 id 都不接受模型输入。 */
+/** 能力对象携带身份；发送方和命令 id 都不接受模型输入。
+ * @experimental
+ */
 export function delegationTool(
   context: TaskExecutionContext,
   yielded: () => void,

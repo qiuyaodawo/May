@@ -1,5 +1,6 @@
 import { createParser } from "eventsource-parser";
 
+/** @experimental */
 export async function* readSseData(
   response: Response,
   signal: AbortSignal,
@@ -48,6 +49,7 @@ export async function* readSseData(
   }
 }
 
+/** @experimental */
 export function parseRetryAfterMs(value: string | null): number | undefined {
   if (value === null) return undefined;
   const seconds = Number(value);

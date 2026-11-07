@@ -1,11 +1,13 @@
 import { MayError } from "@sortedyuan/may/core";
 
+/** @experimental */
 export class McpConfigurationError extends MayError {
   constructor(message: string, options?: ErrorOptions) {
     super("MCP_CONFIGURATION_ERROR", message, options);
   }
 }
 
+/** @experimental */
 export class McpConnectionError extends MayError {
   readonly serverId: string;
   readonly summary: string;
@@ -23,6 +25,7 @@ export class McpConnectionError extends MayError {
   }
 }
 
+/** @experimental */
 export class McpToolsListError extends MayError {
   readonly serverId: string;
   readonly summary: string;
@@ -40,6 +43,7 @@ export class McpToolsListError extends MayError {
   }
 }
 
+/** @experimental */
 export class McpToolCallError extends MayError {
   readonly serverId: string;
   readonly remoteToolName: string;
@@ -51,6 +55,7 @@ export class McpToolCallError extends MayError {
   }
 }
 
+/** @experimental */
 export class McpToolReportedError extends MayError {
   readonly serverId: string;
   readonly remoteToolName: string;
@@ -62,6 +67,7 @@ export class McpToolReportedError extends MayError {
   }
 }
 
+/** @experimental */
 export class McpClientPoolClosedError extends MayError {
   constructor() {
     super("MCP_CLIENT_POOL_CLOSED", "MCP client pool is closed");
@@ -72,24 +78,28 @@ function formatDiagnosticMessage(message: string, stderr?: string): string {
   return stderr === undefined || stderr === "" ? message : `${message}\nRecent stderr:\n${stderr}`;
 }
 
+/** @experimental */
 export class McpCatalogError extends MayError {
   constructor(serverId: string, message: string) {
     super("MCP_CATALOG_ERROR", `MCP server "${serverId}": ${message}`);
   }
 }
 
+/** @experimental */
 export class McpStaleToolError extends MayError {
   constructor(serverId: string) {
     super("MCP_STALE_TOOL", `MCP server "${serverId}" tool snapshot is stale; refresh and start a new Run`);
   }
 }
 
+/** @experimental */
 export class McpCapabilityError extends MayError {
   constructor(serverId: string, message: string, code = "MCP_CAPABILITY_ERROR") {
     super(code, `MCP server "${serverId}": ${message}`);
   }
 }
 
+/** @experimental */
 export class McpContentError extends MayError {
   constructor(message: string) {
     super("MCP_CONTENT_ERROR", message);

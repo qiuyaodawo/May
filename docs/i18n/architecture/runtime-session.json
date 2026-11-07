@@ -23,8 +23,8 @@
     },
     {
       "heading": "@sortedyuan/may/core",
-      "en": "16afda1c37390f09c83fec3c83c1636c57bc91a0966a364c63bc5d570f3e298d",
-      "zh": "f1036d169070c5029817bce31d6617bbf6e4d209a8ab1b8e7c4c00091f2640bd"
+      "en": "095cafe3791c8525956456fe5166096e9bbacb634852d3aa8272202990ae4a73",
+      "zh": "a9dc076b274e89330af374b39223bc1bfc5c0649054affe1c2861ede5c10236a"
     },
     {
       "heading": "@sortedyuan/may/context",
@@ -33,8 +33,8 @@
     },
     {
       "heading": "@sortedyuan/may/session",
-      "en": "551bda682bd3c9a8744fa20253f0ecb82cc645f2f4c4f9f5d9d02467869fd86f",
-      "zh": "0e08dd6770468a5b26a92d6d9eee15ad84487aec6bb3af601244f9c12980addd"
+      "en": "8eeffdb61ca380f4edff771c61b981acb60c9d33b0f369dade0132f0e35f6d66",
+      "zh": "13425aceb817f21fe285cc65ae5e34d7fd30d3332ec2a839c5a4ec27ed932761"
     },
     {
       "heading": "@sortedyuan/may/plugin",
@@ -53,13 +53,13 @@
     },
     {
       "heading": "@sortedyuan/mcp",
-      "en": "6cbe6c35804c6265f67c2d367e7f1f3f80cc73c74ec75572e9b6287ca7713a8c",
-      "zh": "b59c098bf9967ed4392c35d66059bd321a7657f03eeb6ca4d477a757103ffd61"
+      "en": "520fd4b9cac5521fc541a5da732633f5410eb92a03fcf0eb2149cf2cf354c59e",
+      "zh": "10e50a3015f8058d6a803a0ec42199c1e5da9d772991e9ceef5a2383b1abde6f"
     },
     {
       "heading": "@sortedyuan/may/application",
-      "en": "5b02c0fcd16f9f3b741ac60db57e4e1ad5509d7fada2860ba089f8f07dcb817f",
-      "zh": "fc0b18d58783e7fed468f984ddf9c222ea04908c5025c24bf8b1ef60cc11f111"
+      "en": "8662d0c0994d876b438bf39e609a4d63de37a1402a64ec7bd3eb8277ce3ba6ec",
+      "zh": "e38033c2d8fa155f2d94a2491c85434f8f0417cb34cdd7eac81010d8673735a9"
     },
     {
       "heading": "@sortedyuan/tui",
@@ -68,8 +68,13 @@
     },
     {
       "heading": "apps/maybecode",
-      "en": "ff176f30b8673312e897b61da342b97fc41e3ec5241ee3b6310a9a14cda4d635",
-      "zh": "e1709dc81c8436612b652dd0f0e11a7d12520886a2b0e517342909254f92ba7e"
+      "en": "9d08b3ba1d6d339c7fb35312539c9e76408c57d0d697e1b6ee323f772594feda",
+      "zh": "f099a829d663443ec4c272d9e0e890ed0708abe9569e993b6407e3884a58a1b2"
+    },
+    {
+      "heading": "apps/maybeclaw",
+      "en": "492a92931b2dbc5cfa4c2ad0b08bb3b2b40194201fa8888ae1558894dbada030",
+      "zh": "54cf7f0f700ff9a1c0713c8c5b7903b3fa4b3ef85fa70cbcc5b5845427e793b0"
     },
     {
       "heading": "Events and persistence",

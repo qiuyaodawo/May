@@ -2,6 +2,7 @@ import { omitUndefined, type ContextSnapshot, type Message, type SystemMessage }
 
 import type { ContextCompactionOptions, ContextCompactionStrategy } from "./compaction.js";
 
+/** @experimental */
 export interface ContextSummaryRequest {
   readonly messages: readonly Message[];
   readonly signal?: AbortSignal;
@@ -10,16 +11,19 @@ export interface ContextSummaryRequest {
   readonly step?: number;
 }
 
+/** @experimental */
 export interface ContextSummarizer {
   summarize(request: ContextSummaryRequest): string | Promise<string>;
 }
 
+/** @experimental */
 export interface SummaryTailOptions {
   readonly summarizer: ContextSummarizer;
   readonly keepRecentTurns?: number;
   readonly minimumPrefixMessages?: number;
 }
 
+/** @experimental */
 export class SummaryTailStrategy implements ContextCompactionStrategy {
   readonly name = "summary-tail";
 

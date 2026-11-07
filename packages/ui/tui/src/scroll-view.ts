@@ -10,6 +10,7 @@ import type {
 } from "./component.js";
 import { placeImages } from "./component.js";
 
+/** @experimental */
 export interface ScrollViewOptions {
   readonly followEnd?: boolean;
   readonly maxContentLines?: number;
@@ -17,6 +18,7 @@ export interface ScrollViewOptions {
   readonly keybindings?: readonly KeyBindingDefinition[];
 }
 
+/** @experimental */
 export const DEFAULT_SCROLL_KEYBINDINGS: readonly KeyBindingDefinition[] = [
   { context: "scroll", keys: "wheelup", action: "scroll.wheelUp" },
   { context: "scroll", keys: "wheeldown", action: "scroll.wheelDown" },
@@ -28,6 +30,7 @@ export const DEFAULT_SCROLL_KEYBINDINGS: readonly KeyBindingDefinition[] = [
   { context: "scroll", keys: "end", action: "scroll.end" },
 ];
 
+/** @experimental */
 export interface ScrollRegion {
   /** Inclusive zero-based content row. */
   readonly start: number;
@@ -35,7 +38,10 @@ export interface ScrollRegion {
   readonly end: number;
 }
 
-/** A viewport over a child component's rendered lines. */
+/**
+ * A viewport over a child component's rendered lines.
+ * @experimental
+ */
 export class ScrollView implements InteractiveComponent, FocusTarget {
   private offset = 0;
   private followEnd: boolean;

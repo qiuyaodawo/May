@@ -10,6 +10,7 @@ import {
 
 import type { ContextSummarizer } from "./summary-tail.js";
 
+/** @experimental */
 export interface ModelContextSummarizerOptions {
   /** System instructions that define the required summary. */
   readonly instructions: string;
@@ -22,6 +23,7 @@ export interface ModelContextSummarizerOptions {
  *
  * Prompt policy remains application-owned: callers must provide both the
  * instructions and the final request text.
+ * @experimental
  */
 export function createModelContextSummarizer(
   model: Model,

@@ -9,6 +9,7 @@ export * from "./runtime.js";
 export * from "./model.js";
 export * from "./request-recording.js";
 export * from "./tool.js";
+export * from "./define-tool.js";
 export * from "./tool-registry.js";
 export * from "./tracing.js";
 export * from "./types.js";

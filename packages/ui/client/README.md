@@ -71,6 +71,9 @@ optional `exit` callback invoked after an exit receipt is flushed.
 
 `UiClient` synchronizes authoritative snapshots using an authenticated fetch/SSE
 invalidation stream. Reconnects resnapshot; they do not replay commands.
+Call `await client.disconnect()` when closing a view. It aborts the connection
+and waits for its SSE watch to finish. Connection errors are exposed through
+`UiClientState.error`; an unauthorized event stream ends the connection.
 Host epochs reject uncertain commands after restart. Receipts deduplicate up to
 4,096 unique commands per host lifetime; reaching the limit fails closed until a
 controlled restart. Receipts are not a durable command log or exactly-once network guarantee.

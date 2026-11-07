@@ -6,6 +6,7 @@ export * from "./types.js";
 export * from "./may.js";
 export * from "./rpc.js";
 
+/** @experimental */
 export function validateAgentAdapter(adapter: AgentAdapter, id: string): void {
   if (
     !adapter ||
@@ -34,6 +35,7 @@ export function validateAgentAdapter(adapter: AgentAdapter, id: string): void {
       throw new Error(`Agent ${id} 缺少 ${method}。`);
   }
 }
+/** @experimental */
 export async function loadAgentAdapter(
   config: AgentAdapterConfig,
   factoryContext: Record<string, unknown> = {},
@@ -54,12 +56,15 @@ export async function loadAgentAdapter(
     throw error;
   }
 }
+/** @experimental */
 export const agentAdapterRegistryService = defineService<AgentAdapterRegistry>({
   id: "may.agent-adapters",
   version: "1.0.0",
   scope: "host",
 });
+/** @experimental */
 export type AgentAdapterFactories = Readonly<Record<string, () => AgentAdapter | Promise<AgentAdapter>>>;
+/** @experimental */
 export function createAgentAdaptersPlugin(options: {
   readonly factories: AgentAdapterFactories | (() => AgentAdapterFactories);
   readonly id?: string;

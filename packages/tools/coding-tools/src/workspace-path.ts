@@ -3,11 +3,13 @@ import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path
 import { CodingToolError } from "./errors.js";
 import { isMissingPathError } from "./missing-path.js";
 
+/** @experimental */
 export interface WorkspacePath {
   readonly absolute: string;
   readonly relative: string;
 }
 
+/** @experimental */
 export interface WorkspacePathOptions {
   /**
    * Hard links cannot be proven to belong exclusively to the workspace.
@@ -16,6 +18,7 @@ export interface WorkspacePathOptions {
   readonly allowHardLinks?: boolean;
 }
 
+/** @experimental */
 export async function resolveExistingWorkspacePath(
   cwd: string,
   inputPath: string,
@@ -24,6 +27,7 @@ export async function resolveExistingWorkspacePath(
   return resolveWorkspacePath(cwd, inputPath, true, options);
 }
 
+/** @experimental */
 export async function resolveWritableWorkspacePath(
   cwd: string,
   inputPath: string,

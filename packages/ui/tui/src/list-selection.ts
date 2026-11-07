@@ -1,14 +1,19 @@
 import type { KeyStroke } from "./keybindings/index.js";
 
+/** @experimental */
 export type ListNavigationAction = "up" | "down" | "page-up" | "page-down" | "home" | "end";
 
+/** @experimental */
 export interface ListSelectionOptions<Item> {
   readonly initialIndex?: number;
   readonly pageSize?: number;
   readonly filter?: (item: Item, normalizedQuery: string) => boolean;
 }
 
-/** Reusable selection and search state for retained or line-oriented pickers. */
+/**
+ * Reusable selection and search state for retained or line-oriented pickers.
+ * @experimental
+ */
 export class ListSelectionModel<Item> {
   private source: Item[];
   private readonly pageSize: number;
@@ -94,6 +99,7 @@ export class ListSelectionModel<Item> {
   }
 }
 
+/** @experimental */
 export function resolveListInput<Item>(
   items: readonly Item[],
   input: string,
@@ -105,15 +111,18 @@ export function resolveListInput<Item>(
     : items.find((item) => value(item) === input);
 }
 
+/** @experimental */
 export function printableKeyText(stroke: KeyStroke): string | undefined {
   if (stroke.ctrl || stroke.alt || stroke.meta) return undefined;
   return stroke.text !== undefined && stroke.text.length > 0 ? stroke.text : undefined;
 }
 
+/** @experimental */
 export function clampListIndex(index: number, count: number): number {
   return count === 0 ? 0 : Math.min(Math.max(index, 0), count - 1);
 }
 
+/** @experimental */
 export function removeLastCodePoint(value: string): string {
   return [...value].slice(0, -1).join("");
 }

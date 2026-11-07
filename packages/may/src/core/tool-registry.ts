@@ -3,7 +3,9 @@ import { omitUndefined } from "./omit-undefined.js";
 import type { ToolDefinition } from "./model.js";
 import type { Tool } from "./tool.js";
 
-/** Raised when composition would make tool lookup ambiguous. */
+/** Raised when composition would make tool lookup ambiguous.
+ * @experimental
+ */
 export class DuplicateToolNameError extends MayError {
   readonly toolName: string;
 
@@ -28,6 +30,7 @@ interface RegisteredTool {
 /**
  * An instance-scoped collection of tools with deterministic, duplicate-safe
  * composition. A registry never mutates another registry passed to it.
+ * @experimental
  */
 export class ToolRegistry implements Iterable<Tool> {
   private readonly byName = new Map<string, RegisteredTool>();

@@ -1,6 +1,8 @@
 import type { MaybeCodeSubagentConfiguration, MaybeCodeSubagentRole } from "./subagents.js";
 
-/** 主 Agent 可用委派工具时提供的协作指导。 */
+/** 主 Agent 可用委派工具时提供的协作指导。
+ * @experimental
+ */
 export function delegationInstructions(configuration: MaybeCodeSubagentConfiguration, available: boolean): string {
   if (!available) return "";
   const roles = configuration.roles
@@ -27,7 +29,9 @@ Delegation depth: ${limits.maxDepth} tasks, including the main agent at depth 1.
 Task count: ${limits.maxTasks} tasks per request.`;
 }
 
-/** 基于宿主基础指令构造的单个子 Agent 系统指令。 */
+/** 基于宿主基础指令构造的单个子 Agent 系统指令。
+ * @experimental
+ */
 export function subagentInstructions(options: {
   readonly base: string;
   readonly role: MaybeCodeSubagentRole;

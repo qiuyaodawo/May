@@ -12,7 +12,10 @@ import {
 
 const PAGE_SIZE = 50,
   PAGE_CHARACTERS = 262_144;
-/** Opaque, read-only cursors bind the host, resource, query and anchor. They grant no authority. */
+/**
+ * Opaque, read-only cursors bind the host, resource, query and anchor. They grant no authority.
+ * @experimental
+ */
 export function readPage<T extends { id: string }>(
   hostId: string,
   scope: string,
@@ -55,6 +58,7 @@ export function readPage<T extends { id: string }>(
       : null;
   return { hostId, items: backwards ? page.reverse() : page, nextCursor, total: filtered.length };
 }
+/** @experimental */
 export function historyPage(
   hostId: string,
   selectedId: string,
@@ -75,6 +79,7 @@ export function historyPage(
     true,
   );
 }
+/** @experimental */
 export function fieldText(block: UiBlock, field: UiField): string {
   return field === "request"
     ? ""
@@ -146,6 +151,7 @@ function* historyFields(
     }
   }
 }
+/** @experimental */
 export function recordedField(events: readonly SessionEvent[], block: UiBlock, field: UiField): string {
   if (field === "request") {
     const requests = readRecordedModelRequests(events).filter(
@@ -158,6 +164,7 @@ export function recordedField(events: readonly SessionEvent[], block: UiBlock, f
     if (entry.id === block.id && entry.fields[field] !== undefined) text = entry.fields[field]!;
   return text;
 }
+/** @experimental */
 export function searchHistory(events: readonly SessionEvent[], query = ""): ReadonlySet<string> {
   const matches = new Set<string>(),
     needle = query.trim().toLocaleLowerCase();
@@ -166,6 +173,7 @@ export function searchHistory(events: readonly SessionEvent[], query = ""): Read
       if (Object.values(entry.fields).some((text) => text.toLocaleLowerCase().includes(needle))) matches.add(entry.id);
   return matches;
 }
+/** @experimental */
 export function fieldPage(hostId: string, selectedId: string, request: UiFieldRequest, text: string): UiFieldPage {
   const { offset } = request;
   const version = createHash("sha256")

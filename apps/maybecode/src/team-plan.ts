@@ -7,7 +7,17 @@ import { parseTeamChecks, type TeamCheckSpec } from "./team-verification.js";
 export type TeamMode = "read-only" | "coding";
 export type TeamPreset = "supervisor" | "pipeline" | "parallel";
 export type TeamToolName =
-  "read" | "list_files" | "publish_artifact" | "read_artifact" | "write" | "edit" | "run_check" | "submit_report";
+  | "read"
+  | "glob"
+  | "grep"
+  | "fetch"
+  | "list_files"
+  | "publish_artifact"
+  | "read_artifact"
+  | "write"
+  | "edit"
+  | "run_check"
+  | "submit_report";
 
 export interface TeamRole {
   readonly model?: string;
@@ -32,13 +42,15 @@ export interface TeamPlan {
 const MAX_PLAN_BYTES = 1_048_576;
 const READ_TOOLS: readonly TeamToolName[] = [
   "read",
+  "glob",
+  "grep",
   "list_files",
   "publish_artifact",
   "read_artifact",
   "submit_report",
   "run_check",
 ];
-const ALL_TOOLS: readonly TeamToolName[] = [...READ_TOOLS, "write", "edit"];
+const ALL_TOOLS: readonly TeamToolName[] = [...READ_TOOLS, "fetch", "write", "edit"];
 const LIMIT_CAPS = {
   maxConcurrent: 8,
   maxTasks: 128,

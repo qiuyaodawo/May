@@ -1,3 +1,4 @@
+/** @experimental */
 export class ProviderAdapterRegistryError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
@@ -5,6 +6,7 @@ export class ProviderAdapterRegistryError extends Error {
   }
 }
 
+/** @experimental */
 export class ProviderConfigurationError extends ProviderAdapterRegistryError {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);

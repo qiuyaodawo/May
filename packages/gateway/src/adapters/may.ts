@@ -4,6 +4,7 @@ import { correlationTraceAttributes, omitUndefined } from "@sortedyuan/may/core"
 import { digest } from "../delivery/index.js";
 import type { AgentAdapter, AgentAdapterContext } from "./types.js";
 
+/** @experimental */
 export interface MayAgentAdapterOptions {
   readonly agentId: string;
   readonly store: SessionStore;
@@ -19,6 +20,7 @@ export interface MayAgentAdapterOptions {
   ) => unknown;
   readonly modelCapabilities?: AgentAdapter["modelCapabilities"];
 }
+/** @experimental */
 export function createMayAgentAdapter(options: MayAgentAdapterOptions): AgentAdapter {
   const store = options.store;
   const opened = new Map<string, { app: AgentApplication; context?: AgentAdapterContext; relay: Promise<void> }>();

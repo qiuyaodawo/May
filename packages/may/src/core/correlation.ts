@@ -1,6 +1,7 @@
 import { omitUndefined } from "./omit-undefined.js";
 import type { TraceAttributes, TraceContext } from "./tracing.js";
 
+/** @experimental */
 export interface TelemetryCorrelation {
   readonly version: 1;
   readonly taskId?: string;
@@ -11,7 +12,9 @@ export interface TelemetryCorrelation {
   readonly parent?: TraceContext;
 }
 
-/** 跨进程只传递经过验证的身份；禁止附带消息、参数和凭据。 */
+/** 跨进程只传递经过验证的身份；禁止附带消息、参数和凭据。
+ * @experimental
+ */
 export function validateTelemetryCorrelation(value: unknown): TelemetryCorrelation {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("Invalid telemetry correlation");
   const input = value as Record<string, unknown>;
@@ -57,6 +60,7 @@ export function validateTelemetryCorrelation(value: unknown): TelemetryCorrelati
   }) as unknown as TelemetryCorrelation;
 }
 
+/** @experimental */
 export function correlationTraceAttributes(value: TelemetryCorrelation): TraceAttributes {
   const correlation = validateTelemetryCorrelation(value);
   return omitUndefined({

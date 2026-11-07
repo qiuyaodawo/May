@@ -4,6 +4,7 @@ import { ListSelectionModel, printableKeyText } from "./list-selection.js";
 import { Text, sanitizeTerminalText } from "./text.js";
 import { DEFAULT_DARK_THEME, styleText, type TuiTheme } from "./theme.js";
 
+/** @experimental */
 export interface SessionForkPoint {
   readonly id: string;
   readonly sessionId: string;
@@ -19,6 +20,7 @@ export interface SessionForkPoint {
   readonly worktreeAvailable?: boolean;
 }
 
+/** @experimental */
 export interface SessionForkSelection {
   readonly pointId: string;
   readonly mode: "current" | "worktree";
@@ -30,7 +32,10 @@ interface TreeRow {
   readonly children: boolean;
 }
 
-/** 历史父子关系保留 Session 来源，可通过键盘浏览、搜索和预览。 */
+/**
+ * 历史父子关系保留 Session 来源，可通过键盘浏览、搜索和预览。
+ * @experimental
+ */
 export class SessionForkTree {
   private readonly rows: readonly TreeRow[];
   private readonly collapsed = new Set<string>();
@@ -160,6 +165,7 @@ const bindings = [
   ["ctrl+c", "cancel"],
 ].map(([keys, action]) => ({ context: "fork", keys: keys!, action: action! }));
 
+/** @experimental */
 export class SessionForkPicker implements InteractiveComponent {
   readonly tree: SessionForkTree;
   private readonly keymap = new Keymap(bindings, { actions: bindings.map((binding) => binding.action) });

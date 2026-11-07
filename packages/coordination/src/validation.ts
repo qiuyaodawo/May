@@ -119,6 +119,7 @@ export function validateGraph(tasks: readonly TaskSpec[], maxTasks: number, maxI
 
 /**
  * 工作区相对、长度有界、不含上级目录的任务文件声明，适用于共享工作区。
+ * @experimental
  */
 export function validateTaskFiles(files: readonly string[] | undefined): void {
   if (files === undefined) return;
@@ -157,6 +158,7 @@ export function validateHandoff(value: HandoffSpec, maxBytes: number): void {
   if (Buffer.byteLength(value.input, "utf8") > maxBytes) throw new Error("Handoff input exceeds maxHandoffBytes");
 }
 
+/** @experimental */
 export function validateSnapshot(snapshot: CoordinationSnapshot, id: string): void {
   if (snapshot?.format !== 1 || snapshot.id !== id) throw new Error("Invalid coordination journal identity/format");
   positive(snapshot.revision, "revision");

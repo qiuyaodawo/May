@@ -3,10 +3,15 @@ import type { ContentPart, UserMessage } from "@sortedyuan/may/core";
 import { McpContentError } from "./errors.js";
 import type { McpPromptExpansion, McpResourceRead, McpToolOutput } from "./types.js";
 
+/** @experimental */
 export const MCP_CONTENT_MAX_BYTES = 8 * 1024 * 1024;
+/** @experimental */
 export const MCP_CONTENT_MAX_ITEMS = 128;
 
-/** Fail closed rather than silently truncate a schema-valid result or binary. */
+/**
+ * Fail closed rather than silently truncate a schema-valid result or binary.
+ * @experimental
+ */
 export function assertMcpContentSize(value: unknown): void {
   if (Buffer.byteLength(JSON.stringify(value), "utf8") > MCP_CONTENT_MAX_BYTES) {
     throw new McpContentError("MCP content exceeds the 8 MiB host limit");
@@ -75,6 +80,7 @@ function blockParts(block: ContentBlock): ContentPart[] {
   }
 }
 
+/** @experimental */
 export function mcpResourceToUserMessage(
   read: McpResourceRead,
   instruction = "Use the explicitly attached resource to help with my request.",
@@ -91,6 +97,7 @@ export function mcpResourceToUserMessage(
   };
 }
 
+/** @experimental */
 export function mcpPromptToUserMessage(prompt: McpPromptExpansion): UserMessage {
   assertMcpContentSize(prompt);
   count(prompt.result.messages);
@@ -110,6 +117,7 @@ export function mcpPromptToUserMessage(prompt: McpPromptExpansion): UserMessage 
   };
 }
 
+/** @experimental */
 export function mcpToolResultContent(serverId: string, name: string, output: McpToolOutput): ContentPart[] {
   assertMcpContentSize(output);
   count(output.content);
@@ -120,7 +128,10 @@ export function mcpToolResultContent(serverId: string, name: string, output: Mcp
   ];
 }
 
-/** Terminal preview avoids dumping base64. The UI still must sanitize terminal controls. */
+/**
+ * Terminal preview avoids dumping base64. The UI still must sanitize terminal controls.
+ * @experimental
+ */
 export function previewMcpMessage(message: UserMessage, maximum = 16_000): string {
   return message.content
     .map((part) => {

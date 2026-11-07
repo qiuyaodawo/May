@@ -3,11 +3,14 @@ import { Ajv2020, type ErrorObject, type ValidateFunction } from "ajv/dist/2020.
 import formats from "ajv-formats";
 import { MayConfigValidationError } from "./errors.js";
 
+/** @experimental */
 export type JsonSchemaObject = { readonly [key: string]: unknown };
 
 const require = createRequire(import.meta.url);
 
-/** JSON Schema of the May configuration file without application entries. */
+/** JSON Schema of the May configuration file without application entries.
+ * @experimental
+ */
 export const mayConfigSchema = require("../../may-config.schema.json") as JsonSchemaObject;
 
 /**
@@ -16,6 +19,7 @@ export const mayConfigSchema = require("../../may-config.schema.json") as JsonSc
  * `section` describes the object at `apps.<id>`. Its `$defs` join the core
  * definitions, so the section may reference core definitions such as
  * `#/$defs/runBudget` and its own definitions with the same `#/$defs/` prefix.
+ * @experimental
  */
 export function createApplicationConfigSchema(id: string, section: JsonSchemaObject, title: string): JsonSchemaObject {
   const {
@@ -44,7 +48,9 @@ export function createApplicationConfigSchema(id: string, section: JsonSchemaObj
   };
 }
 
-/** Compile a validator that returns the `apps.<id>` entry of a configuration file as `T`. */
+/** Compile a validator that returns the `apps.<id>` entry of a configuration file as `T`.
+ * @experimental
+ */
 export function createApplicationConfigValidator<T>(
   id: string,
   section: JsonSchemaObject,
@@ -57,6 +63,7 @@ export function createApplicationConfigValidator<T>(
   };
 }
 
+/** @experimental */
 export const validateMayConfigDocument: (value: unknown, path: string) => void = (() => {
   const validate = compile(mayConfigSchema);
   return (value: unknown, path: string) => assertValid(validate, value, path, "config");

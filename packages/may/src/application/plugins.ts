@@ -13,6 +13,7 @@ export type { RuntimeFactory } from "../core/index.js";
 
 export type { ApplicationAccess } from "./plugin-access.js";
 
+/** @experimental */
 export const applicationServices = Object.freeze({
   ...services,
   application: defineService<ApplicationAccess>({
@@ -37,8 +38,10 @@ export const applicationServices = Object.freeze({
   }),
 });
 
+/** @experimental */
 export const defaultRuntimePlugin: PluginDefinition = createRuntimePlugin();
 
+/** @experimental */
 export function createCompositionPlugin(existing: readonly PluginDefinition[]): PluginDefinition {
   const factory = <T>(service: import("../plugin/index.js").ServiceToken<T>, create: () => T) => ({
     service,
@@ -68,6 +71,7 @@ export function createCompositionPlugin(existing: readonly PluginDefinition[]): 
   };
 }
 
+/** @experimental */
 export const applicationInfrastructurePlugin: PluginDefinition = Object.freeze({
   id: "may.application",
   version: "1.0.0",
@@ -88,18 +92,22 @@ export const applicationInfrastructurePlugin: PluginDefinition = Object.freeze({
   setup() {},
 });
 
+/** @experimental */
 export interface PluginUpdateOptions {
   readonly cancelActive?: boolean;
 }
 
+/** @experimental */
 export interface ApplicationPluginState {
   readonly version: 1;
   readonly application: PluginStateSnapshot;
   readonly session: PluginStateSnapshot;
 }
 
+/** @experimental */
 export const PLUGIN_STATE_KEY = "may.plugins";
 
+/** @experimental */
 export function readApplicationPluginState(value: unknown): ApplicationPluginState {
   if (value === undefined) return { version: 1, application: {}, session: {} };
   if (typeof value !== "object" || value === null || Array.isArray(value)) {

@@ -1,16 +1,19 @@
 import { CoordinationRuntime, type CreateCoordinationOptions, type CoordinationRuntimeOptions } from "./index.js";
 import { definePlugin, defineService, type PluginDefinition } from "@sortedyuan/may/plugin";
 
+/** @experimental */
 export interface CoordinationService {
   create(options: CreateCoordinationOptions): Promise<CoordinationRuntime>;
   resume(options: CoordinationRuntimeOptions): Promise<CoordinationRuntime>;
   release(runtime: CoordinationRuntime): Promise<void>;
 }
+/** @experimental */
 export const coordinationService = defineService<CoordinationService>({
   id: "may.coordination",
   version: "1.0.0",
   scope: "host",
 });
+/** @experimental */
 export function createCoordinationPlugin(options: { readonly id?: string } = {}): PluginDefinition {
   return definePlugin({
     id: options.id ?? "@may/plugin-coordination",

@@ -9,12 +9,14 @@ import {
   type PluginFactoryMetadata,
 } from "./index.js";
 
+/** @experimental */
 export interface ModelPluginOptions<C = unknown> extends PluginFactoryMetadata<C> {
   readonly id?: string;
   readonly create: (context: PluginContext<C>) => Model | Promise<Model>;
   readonly info?: ModelInfo;
   readonly dispose?: (model: Model) => void | Promise<void>;
 }
+/** @experimental */
 export function createModelPlugin<C = unknown>(options: ModelPluginOptions<C>): PluginDefinition<C> {
   const info = options.info === undefined ? undefined : snapshotModelInfo(options.info);
   return definePlugin({
@@ -44,11 +46,13 @@ function snapshotModelInfo(info: ModelInfo): ModelInfo {
   return Object.freeze({ ...info });
 }
 
+/** @experimental */
 export interface ModelWrapperPluginOptions<C = unknown>
   extends Omit<ContributionOptions, "pluginOrder">, PluginFactoryMetadata<C> {
   readonly create: (context: PluginContext<C>) => ModelWrapper | Promise<ModelWrapper>;
   readonly dispose?: Disposer;
 }
+/** @experimental */
 export function createModelWrapperPlugin<C = unknown>(options: ModelWrapperPluginOptions<C>): PluginDefinition<C> {
   return definePlugin({
     ...factoryMetadata(options, [{ service: services.modelWrappers }]),

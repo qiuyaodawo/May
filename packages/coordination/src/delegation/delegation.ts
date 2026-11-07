@@ -2,7 +2,9 @@ import type { TaskStatus } from "../index.js";
 import type { AgentApplicationEvent, AgentRun } from "@sortedyuan/may";
 import type { RunResult, Usage } from "@sortedyuan/may/core";
 
-/** 各个 MaybeCode 界面看到的委派任务。 */
+/** 各个 MaybeCode 界面看到的委派任务。
+ * @experimental
+ */
 export interface MaybeCodeDelegationTask {
   readonly id: string;
   readonly parentTaskId?: string;
@@ -24,10 +26,13 @@ export interface MaybeCodeDelegationTask {
   readonly changedFiles?: readonly string[];
 }
 
+/** @experimental */
 export type MaybeCodeDelegationStatus =
   "running" | "completed" | "failed" | "cancelled" | "recovery-required" | "interrupted";
 
-/** 整次请求的状态：主 Run、全部子任务与请求用量。 */
+/** 整次请求的状态：主 Run、全部子任务与请求用量。
+ * @experimental
+ */
 export interface MaybeCodeDelegationState {
   readonly requestId: string;
   readonly status: MaybeCodeDelegationStatus;
@@ -46,7 +51,9 @@ export interface MaybeCodeDelegationState {
   };
 }
 
-/** 一次请求中的一个真实 Run，保留自己的身份与结果。 */
+/** 一次请求中的一个真实 Run，保留自己的身份与结果。
+ * @experimental
+ */
 export interface MaybeCodeRequestRun {
   readonly runId: string;
   readonly sessionId: string;
@@ -55,12 +62,15 @@ export interface MaybeCodeRequestRun {
   readonly result: RunResult;
 }
 
+/** @experimental */
 export interface MaybeCodeRun extends AgentRun {
   readonly requestId: string;
   runs(): Promise<readonly MaybeCodeRequestRun[]>;
 }
 
-/** 子 Agent Session 的工具记录，用于按任务查看。 */
+/** 子 Agent Session 的工具记录，用于按任务查看。
+ * @experimental
+ */
 export interface MaybeCodeDelegationToolRecord {
   readonly step: number;
   readonly name: string;
@@ -68,6 +78,7 @@ export interface MaybeCodeDelegationToolRecord {
   readonly summary: string;
 }
 
+/** @experimental */
 export interface MaybeCodeDelegationToolRecords {
   readonly taskId: string;
   readonly sessionId: string;
@@ -75,6 +86,7 @@ export interface MaybeCodeDelegationToolRecords {
   readonly truncated: boolean;
 }
 
+/** @experimental */
 export type MaybeCodeDelegationEvent =
   | { readonly type: "delegation.started"; readonly state: MaybeCodeDelegationState }
   | { readonly type: "delegation.updated"; readonly state: MaybeCodeDelegationState }
@@ -88,7 +100,9 @@ export type MaybeCodeDelegationEvent =
       readonly event: AgentApplicationEvent;
     };
 
-/** 一次用户请求及其真实 Run 与子任务，跨进程重启保留。 */
+/** 一次用户请求及其真实 Run 与子任务，跨进程重启保留。
+ * @experimental
+ */
 export interface MaybeCodeDelegationRequest {
   readonly requestId: string;
   readonly status: MaybeCodeDelegationStatus;

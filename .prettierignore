@@ -1,6 +1,7 @@
 dist/
 coverage/
 pnpm-lock.yaml
+api/
 .changeset/*.md
 .zcode/
 review/

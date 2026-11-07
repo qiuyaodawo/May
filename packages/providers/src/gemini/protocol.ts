@@ -1,7 +1,9 @@
 import type { JsonSchema } from "@sortedyuan/may/core";
 
+/** @experimental */
 export const GEMINI_MODEL_STATE_TYPE = "google-gemini.content.v1";
 
+/** @experimental */
 export interface GeminiPart {
   text?: string;
   thought?: boolean;
@@ -12,16 +14,19 @@ export interface GeminiPart {
   fileData?: { mimeType?: string; fileUri: string };
 }
 
+/** @experimental */
 export interface GeminiContent {
   role: "user" | "model";
   parts: GeminiPart[];
 }
 
+/** @experimental */
 export interface GeminiModelStateData {
   parts: GeminiPart[];
   toolCallIds: string[];
 }
 
+/** @experimental */
 export interface GeminiUsageMetadata {
   promptTokenCount?: number;
   candidatesTokenCount?: number;
@@ -31,6 +36,7 @@ export interface GeminiUsageMetadata {
   toolUsePromptTokenCount?: number;
 }
 
+/** @experimental */
 export interface GeminiGenerateContentRequest {
   contents: GeminiContent[];
   systemInstruction?: { parts: GeminiPart[] };

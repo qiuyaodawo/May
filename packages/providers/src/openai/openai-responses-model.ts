@@ -25,6 +25,7 @@ import {
 } from "./protocol.js";
 import { parseUsage, streamOpenAIResponse } from "./stream.js";
 
+/** @experimental */
 export interface OpenAIResponsesModelOptions {
   readonly apiKey: string;
   readonly model: string;
@@ -37,6 +38,7 @@ export interface OpenAIResponsesModelOptions {
   readonly fetch?: typeof globalThis.fetch;
 }
 
+/** @experimental */
 export class OpenAIResponsesModel implements Model {
   readonly supportsRequestRecording = true;
   readonly contextCompactor: ModelContextCompactor;

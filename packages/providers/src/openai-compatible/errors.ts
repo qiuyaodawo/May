@@ -1,4 +1,7 @@
-/** Errors from any OpenAI-compatible chat endpoint. `provider` names the dialect, `code` keeps its prefix. */
+/**
+ * Errors from any OpenAI-compatible chat endpoint. `provider` names the dialect, `code` keeps its prefix.
+ * @experimental
+ */
 export class OpenAICompatibleError extends Error {
   readonly code: string;
   readonly provider: string;
@@ -11,6 +14,7 @@ export class OpenAICompatibleError extends Error {
   }
 }
 
+/** @experimental */
 export class OpenAICompatibleApiError extends OpenAICompatibleError {
   readonly status: number;
   readonly providerType: string | undefined;
@@ -36,12 +40,14 @@ export class OpenAICompatibleApiError extends OpenAICompatibleError {
   }
 }
 
+/** @experimental */
 export class OpenAICompatibleProtocolError extends OpenAICompatibleError {
   constructor(provider: string, codePrefix: string, message: string, options?: ErrorOptions) {
     super(provider, `${codePrefix}_PROTOCOL_ERROR`, message, options);
   }
 }
 
+/** @experimental */
 export class OpenAICompatibleFinishReasonError extends OpenAICompatibleError {
   readonly finishReason: string;
 

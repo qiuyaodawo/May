@@ -1,8 +1,12 @@
 import { OpenAICompatibleChatModel } from "./chat-model.js";
 
-/** Provider/model metadata determines concrete supported values. */
+/**
+ * Provider/model metadata determines concrete supported values.
+ * @experimental
+ */
 export type OpenAIChatCompletionsReasoningEffort = string;
 
+/** @experimental */
 export interface OpenAIChatCompletionsModelOptions {
   apiKey: string;
   model: string;
@@ -13,6 +17,7 @@ export interface OpenAIChatCompletionsModelOptions {
   fetch?: typeof globalThis.fetch;
 }
 
+/** @experimental */
 export class OpenAIChatCompletionsModel extends OpenAICompatibleChatModel {
   constructor(options: OpenAIChatCompletionsModelOptions) {
     const { store, ...shared } = options;

@@ -1,4 +1,7 @@
-/** Serve only on a dedicated origin with no cookies, credentials or other application routes. */
+/**
+ * Serve only on a dedicated origin with no cookies, credentials or other application routes.
+ * @experimental
+ */
 export function mcpAppSandboxResponse(hostOrigin: string): {
   readonly body: string;
   readonly headers: Readonly<Record<string, string>>;

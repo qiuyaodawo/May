@@ -1,11 +1,13 @@
 import { omitUndefined } from "../core/omit-undefined.js";
 import type { PluginDefinition, ServiceDependency } from "../plugin/index.js";
 
+/** @experimental */
 export type PluginFactoryMetadata<C = unknown> = Pick<
   PluginDefinition<C>,
   "config" | "configSchema" | "requires" | "optional" | "requiresHooks" | "state"
 > & { readonly version?: string };
 
+/** @experimental */
 export function factoryMetadata<C>(
   options: PluginFactoryMetadata<C>,
   defaults: readonly ServiceDependency[] = [],

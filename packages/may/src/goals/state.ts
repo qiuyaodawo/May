@@ -1,8 +1,11 @@
 import type { GoalBudget, GoalState, GoalStatus } from "./types.js";
 
-/** Session state key that stores the current goal. */
+/** Session state key that stores the current goal.
+ * @experimental
+ */
 export const GOAL_STATE_KEY = "may.goal";
 
+/** @experimental */
 export function goalBudget(value: GoalBudget = {}): GoalState["budget"] {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new TypeError("goal budget must be an object");
   for (const [key, limit] of Object.entries(value)) {
@@ -17,12 +20,14 @@ export function goalBudget(value: GoalBudget = {}): GoalState["budget"] {
   return budget;
 }
 
+/** @experimental */
 export function goalText(value: unknown, field: string): string {
   if (typeof value !== "string" || !value.trim() || value.length > 32_768)
     throw new TypeError(`${field} must contain 1..32768 characters`);
   return value.trim();
 }
 
+/** @experimental */
 export function restoreGoal(value: unknown, sessionId: string): GoalState | undefined {
   if (value === undefined) return undefined;
   if (!value || typeof value !== "object") throw new TypeError("Invalid goal state");

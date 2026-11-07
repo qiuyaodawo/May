@@ -1,6 +1,7 @@
 import type { CoordinationJournal, CoordinationSnapshot, CoordinationStore } from "./types.js";
 import { copy, name, validateSnapshot } from "./validation.js";
 
+/** @experimental */
 export class InMemoryCoordinationStore implements CoordinationStore {
   private readonly snapshots = new Map<string, CoordinationSnapshot>();
   private readonly writers = new Set<string>();

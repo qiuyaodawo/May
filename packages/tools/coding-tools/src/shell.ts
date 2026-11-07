@@ -3,15 +3,21 @@ import { existsSync } from "node:fs";
 import { delimiter, join } from "node:path";
 import { omitUndefined, type Tool, type ToolProgressUpdate } from "@sortedyuan/may/core";
 import { CodingToolError } from "./errors.js";
+import type { CodingExecutionEnvironment } from "./execution.js";
 import { optionalPositiveInteger, requireObject, requirePositiveIntegerOption, requireString } from "./input.js";
 import { resolveExistingWorkspacePath } from "./workspace-path.js";
 
+/** @experimental */
 export const DEFAULT_SHELL_TIMEOUT_MS = 120_000;
+/** @experimental */
 export const DEFAULT_SHELL_MAX_TIMEOUT_MS = 600_000;
+/** @experimental */
 export const DEFAULT_SHELL_MAX_OUTPUT_BYTES = 1024 * 1024;
 
+/** @experimental */
 export type ShellKind = "powershell" | "bash" | "custom";
 
+/** @experimental */
 export interface ShellProfile {
   readonly kind: ShellKind;
   readonly displayName: string;
@@ -19,14 +25,17 @@ export interface ShellProfile {
   readonly args: (command: string) => readonly string[];
 }
 
+/** @experimental */
 export interface ShellToolInfo {
   readonly kind: ShellKind;
   readonly displayName: string;
   readonly executable: string;
 }
 
+/** @experimental */
 export interface ShellToolOptions {
   readonly cwd: string;
+  readonly execution?: CodingExecutionEnvironment;
   readonly defaultTimeoutMs?: number;
   readonly maxTimeoutMs?: number;
   readonly maxOutputBytes?: number;
@@ -37,11 +46,13 @@ export interface ShellToolOptions {
   readonly envDenylist?: readonly string[];
 }
 
+/** @experimental */
 export interface ShellToolInput {
   readonly command: string;
   readonly timeoutMs?: number;
 }
 
+/** @experimental */
 export interface ShellToolOutput {
   readonly stdout: string;
   readonly stderr: string;
@@ -53,10 +64,12 @@ export interface ShellToolOutput {
 
 const shellToolInfo = Symbol("may.coding-tools.shell-info");
 
+/** @experimental */
 export function createDefaultShellProfile(platform: NodeJS.Platform = process.platform): ShellProfile {
   return platform === "win32" ? createPowerShellProfile() : createBashShellProfile();
 }
 
+/** @experimental */
 export function createPowerShellProfile(
   options: { readonly executable?: string; readonly displayName?: string } = {},
 ): ShellProfile {
@@ -79,6 +92,7 @@ export function createPowerShellProfile(
   };
 }
 
+/** @experimental */
 export function createBashShellProfile(
   options: { readonly executable?: string; readonly displayName?: string } = {},
 ): ShellProfile {
@@ -90,6 +104,7 @@ export function createBashShellProfile(
   };
 }
 
+/** @experimental */
 export function createShellTool(options: ShellToolOptions): Tool<ShellToolInput, ShellToolOutput> {
   const defaultTimeoutMs = requirePositiveIntegerOption(
     options.defaultTimeoutMs,
@@ -105,7 +120,10 @@ export function createShellTool(options: ShellToolOptions): Tool<ShellToolInput,
   if (defaultTimeoutMs > maxTimeoutMs) {
     throw new RangeError("defaultTimeoutMs must not exceed maxTimeoutMs");
   }
-  const profile = validateShellProfile(options.profile ?? createDefaultShellProfile());
+  const profile = validateShellProfile(
+    options.profile ??
+      (options.execution?.isolation.mode === "container" ? createBashShellProfile() : createDefaultShellProfile()),
+  );
   const info: ShellToolInfo = {
     kind: profile.kind,
     displayName: profile.displayName,
@@ -114,7 +132,7 @@ export function createShellTool(options: ShellToolOptions): Tool<ShellToolInput,
 
   const tool: Tool<ShellToolInput, ShellToolOutput> = {
     name: "shell",
-    description: "Execute a shell command in the workspace with host process permissions.",
+    description: "Execute a shell command in the workspace using the configured execution environment.",
     inputSchema: {
       type: "object",
       properties: {
@@ -162,11 +180,13 @@ export function createShellTool(options: ShellToolOptions): Tool<ShellToolInput,
   return tool;
 }
 
+/** @experimental */
 export function getShellToolInfo(tool: Tool): ShellToolInfo | undefined {
   const info = (tool as Tool & { readonly [shellToolInfo]?: ShellToolInfo })[shellToolInfo];
   return info === undefined ? undefined : { ...info };
 }
 
+/** @experimental */
 export function shellRuntimeInstructions(info: ShellToolInfo): string {
   if (info.kind === "powershell") {
     return (
@@ -190,14 +210,30 @@ function executeCommand(
   report: (update: ToolProgressUpdate) => void,
 ): Promise<ShellToolOutput> {
   return new Promise((resolve, reject) => {
-    const child = spawn(profile.executable, [...profile.args(command)], {
-      cwd,
-      shell: false,
-      env: shellEnvironment(options),
-      detached: process.platform !== "win32",
-      windowsHide: true,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    const executionAbort = new AbortController();
+    const child =
+      options.execution === undefined
+        ? spawn(profile.executable, [...profile.args(command)], {
+            cwd,
+            shell: false,
+            env: shellEnvironment(options),
+            detached: process.platform !== "win32",
+            windowsHide: true,
+            stdio: ["ignore", "pipe", "pipe"],
+          })
+        : options.execution.spawn(profile.executable, profile.args(command), {
+            cwd,
+            signal: executionAbort.signal,
+            env: shellEnvironment(options) as Record<string, string>,
+          });
+    const childStdout = child.stdout;
+    const childStderr = child.stderr;
+    if (childStdout === null || childStderr === null) {
+      reject(
+        new CodingToolError("CODING_TOOL_COMMAND_FAILED", "Execution environment must provide stdout and stderr pipes"),
+      );
+      return;
+    }
     const stdout = createOutputCollector(maxOutputBytes);
     const stderr = createOutputCollector(maxOutputBytes);
     let settled = false;
@@ -205,11 +241,15 @@ function executeCommand(
     let cancelled = false;
     let drainTimer: ReturnType<typeof setTimeout> | undefined;
     const stop = () => {
+      if (options.execution !== undefined) {
+        executionAbort.abort();
+        return;
+      }
       terminateProcessTree(child);
       drainTimer ??= setTimeout(() => {
         child.kill("SIGKILL");
-        child.stdout.destroy();
-        child.stderr.destroy();
+        childStdout.destroy();
+        childStderr.destroy();
         child.unref();
         fail(
           new CodingToolError(
@@ -220,13 +260,13 @@ function executeCommand(
       }, 1000);
     };
 
-    child.stdout.setEncoding("utf8");
-    child.stderr.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => {
+    childStdout.setEncoding("utf8");
+    childStderr.setEncoding("utf8");
+    childStdout.on("data", (chunk: string) => {
       stdout.append(chunk);
       report({ type: "output.delta", channel: "stdout", delta: chunk });
     });
-    child.stderr.on("data", (chunk: string) => {
+    childStderr.on("data", (chunk: string) => {
       stderr.append(chunk);
       report({ type: "output.delta", channel: "stderr", delta: chunk });
     });
@@ -378,7 +418,7 @@ function shellEnvironment(options: ShellToolOptions): NodeJS.ProcessEnv {
   const allowed = options.envAllowlist?.map(normalize);
   const denied = (options.envDenylist ?? []).map(normalize);
   const result: NodeJS.ProcessEnv = {};
-  if (options.inheritEnv !== false)
+  if (options.inheritEnv !== false && options.execution?.isolation.mode !== "container")
     for (const [key, value] of Object.entries(process.env)) {
       if (allowed !== undefined && !allowed.includes(normalize(key))) continue;
       if (denied.includes(normalize(key)) || /(?:TOKEN|SECRET|PASSWORD|CREDENTIAL|API_KEY|APIKEY)/iu.test(key))

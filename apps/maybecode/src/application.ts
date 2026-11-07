@@ -11,6 +11,10 @@ import {
   decodeToolChangePreviewPresentation,
   TOOL_CHANGE_PREVIEW_PRESENTATION_KIND,
   TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION,
+  openCodingExecutionEnvironment,
+  type CodingExecutionEnvironment,
+  type CodingExecutionIsolation,
+  type FetchToolOptions,
 } from "@sortedyuan/coding-tools";
 import {
   type ContextBudget,
@@ -116,6 +120,8 @@ export interface MaybeCodeSubagentOptions {
 }
 
 export interface MaybeCodeApplicationOptions {
+  readonly execution?: CodingExecutionIsolation;
+  readonly fetch?: FetchToolOptions;
   readonly requestRecording?: "off" | "required";
   readonly providerBodyRecording?: boolean;
   readonly gitWorkspace?: ProjectGitWorkspace;
@@ -194,24 +200,46 @@ export class MaybeCodeApplication {
   private inputEpoch = 0;
   private steeringCancellation: Promise<void> = Promise.resolve();
   private removeGoalListener: (() => void) | undefined;
+  private readonly backgroundTasks = new Set<Promise<void>>();
+  private readonly backgroundErrors: unknown[] = [];
 
   private constructor(
     workspace: string,
     application: AgentApplication,
     instructions: MaybeCodeInstructionState,
     private readonly createModelPlugins: (update: MaybeCodeModelUpdate) => MaybeCodePluginComposition,
+    readonly execution: CodingExecutionEnvironment,
   ) {
     this.workspace = workspace;
     this.agent = application;
     this.sessionId = application.sessionId;
     this.instructionState = instructions;
     this.serviceReferences = this.readServices();
-    this.events = this.eventQueue;
+    this.events = this.readEvents();
     this.eventRelay = this.relayEvents(application.events);
+    this.trackBackground(this.eventRelay);
     this.connectServiceEvents();
   }
 
   static async open(options: MaybeCodeApplicationOptions): Promise<MaybeCodeApplication> {
+    const execution = await openCodingExecutionEnvironment({
+      workspace: options.workspace,
+      isolation: options.execution ?? { mode: "host" },
+    });
+    let opened = false;
+    try {
+      const product = await MaybeCodeApplication.openWithExecution(options, execution);
+      opened = true;
+      return product;
+    } finally {
+      if (!opened) await execution.close();
+    }
+  }
+
+  private static async openWithExecution(
+    options: MaybeCodeApplicationOptions,
+    execution: CodingExecutionEnvironment,
+  ): Promise<MaybeCodeApplication> {
     const workspace = resolve(options.workspace);
     const configuredTools = ToolRegistry.compose(options.tools ?? [], options.additionalTools ?? []);
     const created =
@@ -259,6 +287,7 @@ export class MaybeCodeApplication {
         },
         {
           workspace,
+          execution,
           gitRequest,
           instructions: instructions.system.content,
           instructionsSource: () => instructionState.current.system.content,
@@ -317,26 +346,32 @@ export class MaybeCodeApplication {
       contextMetadata: { workspace },
       ...omitUndefined({ sessionId: options.sessionId, resume: options.resume, fork: options.fork }),
     });
-    product = new MaybeCodeApplication(workspace, application, instructionState, (update) => {
-      if (
-        options.plugins?.some((plugin) =>
-          plugin.provides?.some(
-            (service) =>
-              service.id === applicationServices.model.id && service.scope === applicationServices.model.scope,
-          ),
-        )
-      ) {
-        throw new Error("The configured Model plugin owns model selection");
-      }
-      const {
-        model: _model,
-        modelInfo: _modelInfo,
-        modelRuntimeOptions: _modelRuntimeOptions,
-        contextBudget: _contextBudget,
-        ...base
-      } = options;
-      return createPlugins({ ...base, ...update });
-    });
+    product = new MaybeCodeApplication(
+      workspace,
+      application,
+      instructionState,
+      (update) => {
+        if (
+          options.plugins?.some((plugin) =>
+            plugin.provides?.some(
+              (service) =>
+                service.id === applicationServices.model.id && service.scope === applicationServices.model.scope,
+            ),
+          )
+        ) {
+          throw new Error("The configured Model plugin owns model selection");
+        }
+        const {
+          model: _model,
+          modelInfo: _modelInfo,
+          modelRuntimeOptions: _modelRuntimeOptions,
+          contextBudget: _contextBudget,
+          ...base
+        } = options;
+        return createPlugins({ ...base, ...update });
+      },
+      execution,
+    );
     product.gitRequest = gitRequest;
     product.permissionScopeId =
       options.permissionRuleStore === undefined
@@ -384,9 +419,10 @@ export class MaybeCodeApplication {
     const { goals, subagents } = this.serviceReferences;
     this.removeGoalListener = goals?.subscribe((event) => {
       this.eventQueue.push(event);
-      if (!this.updatingModel && !goals.isRunning) void this.resumeSteering();
+      if (!this.updatingModel && !goals.isRunning) this.trackBackground(this.resumeSteering());
     });
     this.subagentRelay = subagents === undefined ? undefined : this.relaySubagentEvents(subagents.events);
+    if (this.subagentRelay) this.trackBackground(this.subagentRelay);
   }
 
   private async recordModel(runtimeOptions?: Readonly<Record<string, unknown>>): Promise<void> {
@@ -556,9 +592,9 @@ export class MaybeCodeApplication {
     this.currentRun = run;
     const settled = () => {
       if (this.currentRun === run) this.currentRun = undefined;
-      void this.resumeSteering();
+      return this.resumeSteering();
     };
-    void run.result.then(settled, settled);
+    this.trackBackground(run.result.then(settled, settled));
     return run;
   }
 
@@ -793,11 +829,12 @@ export class MaybeCodeApplication {
   cancel(reason?: string): boolean {
     this.inputEpoch++;
     const request = this.subagents?.isRunning === true;
-    if (request) void this.subagents?.cancel(reason ?? "Cancelled by user");
+    if (request) this.trackBackground(this.subagents!.cancel(reason ?? "Cancelled by user"));
     const pending =
       this.inputOperations > 0 ||
       this.agent.listSteeringInputs().some((input) => input.status === "pending" || input.status === "idle");
     this.steeringCancellation = this.agent.cancelSteeringInputs(reason);
+    this.trackBackground(this.steeringCancellation);
     this.historyMemory.cancelRequest();
     if (this.goals?.interrupt(reason)) return true;
     return this.agent.cancel(reason) || pending || request;
@@ -896,17 +933,51 @@ export class MaybeCodeApplication {
 
   private async closeOnce(): Promise<void> {
     this.closed = true;
+    this.removeGoalListener?.();
     try {
       if (this.modelUpdate) await Promise.allSettled([this.modelUpdate]);
-      await this.steeringCancellation;
-      await this.agent.close();
-      await this.inputTail;
-      await this.eventRelay;
-      await this.subagentRelay;
+      const results = await Promise.allSettled([
+        this.steeringCancellation,
+        this.agent.close(),
+        this.inputTail,
+        this.eventRelay,
+        ...(this.subagentRelay ? [this.subagentRelay] : []),
+      ]);
+      while (this.backgroundTasks.size) await Promise.all(this.backgroundTasks);
+      const failures = [
+        ...new Set([
+          ...this.backgroundErrors,
+          ...results.flatMap((result) => (result.status === "rejected" ? [result.reason] : [])),
+        ]),
+      ];
+      if (failures.length) throw new AggregateError(failures, "MaybeCode background operations failed");
     } finally {
-      this.removeGoalListener?.();
-      this.eventQueue.close();
+      try {
+        await this.execution.close();
+      } finally {
+        this.eventQueue.close();
+      }
     }
+  }
+
+  private trackBackground(operation: Promise<unknown>): void {
+    const task = operation.then(
+      () => {
+        this.backgroundTasks.delete(task);
+      },
+      (error) => {
+        this.backgroundTasks.delete(task);
+        this.backgroundErrors.push(error);
+        this.eventQueue.close();
+      },
+    );
+    this.backgroundTasks.add(task);
+  }
+
+  private async *readEvents(): AsyncIterable<MaybeCodeSessionEvent> {
+    for await (const event of this.eventQueue) yield event;
+    if (this.backgroundErrors.length)
+      throw new AggregateError(this.backgroundErrors, "MaybeCode background operations failed");
   }
 
   private async relaySubagentEvents(

@@ -1,7 +1,10 @@
 import { readFile } from "node:fs/promises";
 import type { UiAssets } from "@sortedyuan/ui-client/server";
 
-/** Native ES modules, no CDN, runtime transpilation, inline scripts or application imports. */
+/**
+ * Native ES modules, no CDN, runtime transpilation, inline scripts or application imports.
+ * @experimental
+ */
 export async function webUiAssets(
   title: string,
   kind: "session" | "task",
@@ -35,6 +38,7 @@ export async function webUiAssets(
     "commands",
     "navigation",
     "workspace",
+    "tasks",
   ])
     assets.set(`/webui/${name}.js`, {
       type: "text/javascript; charset=utf-8",

@@ -94,6 +94,8 @@ server with `required: false` instead records a failed status and lets the
 remaining servers start. `close()` is idempotent, visits every connection even
 if one close fails, and owns termination of the child processes spawned by the
 stdio transport.
+Await it to finish subscription and transport cleanup. Cleanup failures are
+reported to the caller after the connection's background work finishes.
 
 | Configuration       | Meaning and default                                                            |
 | ------------------- | ------------------------------------------------------------------------------ |

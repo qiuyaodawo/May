@@ -4,6 +4,7 @@ import { omitUndefined, type ModelLimits } from "@sortedyuan/may/core";
 import { ProviderConfigurationError } from "./errors.js";
 import type { ProviderModelSelection, ModelProfileSelector } from "./types.js";
 
+/** @experimental */
 export function selectProviderModel(
   config: MayConfig,
   selector: ModelProfileSelector = {},

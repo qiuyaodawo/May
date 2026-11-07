@@ -1,5 +1,112 @@
 # MaybeCode
 
+[简体中文](README.zh-CN.md)
+
+MaybeCode is a coding agent for reading projects, searching files and text,
+editing code, running commands, and consulting web documentation. It provides
+a retained terminal interface, a Web UI, resumable sessions, and delegated teams.
+
+## Requirements
+
+Use Node.js **22.16 or newer**. Container execution additionally requires
+Docker Desktop or a compatible Docker runtime with a running daemon.
+
+## Installation
+
+Install the published package globally with npm or pnpm:
+
+```sh
+npm install --global @sortedyuan/maybecode
+pnpm add --global @sortedyuan/maybecode
+```
+
+## Configure a model
+
+Save this minimal configuration as `may.config.json` in your project. Set
+`DEEPSEEK_API_KEY` in your environment to your provider API key.
+
+```json
+{
+  "providers": {
+    "deepseek": { "adapter": "deepseek-chat", "apiKeyEnv": "DEEPSEEK_API_KEY" }
+  },
+  "models": {
+    "deepseek": { "provider": "deepseek", "model": "deepseek-chat" }
+  },
+  "defaultModel": "deepseek"
+}
+```
+
+## Start
+
+```sh
+maybecode --config may.config.json .
+maybecode --help
+```
+
+`--ui` accepts `retained` (the default) and `web`. Run `/web` from the terminal
+to open a connected browser view. Web-only startup requires
+`MAYBECODE_CONTROL_TOKEN`; see [Web UI](#web-ui-developer-preview).
+
+## Resume a session
+
+```sh
+maybecode --config may.config.json --continue .
+maybecode --config may.config.json --resume <session-id> .
+```
+
+Ordinary startup creates a new session. `/resume` opens the session picker;
+saved sessions remain available across restarts.
+
+## Approval modes
+
+Normal mode approves `read`, `glob`, and `grep` automatically. Commands, edits,
+writes, and `fetch` web requests require approval. `fetch` has a separate network
+permission category, including persistent rules when enabled.
+`--yolo` enables automatic approval; `--no-yolo` selects normal mode. Explicit
+policy denials remain enforced. `/yolo on|off|status` controls the running host.
+
+## Execution isolation
+
+`apps.maybecode.execution` defaults to `{ "mode": "host" }`. Host commands run
+with your account's permissions. To execute commands in a container, pull an
+image before startup and configure the same image:
+
+```sh
+docker pull nixery.dev/shell/git/ripgrep/util-linux
+```
+
+```json
+{
+  "apps": {
+    "maybecode": {
+      "execution": {
+        "mode": "container",
+        "image": "nixery.dev/shell/git/ripgrep/util-linux",
+        "network": "none",
+        "memoryBytes": 1073741824,
+        "cpuCount": 2
+      }
+    }
+  }
+}
+```
+
+The image must contain `bash`, `git`, `rg`, and `setsid`. Container execution
+uses a non-root user, a read-only root filesystem, temporary `/tmp` storage,
+disabled networking, and the configured memory and CPU limits. Only the workspace
+is mounted. File tools access the same workspace from the host. Shell, search,
+delegated tools, and authorized team checks use the configured execution environment.
+MCP servers continue to run on the host. Missing Docker service or images stop
+startup. Closing the application waits for its execution resources to terminate.
+
+The `fetch` tool accesses public HTTP/HTTPS origins by default. Configure
+`apps.maybecode.fetch.allowedOrigins` to restrict requests to specific origins;
+listed origins may explicitly permit local services. `maxBytes`, `timeoutMs`,
+and `maxRedirects` bound responses. Redirect destinations are checked individually.
+
+## Delegation notifications
+
 Automatic request and task status notices are disabled by default. Use
 `/delegations notifications on|off|status` to change or inspect the current
 process setting, including during a run. Set `apps.maybecode.delegationNotifications`
@@ -17,7 +124,7 @@ recreated; MaybeCode refreshes its service references and event subscriptions.
 Conversation history, paused Goals, active Skills, durable notes and the current
 permission mode remain available. Shared MCP connections remain open.
 
-Headless hosts can call `MaybeCodeApplication.updateModel()` with a Model,
+Headless hosts can call `controller.application.updateModel()` with a Model,
 `modelInfo`, and optional `modelRuntimeOptions` and `contextBudget`. A configured
 Model plugin retains ownership of model selection. `modelUpdateFailed` reports an
 unsuccessful update; new input remains unavailable until an update succeeds.
@@ -82,11 +189,11 @@ apply to the current workspace host and all its sessions and connected views;
 they do not update configuration. Restarting uses the current startup settings.
 
 The terminal status bar and Web UI header show `YOLO · Auto-approve` while enabled.
-Classic terminal mode shows it in the input prompt. Notifications use `YOLO enabled`
+Notifications use `YOLO enabled`
 and `YOLO disabled`. Explicit policy denials remain enforced. Tool validation,
 cancellation, execution records, and MCP requests for user-provided input remain
-active. Shell commands run with the host account's OS permissions; YOLO provides
-no filesystem or network isolation. Team commands retain their own authorization.
+active. Shell commands use the configured execution environment. YOLO changes
+approval behavior. Team commands retain their own authorization.
 
 ### Persistent permission rules
 
@@ -119,7 +226,7 @@ process exit. See [Permission policies](../../docs/en/guides/permission-policy.m
 and [权限策略](../../docs/zh-CN/guides/permission-policy.md).
 
 Image replies retain text/image ordering. Terminal saves embedded images and
-supports Kitty/iTerm2/Sixel graphics in both terminal frontends; `/web` provides
+supports Kitty/iTerm2/Sixel graphics in the terminal frontend; `/web` provides
 image viewing and downloads. Windows Terminal is detected through `WT_SESSION`
 and queried for Sixel support and cell dimensions. `MAY_IMAGE_PROTOCOL=sixel`
 explicitly selects Sixel for a compatible terminal.
@@ -128,7 +235,7 @@ See [Image replies](../../docs/en/guides/images.md) /
 
 `/goal start [--max-runs N] [--tokens N] [--duration-ms N] -- <objective>` starts a
 durable goal. Use `/goal status`, `/goal pause`, `/goal resume` and `/goal cancel`
-in either terminal frontend or the Web UI. New user input pauses active goals.
+in the terminal frontend or the Web UI. New user input pauses active goals.
 Run count and active execution time have no default limits; the corresponding
 flags apply only when specified. Saved goals retain their recorded budgets.
 See [Goals](../../docs/en/guides/goals.md) and
@@ -136,7 +243,7 @@ See [Goals](../../docs/en/guides/goals.md) and
 
 MaybeCode is a coding-agent application assembled from May's Core, application,
 session, permission, provider, configuration, coding-tool and UI packages.
-It offers terminal frontends and a developer-preview Web UI.
+It offers a terminal frontend and a developer-preview Web UI.
 
 In the retained TUI, the mouse wheel scrolls the conversation by three rows per
 event while preserving editor focus and draft text. Scrolling up keeps the
@@ -155,7 +262,7 @@ sessions and for replies longer than the normal scroll buffer.
 
 ## Web UI (developer preview)
 
-Type `/web` in either terminal frontend to open the current workspace and Session
+Type `/web` in the terminal frontend to open the current workspace and Session
 in the default browser. The terminal shares live output, approvals, model selection
 and Session changes with the Web UI. Repeating `/web` opens the same service with
 a fresh one-time connection link. No token environment variable is needed. After
@@ -204,8 +311,8 @@ or [简体中文指南](../../docs/zh-CN/guides/web-ui.md) for commands and curr
 
 `src/plugins/application.ts` defines application features and service selection;
 `src/plugins/resources.ts` defines workspace resource ownership and the shared
-MCP and tracing providers supplied to each Session. `MaybeCodeApplication.open`
-and `openConfiguredMaybeCode` use these factories directly.
+MCP and tracing providers supplied to each Session. `openConfiguredMaybeCode`
+uses these factories directly.
 
 MaybeCode selects Model, Context, Permission, Skills, Goals, History Memory,
 Delegation, and Workspace Files plugins for each application. Optional MCP and
@@ -215,7 +322,7 @@ connections. Each worktree owns its configured MCP connections and stdio working
 directories; returning to a workspace reuses them. All workspaces share the tracing
 processor. Closing the host releases every workspace connection and the processor.
 
-`MaybeCodeApplication.open({ plugins, ... })` accepts custom plugins. A selected
+`openConfiguredMaybeCode({ plugins, ... })` accepts custom plugins. A selected
 plugin replaces a default with the same id or provided service token; the host
 validates the complete dependency graph. `goals: false`, `subagents: false`, and
 `skills: false` retain their independent disable controls. Configured MCP and
@@ -245,8 +352,8 @@ continue to re-export history-memory and delegation interfaces.
 MaybeCode is a product composition layer. Generic lifecycle does not live in
 the app:
 
-- `@sortedyuan/core`'s instance-scoped `ToolRegistry` composes the coding tools;
-- `@sortedyuan/application`'s `defineAgent()` captures reusable behavior, while its
+- `@sortedyuan/may/core`'s instance-scoped `ToolRegistry` composes the coding tools;
+- `@sortedyuan/may`'s `defineAgent()` captures reusable behavior, while its
   application/workspace layer owns run/retry/cancel, approval relaying,
   Session history, Context compaction persistence, closing, session switching,
   and Catalog summaries;
@@ -279,9 +386,9 @@ also requires passing acceptance. `team verify <id>` explicitly runs checks;
 status and recovery never replay them.
 
 `--mode coding` allows explicitly listed editing tools in private task copies.
-`--allow-checks` separately authorizes exact configured test processes, not a
-general model-controlled Shell. These processes are **not OS-sandboxed**, even
-for a read-only team. MCP and model-controlled source application stay disabled.
+`--allow-checks` separately authorizes exact configured test processes. Checks
+inherit `apps.maybecode.execution`, including container restrictions when selected.
+MCP and model-controlled source application stay disabled.
 `team diff <id> --tasks <task-ids>` exports a reviewable patch; only
 `team apply <id> --patch <patch-id> --confirm <digest>` can apply it after human
 review. Another task's passing checks never verify an unchecked patch task.
@@ -311,19 +418,25 @@ or remote UI sends user actions through its methods and renders its
 ```ts
 import { openConfiguredMaybeCode, type MaybeCodeController } from "@sortedyuan/maybecode";
 
-const controller: MaybeCodeController = await openConfiguredMaybeCode();
+const controller: MaybeCodeController = await openConfiguredMaybeCode({
+  configPath: "may.config.json",
+});
 
 const observation = (async () => {
   for await (const event of controller.events) {
-    render(event);
+    console.log(event);
   }
 })();
 
-await (
-  await controller.submit({ input: "Inspect this workspace." })
-).result;
-await controller.close();
-await observation;
+try {
+  console.log(controller.application.modelInfo);
+  await (
+    await controller.submit({ input: "Inspect this workspace." })
+  ).result;
+} finally {
+  await controller.close();
+  await observation;
+}
 ```
 
 The controller covers submission, steering, cancellation, approvals, sessions,
@@ -672,7 +785,7 @@ or its [Chinese version](../../docs/zh-CN/guides/maybecode-instructions.md).
 
 Programmatic callers can pass a `ContextFactory` to
 `openConfiguredMaybeCode`. When omitted, MaybeCode uses
-`InMemoryContextFactory` from `@sortedyuan/context`. Factories return the Core context
+`InMemoryContextFactory` from `@sortedyuan/may/context`. Factories return the Core context
 and may also return a `ContextController` for application-level inspection.
 
 ## Commands
@@ -870,8 +983,8 @@ so notes can be prepared for manual `/compact history-reference`. Only automatic
 history-reference mode exposes `new_context` and adds proactive guidance/warnings.
 Explicit custom strategy arrays keep their existing caller-defined behavior.
 
-The `read` tool runs without approval. `shell`, `edit`, and `write` require an
-allow-once, allow-for-session, or deny decision. The shell tool is not a sandbox.
+The `read`, `glob`, and `grep` tools run without approval. `shell`, `edit`, `write`,
+and `fetch` require an allow-once, allow-for-session, or deny decision.
 The read-only `session_history` tool also runs without approval and returns
 bounded pages of durable events from only the active session.
 Allow-for-session grants currently last for the running MaybeCode process and
@@ -922,7 +1035,7 @@ and `complete` preview data; `attach` and `use-prompt` explicitly submit user-le
 content; `watch`/`unwatch` manage notification-only subscriptions. See the bilingual
 [MCP guide](../../docs/en/guides/mcp.md).
 
-Both interactive terminal UIs support modern MCP form/URL elicitation, with
+The terminal UI supports modern MCP form/URL elicitation, with
 explicit review/send, decline/cancel, and manual URL navigation/resume. Answers
 are not command history. Library hosts must opt in with `mcpInteractions: true`
 and consume the controller interaction events; no UI means no advertised
@@ -938,7 +1051,7 @@ Session-bound controls; `task-attach` alone submits a completed result to a new 
 Stopping local waiting is not remote cancellation. No automatic replay after
 restart. See the bilingual [Tasks guide](../../docs/en/guides/mcp-tasks.md).
 
-`/mcp apps` explicitly reports unsupported HTML in both terminal UIs. App-only
+`/mcp apps` explicitly reports unsupported HTML in the terminal UI. App-only
 tools are hidden even without a graphical Host; model-visible text fallback remains.
 Optional custom graphical integration: [Apps guide](../../docs/en/guides/mcp-apps.md).
 

@@ -19,6 +19,7 @@ import { parseRetryAfterMs } from "./http.js";
 import type { OpenAICompatibleMessage, OpenAICompatibleToolDefinition } from "./protocol.js";
 import { streamOpenAICompatibleResponse } from "./stream.js";
 
+/** @experimental */
 export interface OpenAICompatibleChatRequest {
   model: string;
   messages: OpenAICompatibleMessage[];
@@ -34,7 +35,10 @@ export interface OpenAICompatibleChatRequest {
   thinking?: Readonly<Record<string, unknown>>;
 }
 
-/** Differences between OpenAI-compatible chat endpoints. */
+/**
+ * Differences between OpenAI-compatible chat endpoints.
+ * @experimental
+ */
 export interface OpenAICompatibleDialect {
   /** Display name used in error messages. */
   readonly provider: string;
@@ -52,6 +56,7 @@ export interface OpenAICompatibleDialect {
   readonly extendRequest?: (body: OpenAICompatibleChatRequest, request: ModelRequest) => void;
 }
 
+/** @experimental */
 export interface OpenAICompatibleChatModelOptions {
   apiKey: string;
   model: string;
@@ -61,6 +66,7 @@ export interface OpenAICompatibleChatModelOptions {
   fetch?: typeof globalThis.fetch;
 }
 
+/** @experimental */
 export class OpenAICompatibleChatModel implements Model {
   readonly supportsRequestRecording = true;
   private readonly apiKey: string;

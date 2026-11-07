@@ -6,7 +6,9 @@ import { MayConfigWriteError } from "./errors.js";
 import { parseMayConfig } from "./parse.js";
 import type { MayConfig } from "./types.js";
 
-/** 创建完整的新配置；已有文件和符号链接保持原状。 */
+/** 创建完整的新配置；已有文件和符号链接保持原状。
+ * @experimental
+ */
 export async function createMayConfig(
   path: string,
   value: unknown,

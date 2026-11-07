@@ -242,6 +242,16 @@ MaybeCode 的真实 Provider 验证需要显式启用。运行 `pnpm build` 后�
 
 ## 安全边界
 
+MaybeCode 将 `glob`、`grep` 与 `read` 归为同一个读取类别。`fetch` 使用 `network`
+类别，默认模式需要审批。网络授权使用 URL origin，因此同一 origin 下的不同路径
+共用授权。启用 `apps.maybecode.persistentRules` 后，可以与文件授权一起保存网络授权。
+YOLO 按照现有策略自动批准请求，明确禁止的操作继续优先拒绝。批准后仍然执行
+`allowedOrigins` 和地址检查。
+
+`apps.maybecode.execution` 为 shell、搜索进程、委派工具和 team 检查选择宿主或
+容器执行。容器模式将执行资源限制为挂载工作区、关闭网络并限制资源。宿主的 `fetch`
+工具和 MCP server 各自保留权限及网络边界。参阅[执行配置](../reference/configuration.md)。
+
 权限决定工具**是否**可以执行，进程能够影响的资源由执行环境限制：
 
 - `allow` 与已审批调用仍使用工具的 OS/network credential；

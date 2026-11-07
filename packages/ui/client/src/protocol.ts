@@ -1,5 +1,8 @@
 import type { DisplayPart, ImageData } from "@sortedyuan/media";
-/** JSON-only presentation contract. Host policy, not this manifest, grants authority. */
+/**
+ * JSON-only presentation contract. Host policy, not this manifest, grants authority.
+ * @experimental
+ */
 export interface UiProduct {
   readonly id: string;
   readonly title: string;
@@ -8,11 +11,13 @@ export interface UiProduct {
   readonly suggestions: readonly string[];
 }
 
+/** @experimental */
 export interface UiBadge {
   readonly label: string;
   readonly tone?: "neutral" | "warning";
 }
 
+/** @experimental */
 export interface UiWorkspaceGit {
   readonly path: string;
   readonly status: "ready" | "initializing" | "disabled" | "error";
@@ -23,6 +28,7 @@ export interface UiWorkspaceGit {
   readonly error?: string;
 }
 
+/** @experimental */
 export interface UiForkPoint {
   readonly blockId?: string;
   readonly id: string;
@@ -39,6 +45,7 @@ export interface UiForkPoint {
   readonly worktreeAvailable?: boolean;
 }
 
+/** @experimental */
 export interface UiCheckpoint {
   readonly runId: string;
   readonly pointId?: string;
@@ -49,6 +56,7 @@ export interface UiCheckpoint {
   readonly error?: string;
 }
 
+/** @experimental */
 export interface UiFileDiff {
   readonly path: string;
   readonly previousPath?: string;
@@ -59,6 +67,7 @@ export interface UiFileDiff {
   readonly patch: string;
 }
 
+/** @experimental */
 export interface UiWorkspaceDiff {
   readonly runId?: string;
   readonly restorePreviewId?: string;
@@ -70,6 +79,7 @@ export interface UiWorkspaceDiff {
   readonly files: readonly UiFileDiff[];
 }
 
+/** @experimental */
 export interface UiWorktree {
   readonly id: string;
   readonly path: string;
@@ -82,6 +92,7 @@ export interface UiWorktree {
   readonly error?: string;
 }
 
+/** @experimental */
 export interface UiResource {
   readonly id: string;
   readonly kind: "session" | "task";
@@ -90,6 +101,7 @@ export interface UiResource {
   readonly updatedAt: number;
 }
 
+/** @experimental */
 export type UiBlockStatus =
   | "queued"
   | "streaming"
@@ -102,16 +114,21 @@ export type UiBlockStatus =
   | "unknown"
   | "not-started"
   | "denied";
+/** @experimental */
 export interface UiDiagnostic {
   readonly message: string;
   readonly code?: string;
 }
+/** @experimental */
 export interface UiPresentation {
   readonly kind: string;
   readonly version: number;
   readonly text: string;
 }
-/** A historical decision is evidence, never an actionable request. */
+/**
+ * A historical decision is evidence, never an actionable request.
+ * @experimental
+ */
 export interface UiApprovalRecord {
   readonly id: string;
   readonly status: "pending" | "allowed" | "denied" | "cancelled";
@@ -119,6 +136,7 @@ export interface UiApprovalRecord {
   readonly scopeDescription?: string;
 }
 
+/** @experimental */
 export interface UiBlock {
   readonly content?: readonly DisplayPart[];
   readonly id: string;
@@ -136,6 +154,7 @@ export interface UiBlock {
   readonly presentation?: UiPresentation;
 }
 
+/** @experimental */
 export interface UiInteraction {
   readonly id: string;
   readonly kind: "approval";
@@ -149,6 +168,7 @@ export interface UiInteraction {
   readonly choices: readonly { readonly value: string; readonly label: string }[];
 }
 
+/** @experimental */
 export interface UiPanel {
   readonly id: string;
   readonly title: string;
@@ -156,6 +176,7 @@ export interface UiPanel {
   readonly actions?: readonly UiAction[];
 }
 
+/** @experimental */
 export interface UiChoice {
   readonly command: string;
   readonly label: string;
@@ -163,6 +184,7 @@ export interface UiChoice {
   readonly options: readonly { readonly value: string; readonly label: string }[];
 }
 
+/** @experimental */
 export interface UiAction {
   readonly label: string;
   readonly command: string;
@@ -170,11 +192,13 @@ export interface UiAction {
   readonly confirm?: string;
   readonly input?: { readonly name: string; readonly label: string; readonly value: string };
 }
+/** @experimental */
 export interface UiCommandOutput {
   readonly title: string;
   readonly text: string;
   readonly actions?: readonly UiAction[];
 }
+/** @experimental */
 export interface UiForm {
   readonly id: string;
   readonly title: string;
@@ -184,6 +208,7 @@ export interface UiForm {
   readonly value: string;
   readonly url?: string;
 }
+/** @experimental */
 export interface UiControls {
   readonly inputCommand: string;
   readonly responseCommand: string;
@@ -191,12 +216,14 @@ export interface UiControls {
   readonly busy: boolean;
   readonly forms: readonly UiForm[];
 }
+/** @experimental */
 export interface UiCompletion {
   readonly value: string;
   readonly label: string;
   readonly description?: string;
 }
 
+/** @experimental */
 export interface UiSnapshot {
   readonly workspace?: UiWorkspaceGit;
   readonly forkPoints?: readonly UiForkPoint[];
@@ -226,6 +253,7 @@ export interface UiSnapshot {
   readonly controls?: UiControls;
 }
 
+/** @experimental */
 export interface UiCommand {
   readonly version: 1;
   readonly hostId: string;
@@ -237,6 +265,7 @@ export interface UiCommand {
   readonly args: Readonly<Record<string, string>>;
 }
 
+/** @experimental */
 export interface UiReceipt {
   readonly selectedId?: string | null;
   readonly output?: UiCommandOutput;
@@ -244,23 +273,28 @@ export interface UiReceipt {
   readonly disconnect?: boolean;
 }
 
+/** @experimental */
 export interface UiPageRequest {
   readonly query?: string;
   readonly cursor?: string;
 }
+/** @experimental */
 export interface UiPage<T> {
   readonly hostId: string;
   readonly items: readonly T[];
   readonly nextCursor: string | null;
   readonly total: number;
 }
+/** @experimental */
 export type UiField = "input" | "text" | "reasoning" | "diagnostic" | "presentation" | "request";
+/** @experimental */
 export interface UiFieldRequest {
   readonly blockId: string;
   readonly field: UiField;
   readonly offset: number;
   readonly version?: string;
 }
+/** @experimental */
 export interface UiFieldPage {
   readonly hostId: string;
   readonly text: string;
@@ -270,7 +304,10 @@ export interface UiFieldPage {
   readonly version: string;
 }
 
-/** One owner consumes runtime events; many clients subscribe to invalidations. */
+/**
+ * One owner consumes runtime events; many clients subscribe to invalidations.
+ * @experimental
+ */
 export interface UiHost {
   media?(selectedId: string, id: string): Promise<ImageData>;
   readonly hostId: string;
@@ -286,6 +323,7 @@ export interface UiHost {
   ): Promise<{ readonly hostId: string; readonly items: readonly UiCompletion[] }>;
 }
 
+/** @experimental */
 export class UiError extends Error {
   constructor(
     readonly status: number,
@@ -296,6 +334,7 @@ export class UiError extends Error {
   }
 }
 
+/** @experimental */
 export function commandArgs(command: UiCommand, required: readonly string[], optional: readonly string[] = []): void {
   if (
     required.some((key) => !command.args[key]?.trim()) ||

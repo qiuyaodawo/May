@@ -2,18 +2,22 @@ import type { ImageData, MediaCapabilities } from "@sortedyuan/media";
 import type { Disposer } from "@sortedyuan/may/plugin";
 import type { ChannelStore, ChannelInput, ChannelAttachment, ChannelDeliveryReceipt, DeliveryRecord } from "./store.js";
 
+/** @experimental */
 export type GroupTrigger = "explicit" | "all";
+/** @experimental */
 export interface EntranceTrigger {
   conversation: string;
   threadId?: string;
   trigger: GroupTrigger;
 }
+/** @experimental */
 export interface ChannelAccessSettings {
   allowUsers: readonly string[];
   allowGroups?: readonly string[];
   groupTrigger?: GroupTrigger;
   entranceTriggers?: readonly EntranceTrigger[];
 }
+/** @experimental */
 export interface ChannelCapabilities {
   groups: boolean;
   threads: boolean;
@@ -25,12 +29,15 @@ export interface ChannelCapabilities {
   inputAttachments: readonly ChannelAttachment["kind"][];
   outputAttachments: readonly ChannelAttachment["kind"][];
 }
+/** @experimental */
 export interface ChannelAttachmentData {
   data: Uint8Array;
   name?: string;
   mediaType?: string;
 }
+/** @experimental */
 export type ChannelState = Pick<ChannelStore, "get" | "put" | "values">;
+/** @experimental */
 export interface ChannelAdapter {
   readonly media?: MediaCapabilities;
   readonly name: string;
@@ -49,23 +56,27 @@ export interface ChannelAdapter {
     signal: AbortSignal,
   ): Promise<ChannelAttachmentData>;
 }
+/** @experimental */
 export interface ChannelIngress {
   readonly store: ChannelState;
   readonly ready?: Promise<void>;
   receive(input: ChannelInput): Promise<void>;
   onError?(account: string, error: unknown): void | Promise<void>;
 }
+/** @experimental */
 export interface ChannelRegistry {
   register(adapter: ChannelAdapter): Disposer;
   get(account: string): ChannelAdapter | undefined;
   list(): readonly ChannelAdapter[];
   errors(): ReadonlyMap<string, unknown>;
 }
+/** @experimental */
 export interface DeliveryAttemptOptions {
   readonly signal: AbortSignal;
   readonly image?: ImageData;
   commit(status: "sending" | "sent" | "unknown", receipt?: ChannelDeliveryReceipt): void | Promise<void>;
 }
+/** @experimental */
 export interface DeliveryService {
   attempt(
     adapter: ChannelAdapter,

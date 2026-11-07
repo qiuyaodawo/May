@@ -1,3 +1,4 @@
+/** @experimental */
 export class MayConfigError extends Error {
   readonly code: string;
 
@@ -8,6 +9,7 @@ export class MayConfigError extends Error {
   }
 }
 
+/** @experimental */
 export class MayConfigFileError extends MayConfigError {
   readonly path: string;
 
@@ -17,6 +19,7 @@ export class MayConfigFileError extends MayConfigError {
   }
 }
 
+/** @experimental */
 export class MayConfigWriteError extends MayConfigError {
   readonly path: string;
 
@@ -30,6 +33,7 @@ export class MayConfigWriteError extends MayConfigError {
   }
 }
 
+/** @experimental */
 export class MayConfigParseError extends MayConfigError {
   readonly path: string;
 
@@ -39,6 +43,7 @@ export class MayConfigParseError extends MayConfigError {
   }
 }
 
+/** @experimental */
 export class MayConfigValidationError extends MayConfigError {
   readonly path: string;
   readonly field: string;
@@ -50,6 +55,7 @@ export class MayConfigValidationError extends MayConfigError {
   }
 }
 
+/** @experimental */
 export class MayConfigResolutionError extends MayConfigError {
   constructor(message: string) {
     super("MAY_CONFIG_RESOLUTION_ERROR", message);

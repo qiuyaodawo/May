@@ -2,12 +2,14 @@ import { applicationHooks, applicationServices, type ApplicationFacade } from ".
 import { GOAL_STATE_KEY, GoalController, type GoalAgent, type GoalOptions, type GoalState } from "./index.js";
 import { definePlugin, defineService } from "../plugin/index.js";
 
+/** @experimental */
 export const goalsService = defineService<GoalController>({
   id: "may.goals",
   version: "1.0.0",
   scope: "application",
 });
 
+/** @experimental */
 export interface GoalsPluginOptions extends GoalOptions {
   readonly createAgent?: (application: ApplicationFacade) => GoalAgent;
 }
@@ -16,6 +18,7 @@ interface GoalsState {
   readonly goal: GoalState | null;
 }
 
+/** @experimental */
 export function createGoalsPlugin(options: GoalsPluginOptions = {}) {
   return definePlugin({
     id: "may.goals",

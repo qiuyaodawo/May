@@ -3,10 +3,12 @@ import { ScreenBuffer } from "./screen-buffer.js";
 import { encodeImage } from "./images.js";
 import { placeImages, type ImagePlacement } from "./component.js";
 
+/** @experimental */
 export interface TerminalWriter {
   write(value: string): unknown;
 }
 
+/** @experimental */
 export interface FullscreenRendererOptions {
   /** Hide the terminal cursor when a frame does not declare one. */
   readonly hideCursorByDefault?: boolean;
@@ -15,6 +17,7 @@ export interface FullscreenRendererOptions {
 /**
  * Renders a retained frame at the top-left of the current terminal screen.
  * Callers should normally pair this with an alternate-screen terminal driver.
+ * @experimental
  */
 export class FullscreenRenderer {
   private previous: ScreenBuffer | undefined;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { access, mkdir, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { fromMarkdown } from "mdast-util-from-markdown";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -51,6 +51,7 @@ assert.ok(
   "packed CLI chunks are missing",
 );
 assert.ok(applicationPaths.includes("dist/index.js"), "packed entry point is missing");
+assert.ok(applicationPaths.includes("README.zh-CN.md"), "packed Chinese README is missing");
 const retiredModules = ["dist/ui/tool-renderers", "dist/ui/transcript-store", "dist/ui/transcript-view"];
 assert.equal(
   applicationPaths.some((path) => retiredModules.some((module) => path === module || path.startsWith(`${module}.`))),
@@ -156,6 +157,37 @@ const help = await runPnpm(["exec", "maybecode", "--help"], {
 });
 assert.match(help.stdout, /Usage:\s+maybecode/u);
 
+const readmeExamples = [];
+for (const readme of ["README.md", "README.zh-CN.md"]) {
+  const text = await readFile(join(consumerDirectory, "node_modules", "@sortedyuan", "maybecode", readme), "utf8");
+  const tree = fromMarkdown(text);
+  const examples = tree.children.filter((node) => node.type === "code" && node.lang === "ts");
+  assert.ok(examples.length > 0, `${readme} has no TypeScript consumer examples`);
+  for (const [index, example] of examples.entries()) {
+    const path = join(consumerDirectory, `${readme.replaceAll(".", "-")}-${index}.ts`);
+    await writeFile(path, example.value, "utf8");
+    readmeExamples.push(path);
+  }
+}
+await run(
+  process.execPath,
+  [
+    join(repository, "node_modules", "typescript", "bin", "tsc"),
+    "--ignoreConfig",
+    "--noEmit",
+    "--strict",
+    "--skipLibCheck",
+    "--target",
+    "ES2022",
+    "--module",
+    "NodeNext",
+    "--moduleResolution",
+    "NodeNext",
+    ...readmeExamples,
+  ],
+  { cwd: consumerDirectory },
+);
+
 // Verify both optional MCP entry points from the installed tarballs, not workspace dist.
 await writeFile(
   join(consumerDirectory, "mcp-subpaths.mjs"),
@@ -204,7 +236,7 @@ const launched = await launchUntil(
 );
 assert.doesNotMatch(launched.stdout + launched.stderr, /Error:/u);
 
-process.stdout.write(`MaybeCode package smoke test passed outside the repository:\n${consumerDirectory}\n`);
+process.stdout.write(`MaybeCode package smoke test passed in the installed consumer:\n${consumerDirectory}\n`);
 
 function resolveSmokeParent(args) {
   let value;
@@ -219,7 +251,7 @@ function resolveSmokeParent(args) {
       throw new Error("--directory requires a value");
     }
   }
-  return resolve(value ?? tmpdir());
+  return resolve(value ?? join(repository, "review", "impl-batch-b"));
 }
 
 async function resetSmokeDirectory(target) {
@@ -228,7 +260,7 @@ async function resetSmokeDirectory(target) {
     basename(target) !== "may-maybecode-package-smoke" ||
     target === parent ||
     target === repository ||
-    isInside(target, repository) ||
+    (isInside(target, repository) && !isInside(target, join(repository, "review", "impl-batch-b"))) ||
     isInside(repository, target)
   ) {
     throw new Error(`Refusing to clear unsafe smoke directory: ${target}`);

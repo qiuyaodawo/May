@@ -6,10 +6,12 @@ import { MayConfigFileError, MayConfigParseError } from "./errors.js";
 import { parseMayConfig } from "./parse.js";
 import type { LoadMayConfigOptions, MayConfig } from "./types.js";
 
+/** @experimental */
 export function getDefaultMayConfigPath(): string {
   return join(homedir(), ".may", "config.json");
 }
 
+/** @experimental */
 export async function loadMayConfig(options: LoadMayConfigOptions = {}): Promise<MayConfig> {
   const path = options.path === undefined ? getDefaultMayConfigPath() : resolve(options.path);
   let source: string;

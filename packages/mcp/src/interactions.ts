@@ -10,7 +10,10 @@ import {
 import { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
 import { McpCapabilityError } from "./errors.js";
 
-/** Supplied by trusted host code, never by the server, model, or MCP _meta. */
+/**
+ * Supplied by trusted host code, never by the server, model, or MCP _meta.
+ * @experimental
+ */
 export interface McpInteractionOwner {
   readonly workspaceId: string;
   readonly sessionId: string;
@@ -18,8 +21,10 @@ export interface McpInteractionOwner {
   readonly toolCallId?: string;
 }
 
+/** @experimental */
 export type McpElicitationParams =
   ElicitRequestFormParams | { readonly mode: "url"; readonly message: string; readonly url: string };
+/** @experimental */
 export interface McpHostReviewParams {
   readonly mode: "review";
   readonly kind: "roots" | "sampling.request" | "sampling.response";
@@ -28,6 +33,7 @@ export interface McpHostReviewParams {
   readonly editable: boolean;
 }
 
+/** @experimental */
 export interface McpInteractionRequest {
   readonly id: string;
   readonly serverId: string;
@@ -37,6 +43,7 @@ export interface McpInteractionRequest {
   readonly params: McpElicitationParams | McpHostReviewParams;
 }
 
+/** @experimental */
 export type McpInteractionEvent =
   | { readonly type: "mcp.interaction.requested"; readonly request: McpInteractionRequest }
   | { readonly type: "mcp.interaction.settled"; readonly requestId: string; readonly reason: "answered" | "cancelled" };
@@ -47,7 +54,10 @@ interface Pending {
   finish(response?: ElicitResult): void;
 }
 
-/** Ephemeral, bounded UI rendezvous. Answers never enter Session history or traces here. */
+/**
+ * Ephemeral, bounded UI rendezvous. Answers never enter Session history or traces here.
+ * @experimental
+ */
 export class McpInteractionBroker {
   private readonly queue = new AsyncEventQueue<McpInteractionEvent>({
     maxBufferedValues: 128,
@@ -86,7 +96,7 @@ export class McpInteractionBroker {
       // deliberately removed that field. No synthetic server id is invented.
       params = { mode: "url", url: url.url, message: url.message };
     } else {
-      const parsed = await specTypeSchemas.ElicitRequestFormParams["~standard"].validate(raw);
+      const parsed = specTypeSchemas.ElicitRequestFormParams["~standard"].validate(raw);
       if (parsed.issues !== undefined) throw failure(serverId, "invalid elicitation request");
       params = {
         mode: "form",

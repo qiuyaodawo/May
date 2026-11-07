@@ -11,6 +11,7 @@ import {
 } from "../index.js";
 import { omitUndefined, type TraceAttributes } from "@sortedyuan/may/core";
 
+/** @experimental */
 export interface ObservabilityPluginOptions {
   readonly dataDirectory: string;
   readonly file?: string;
@@ -25,6 +26,7 @@ export interface ObservabilityPluginOptions {
   readonly maxMetricSeries?: number;
 }
 
+/** @experimental */
 export interface ObservabilityService {
   readonly processor: BatchSpanProcessor;
   readonly tracer: BasicTracer;
@@ -32,11 +34,13 @@ export interface ObservabilityService {
   readonly metrics?: BoundedMetrics;
 }
 
+/** @experimental */
 export const observabilityService = defineService<ObservabilityService>({
   id: "may.observability",
   version: "1.0.0",
   scope: "application",
 });
+/** @experimental */
 export const observabilityHostService = defineService<ObservabilityService>({
   id: "may.workspace-observability",
   version: "1.0.0",
@@ -81,6 +85,7 @@ function createResources(options: ObservabilityPluginOptions): ObservabilityServ
   };
 }
 
+/** @experimental */
 export function createObservabilityPlugin(options: ObservabilityPluginOptions) {
   return definePlugin({
     id: "may.observability",
@@ -96,6 +101,7 @@ export function createObservabilityPlugin(options: ObservabilityPluginOptions) {
   });
 }
 
+/** @experimental */
 export function createObservabilityHostPlugin(options: ObservabilityPluginOptions) {
   return definePlugin({
     id: "may.workspace-observability",
@@ -110,6 +116,7 @@ export function createObservabilityHostPlugin(options: ObservabilityPluginOption
   });
 }
 
+/** @experimental */
 export function createSharedObservabilityPlugin(resources: ObservabilityService) {
   return definePlugin({
     id: "may.observability",

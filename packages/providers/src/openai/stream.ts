@@ -117,6 +117,7 @@ export function parseCompletedOpenAIResponse(value: unknown): {
   return omitUndefined({ message, usage });
 }
 
+/** @experimental */
 export function openAIResponseContent(message: AssistantMessage): readonly ContentPart[] {
   if (
     message.content.some((part) => part.type === "image") ||

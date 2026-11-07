@@ -1,19 +1,23 @@
 import clipboardy from "clipboardy";
 import type { TerminalWriter } from "./renderer.js";
 
+/** @experimental */
 export interface Clipboard {
   readText(): Promise<string>;
   writeText(text: string): Promise<void>;
 }
 
+/** @experimental */
 export type ClipboardMode = "auto" | "system" | "osc52" | "disabled";
 
+/** @experimental */
 export interface TerminalClipboardOptions {
   readonly mode?: ClipboardMode;
   readonly output?: TerminalWriter;
   readonly env?: Readonly<Record<string, string | undefined>>;
 }
 
+/** @experimental */
 export class ClipboardUnavailableError extends Error {
   constructor(message: string) {
     super(message);
@@ -21,6 +25,7 @@ export class ClipboardUnavailableError extends Error {
   }
 }
 
+/** @experimental */
 export class SystemClipboard implements Clipboard {
   async readText(): Promise<string> {
     return clipboardy.read();
@@ -31,6 +36,7 @@ export class SystemClipboard implements Clipboard {
   }
 }
 
+/** @experimental */
 export class Osc52Clipboard implements Clipboard {
   constructor(private readonly output: TerminalWriter) {}
 
@@ -55,6 +61,7 @@ class UnavailableClipboard implements Clipboard {
   }
 }
 
+/** @experimental */
 export function createTerminalClipboard(options: TerminalClipboardOptions = {}): Clipboard {
   const env = options.env ?? process.env;
   const mode = options.mode ?? env.MAY_CLIPBOARD ?? "auto";

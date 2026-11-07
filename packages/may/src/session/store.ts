@@ -1,6 +1,7 @@
 import type { SessionEvent } from "./events.js";
 import { readRecordedModelRequests } from "./requests.js";
 
+/** @public */
 export interface SessionStore {
   /** 持久化目录；内存存储为 undefined，宿主可用它选择自己的记录目录。 */
   readonly directory?: string;
@@ -14,6 +15,7 @@ export interface SessionStore {
   delete?(sessionId: string): Promise<boolean>;
 }
 
+/** @experimental */
 export function validateSessionHistory(sessionId: string, events: readonly SessionEvent[]): void {
   readRecordedModelRequests(events);
   const continuations = new Set<string>();
@@ -51,6 +53,7 @@ export function validateSessionHistory(sessionId: string, events: readonly Sessi
   }
 }
 
+/** @experimental */
 export class InMemorySessionStore implements SessionStore {
   private readonly sessions = new Map<string, SessionEvent[]>();
 

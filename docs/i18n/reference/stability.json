@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "sections": [
+    {
+      "heading": "preamble",
+      "en": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "zh": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "heading": "API stability",
+      "en": "8c74902bbfcb3f9bdd17488cf08262cb1a16d6b6ea077f4fd256a62f88229925",
+      "zh": "2d9f20acc07853116ce9be1bd963ecbc72151ec3261e38fc761e04eee80d906c"
+    },
+    {
+      "heading": "Stability levels",
+      "en": "65951f8761638ef344c67eaa51dfd613795c42c37ef292f5afe45da489432cb0",
+      "zh": "8f89b1cf9cd1de19df5ec4e54a3dc7fcfafa1b57206cdb1e9042efb9ec28a983"
+    },
+    {
+      "heading": "Persistent data and configuration",
+      "en": "0706024883e0cf620d02f3e9312b90fb90fd4b22007660e69ffa9c4dae8dfed0",
+      "zh": "f85bb98fc4df92d30b2c7dfab69a246adcba5379734cabbf878cd4b1cff93e49"
+    },
+    {
+      "heading": "Inspect the API boundary",
+      "en": "887a032d8b69429bc0022ec5ad3190f962085dd3bf3eed25ade8f58afa73a401",
+      "zh": "b7ac1b67ab0474a963e02c337c9b34140c12cb56f8e707e0bb22fcf968a99fe2"
+    }
+  ]
+}

@@ -9,6 +9,7 @@ import {
 import type { ApprovalRequest, PermissionEvent } from "../permissions/index.js";
 import type { ContextCompactionResult } from "../context/index.js";
 
+/** @experimental */
 export interface ApplicationOpeningHook {
   readonly sessionId: string;
   readonly resume: boolean;
@@ -17,30 +18,36 @@ export interface ApplicationOpeningHook {
   readonly instructions?: string;
 }
 
+/** @experimental */
 export interface ApplicationIdentityHook {
   readonly sessionId: string;
 }
 
+/** @experimental */
 export interface InputHook {
   readonly input: string | UserMessage;
   readonly inputId?: string;
   readonly steering?: boolean;
 }
 
+/** @experimental */
 export interface CompactionHook {
   readonly strategy?: string;
   readonly automatic: boolean;
 }
 
+/** @experimental */
 export interface CompactionFailureHook extends CompactionHook {
   readonly error: SerializedError;
 }
 
+/** @experimental */
 export interface RecoveryHook {
   readonly id: string;
   readonly finding: string;
 }
 
+/** @public */
 export type ApplicationApprovalEvent =
   | Exclude<PermissionEvent, { readonly type: "approval.requested" }>
   | {
@@ -55,6 +62,7 @@ export type ApplicationApprovalEvent =
       };
     };
 
+/** @experimental */
 export const applicationHooks = Object.freeze({
   beforeCreate: defineHook<ApplicationOpeningHook>({
     name: "application.beforeCreate",
@@ -120,6 +128,7 @@ export const applicationHooks = Object.freeze({
   }),
 });
 
+/** @experimental */
 export const APPLICATION_HOOKS: readonly HookDefinition<unknown>[] = Object.freeze(Object.values(applicationHooks));
 
 function record(value: unknown): Record<string, unknown> {

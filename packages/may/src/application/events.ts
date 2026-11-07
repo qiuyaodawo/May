@@ -3,7 +3,9 @@ import type { MayEvent, RunResult, SerializedError, TraceContext } from "../core
 import type { PermissionEvent } from "../permissions/index.js";
 import type { SessionToolPresentation } from "../session/index.js";
 
-/** Events shared by headless May applications, regardless of their UI. */
+/** Events shared by headless May applications, regardless of their UI.
+ * @experimental
+ */
 export type AgentApplicationEvent =
   | { type: "run.event"; event: MayEvent }
   | { type: "permission.event"; event: PermissionEvent }
@@ -23,6 +25,7 @@ export type AgentApplicationEvent =
       before: ContextInspection;
     };
 
+/** @experimental */
 export interface AgentRun {
   readonly id: string;
   readonly result: Promise<RunResult>;
@@ -30,12 +33,14 @@ export interface AgentRun {
   cancel(reason?: string): void;
 }
 
+/** @experimental */
 export interface AgentSessionChangedEvent {
   readonly type: "session.changed";
   readonly sessionId: string;
   readonly resumed: boolean;
 }
 
+/** @experimental */
 export interface AgentSessionForkedEvent {
   readonly type: "session.forked";
   readonly sessionId: string;
@@ -44,5 +49,6 @@ export interface AgentSessionForkedEvent {
   readonly workspace: string;
 }
 
+/** @experimental */
 export type AgentWorkspaceEvent<ApplicationEvent = AgentApplicationEvent, ExtensionEvent = never> =
   ApplicationEvent | AgentSessionChangedEvent | AgentSessionForkedEvent | ExtensionEvent;

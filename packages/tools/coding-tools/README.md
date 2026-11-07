@@ -6,6 +6,9 @@ Basic filesystem and shell tools for May coding agents:
 - `shell`: run a platform-appropriate shell command and capture its output
 - `edit`: replace one exact, unique text occurrence
 - `write`: create or overwrite a UTF-8 text file
+- `glob`: find file names with ripgrep glob matching
+- `grep`: search file contents with ripgrep regex or literal matching
+- `fetch`: retrieve HTTP/HTTPS text and convert HTML to readable text
 
 Each tool is created for one workspace. Filesystem tools reject paths and
 symbolic links that escape that workspace. Existing hard-linked files are also
@@ -26,7 +29,7 @@ const may = new May({
 });
 ```
 
-`createCodingTools` creates all four tools; passing them to `May` registers
+`createCodingTools` creates all seven tools; passing them to `May` registers
 them for that runtime instance. The package does not maintain a global tool
 registry.
 
@@ -173,6 +176,62 @@ and `createBashShellProfile` provide the built-in launch conventions.
 `createBashTool` remains as a deprecated compatibility factory and now means a
 real Bash executable rather than the platform's implicit default shell.
 
-`shell` executes with May process permissions and inherits its environment.
-Applications that require execution isolation must provide a separate sandbox
-or remote execution backend.
+`createReadOnlyTools` returns `read`, `glob`, and `grep`.
+
+## Search and web access
+
+`createGlobTool(options)` and `createGrepTool(options)` accept `SearchToolOptions`:
+`cwd`, optional `maxResults` (default 1000), `maxOutputBytes` (default 1 MiB),
+`timeoutMs` (default 30000), and `execution`. Both use `@vscode/ripgrep`, respect
+`.gitignore`, validate workspace paths, and do not follow directory symbolic links.
+Cancellation terminates the process and waits for exit. Timeout raises an error;
+result and byte limits return `truncated: true`.
+
+`glob` accepts `pattern`, optional `path` and `includeHidden`, and returns
+`{ paths, truncated }` with workspace-relative paths. `grep` accepts `pattern`,
+optional `path`, `glob`, `literal`, and `caseSensitive`, and returns
+`{ matches, truncated }`, where each match contains `file`, one-based `line`, and
+`text`. Matching is case-sensitive by default. Both tools have `workspaceEffect: "read"`.
+
+`createFetchTool(options)` accepts `FetchToolOptions`: optional `allowedOrigins`,
+`maxBytes` (default 1 MiB), `timeoutMs` (default 30000), and `maxRedirects`
+(default 5). Input is `{ url }`; output is `{ url, contentType, text, truncated }`,
+with the final URL. HTTP and HTTPS are supported. HTML is converted with
+`html-to-text`; text and JSON retain their content. Other content types raise
+`FetchToolError`. Requests carry no host credentials or cookies. Byte limits
+truncate content, and cancellation or timeout aborts the request.
+
+Without `allowedOrigins`, private, loopback, link-local, and reserved addresses
+are rejected. Connections use the checked DNS address and every redirect is
+checked again. Supplying `allowedOrigins` restricts access to those origins and
+can explicitly allow local services. The tool leaves `workspaceEffect` unset;
+hosts should apply a separate network permission policy.
+
+## Execution environments
+
+`openCodingExecutionEnvironment({ workspace, isolation, signal? })` opens a
+`CodingExecutionEnvironment` with `workspace`, `isolation`, `spawn`, and async
+`close()`. Pass it as `execution` to shell, search, or coding-tool factories.
+Pass its `isolation` as `execution` to `codingRuntimeInstructions` to describe
+the container's Linux paths and network settings to the model.
+The host owns the environment and must await `close()` after all tools finish.
+`CodingExecutionIsolation` is `{ mode: "host" }` or
+`{ mode: "container", image, network: "none", memoryBytes, cpuCount }`.
+
+Host mode retains host permissions and environment. Container mode requires
+Docker Desktop or a compatible running Docker runtime and a pre-pulled image
+providing `bash`, `git`, `rg`, and `setsid`:
+
+```bash
+docker pull nixery.dev/shell/git/ripgrep/util-linux
+```
+
+The workspace is the only host directory mounted, at `/workspace`, with working
+directory translation for Windows and Unix paths. File tools access the same
+files through host path checks. The container uses the Unix host UID:GID or
+`1000:1000` on Windows, a read-only root, temporary storage, no network, memory
+and CPU limits, removed capabilities, and no privilege escalation. Home,
+credentials, and Docker socket mounts are excluded. Missing Docker, images, or
+required programs cause startup errors. Cancellation waits for command shutdown;
+`close()` waits for processes and container removal. Host `fetch` and MCP services
+use their own network and permission boundaries.

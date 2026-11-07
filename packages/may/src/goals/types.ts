@@ -1,21 +1,26 @@
 import type { ContinueOptions, RunOptions, RunResult } from "../core/index.js";
 
+/** @experimental */
 export type GoalStatus = "active" | "paused" | "blocked" | "completed" | "cancelled" | "failed" | "budget_exhausted";
 
+/** @experimental */
 export interface GoalBudget {
   readonly maxRuns?: number;
   readonly maxTotalTokens?: number;
   readonly maxDurationMs?: number;
 }
 
+/** @experimental */
 export interface GoalModelOptions {
   readonly includeInstructions?: boolean;
 }
 
+/** @experimental */
 export interface GoalContextOptions {
   readonly includeInstructions?: boolean;
 }
 
+/** @experimental */
 export interface GoalCall {
   readonly id: string;
   readonly runId?: string;
@@ -23,6 +28,7 @@ export interface GoalCall {
   readonly tokens?: number;
 }
 
+/** @experimental */
 export interface GoalState {
   readonly version: 1;
   readonly id: string;
@@ -46,11 +52,13 @@ export interface GoalState {
   readonly updatedAt: number;
 }
 
+/** @experimental */
 export interface GoalStore {
   read(): Promise<unknown>;
   write(state: GoalState): Promise<void>;
 }
 
+/** @experimental */
 export interface GoalRun {
   readonly id: string;
   readonly result: Promise<RunResult>;
@@ -59,8 +67,10 @@ export interface GoalRun {
   finalize?(outcome: GoalRunOutcome): Promise<void>;
 }
 
+/** @experimental */
 export type GoalRunOutcome = "completed" | "continued" | "failed" | "cancelled";
 
+/** @experimental */
 export interface GoalAgent {
   readonly sessionId: string;
   readonly isRunning: boolean;
@@ -68,6 +78,7 @@ export interface GoalAgent {
   continue(options: Omit<ContinueOptions, "stepInputSource">): Promise<GoalRun>;
 }
 
+/** @experimental */
 export interface GoalOptions {
   readonly verify?: (
     state: GoalState,
@@ -76,6 +87,7 @@ export interface GoalOptions {
   readonly validateBudget?: (budget: GoalBudget) => void;
 }
 
+/** @experimental */
 export interface GoalEvent {
   readonly type: "goal.changed";
   readonly goal: GoalState;

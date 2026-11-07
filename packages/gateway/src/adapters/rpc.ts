@@ -14,6 +14,7 @@ import { freezeToolInput, omitUndefined, validateTelemetryCorrelation, type Cont
 import type { ApprovalDecision, PersistentApprovalOptions } from "@sortedyuan/may/permissions";
 import type { AgentAdapterContext, AgentAdapter, AgentCapabilities, AgentTaskStatus } from "./types.js";
 
+/** @experimental */
 export type GatewayRpcOptions =
   | {
       transport: "stdio";
@@ -47,6 +48,7 @@ interface RpcHandshake {
   commands?: string[];
   telemetryVersion?: 1;
 }
+/** @experimental */
 export class RpcOutcomeUnknownError extends Error {
   readonly outcome = "unknown";
   constructor(
@@ -56,9 +58,11 @@ export class RpcOutcomeUnknownError extends Error {
     super(`RPC ${method} 的结果未能确认，请按原请求 ID 查询状态。`);
   }
 }
+/** @experimental */
 export async function createAdapter(factory: RpcFactoryOptions): Promise<AgentAdapter> {
   return createGatewayRpcAdapter(factory.agent.id, parseRpcOptions(factory.options));
 }
+/** @experimental */
 export async function createGatewayRpcAdapter(agentId: string, options: GatewayRpcOptions): Promise<AgentAdapter> {
   const validated = parseRpcOptions(options);
   const open = async () => {
@@ -174,20 +178,35 @@ class RpcAdapter implements AgentAdapter {
         return previous.result;
       }
       context.signal.throwIfAborted();
-      const result = tool.execute(freezeToolInput(tool.parse ? tool.parse(item.input) : item.input), {
-        runId: context.inputId,
-        step: item.step as number,
-        toolCallId: callId,
-        idempotencyKey: key,
-        signal: context.signal,
-        report: (update) => {
-          void transport.connection.sendNotification("gateway/toolProgress", {
-            conversationId: context.conversationId,
-            inputId: context.inputId,
-            callId,
-            update,
+      const result = Promise.resolve().then(async () => {
+        const parsedInput = tool.parse ? await tool.parse(item.input) : item.input;
+        context.signal.throwIfAborted();
+        const progress: Promise<PromiseSettledResult<void>[]>[] = [];
+        try {
+          return await tool.execute(freezeToolInput(parsedInput), {
+            runId: context.inputId,
+            step: item.step as number,
+            toolCallId: callId,
+            idempotencyKey: key,
+            signal: context.signal,
+            report: (update) => {
+              progress.push(
+                Promise.allSettled([
+                  transport.connection.sendNotification("gateway/toolProgress", {
+                    conversationId: context.conversationId,
+                    inputId: context.inputId,
+                    callId,
+                    update,
+                  }),
+                ]),
+              );
+            },
           });
-        },
+        } finally {
+          const updates = (await Promise.all(progress)).flat();
+          const failed = updates.find((update) => update.status === "rejected");
+          if (failed?.status === "rejected") throw failed.reason;
+        }
       });
       this.toolCalls.set(key, { name, input: encoded, result });
       return result;

@@ -4,7 +4,9 @@ import { omitUndefined } from "../core/omit-undefined.js";
 import type { ModelRequestRecord } from "../core/request-recording.js";
 import type { SessionEvent } from "./events.js";
 
+/** @experimental */
 export type RequestReferences = Readonly<Record<string, string | readonly string[]>>;
+/** @experimental */
 export type SessionRequestEvent =
   | { type: "model.request.defined"; id: string; value: unknown }
   | {
@@ -45,6 +47,7 @@ export type SessionRequestEvent =
       httpStatus?: number;
     };
 
+/** @experimental */
 export interface RecordedModelRequest {
   readonly outcome?: Extract<SessionRequestEvent, { type: "model.attempt.completed" | "model.attempt.failed" }>;
   readonly runId: string;
@@ -56,10 +59,12 @@ export interface RecordedModelRequest {
   readonly record: ModelRequestRecord;
 }
 
+/** @experimental */
 export function requestValueId(value: unknown): string {
   return createHash("sha256").update(canonicalize(value)).digest("hex");
 }
 
+/** @experimental */
 export function requestReferences(
   value: Readonly<Record<string, unknown>>,
   define: (value: unknown) => string,
@@ -71,6 +76,7 @@ export function requestReferences(
   );
 }
 
+/** @experimental */
 export function readRecordedModelRequests(events: readonly SessionEvent[]): RecordedModelRequest[] {
   const values = new Map<string, unknown>();
   const requests: RecordedModelRequest[] = [];

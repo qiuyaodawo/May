@@ -5,6 +5,7 @@ import { McpConfigurationError } from "./errors.js";
 const MAX_TOOL_NAME_LENGTH = 64;
 const SERVER_ID_PATTERN = /^[A-Za-z0-9_-]+$/u;
 
+/** @experimental */
 export function assertMcpServerId(id: string): void {
   if (id.trim() === "" || id !== id.trim()) {
     throw new McpConfigurationError("MCP server id must be a non-empty string without surrounding whitespace");
@@ -14,7 +15,10 @@ export function assertMcpServerId(id: string): void {
   }
 }
 
-/** Create a provider-safe, collision-resistant model-facing tool name. */
+/**
+ * Create a provider-safe, collision-resistant model-facing tool name.
+ * @experimental
+ */
 export function namespaceMcpToolName(serverId: string, remoteToolName: string): string {
   assertMcpServerId(serverId);
   if (remoteToolName.trim() === "") {

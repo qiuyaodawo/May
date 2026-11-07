@@ -1,12 +1,14 @@
 import { omitUndefined, userMessage, type UserMessage } from "../core/index.js";
 import type { SessionEvent, SessionEventPayload } from "./events.js";
 
+/** @experimental */
 export interface SessionSteerOptions {
   readonly input: string | UserMessage;
   readonly inputId?: string;
   readonly runId?: string;
 }
 
+/** @experimental */
 export interface SessionSteeringInput {
   readonly inputId: string;
   readonly message: UserMessage;

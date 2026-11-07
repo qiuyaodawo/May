@@ -19,6 +19,7 @@ import {
 } from "@sortedyuan/observability";
 import type { EvalExecutionEvent, EvalIdentities, EvalMetrics, MeasuredValue } from "./types.js";
 
+/** @experimental */
 export interface EvalAgentMetrics {
   readonly modelCalls: number;
   readonly modelAttempts: number;
@@ -41,6 +42,7 @@ export interface EvalAgentMetrics {
   readonly costs: readonly UsageCost[];
 }
 
+/** @experimental */
 export interface EvalAgentIdentities {
   readonly sessionIds: readonly string[];
   readonly runIds: readonly string[];
@@ -49,6 +51,7 @@ export interface EvalAgentIdentities {
   readonly traceIds: readonly string[];
 }
 
+/** @experimental */
 export interface EvalApprovalEvidence {
   readonly requestId: string;
   readonly sessionId: string;
@@ -80,6 +83,7 @@ const safeAttributes = new Set([
   "may.model.attempts_complete",
 ]);
 
+/** @experimental */
 export class EvalTelemetryCollector implements SpanObserver, SpanProcessor {
   readonly tracer: BasicTracer;
   private readonly scopes = new Map<string, TraceAttributes>();
@@ -419,10 +423,12 @@ export class EvalTelemetryCollector implements SpanObserver, SpanProcessor {
   }
 }
 
+/** @experimental */
 export function evalIdentities(identities: EvalAgentIdentities): EvalIdentities {
   return identities;
 }
 
+/** @experimental */
 export function evalMetrics(metrics: EvalAgentMetrics): Partial<EvalMetrics> {
   const costGroups = metrics.costs;
   const currencies = new Set(costGroups.map((cost) => cost.currency));
@@ -482,6 +488,7 @@ export function evalMetrics(metrics: EvalAgentMetrics): Partial<EvalMetrics> {
   };
 }
 
+/** @experimental */
 export function createEvalTaskAssessment(options: {
   readonly trialId: string;
   readonly evaluatorId: string;

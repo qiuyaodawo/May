@@ -13,6 +13,7 @@ import type {
 } from "./compaction.js";
 import { ContextCompactionExhaustedError } from "./compaction.js";
 
+/** @experimental */
 export interface ContextBudget {
   readonly contextWindowTokens?: number;
   readonly outputReserveTokens?: number;
@@ -21,11 +22,13 @@ export interface ContextBudget {
   readonly compactTriggerRatio?: number;
 }
 
+/** @experimental */
 export interface ContextMeasurement {
   readonly inputTokens: number;
   readonly contextMessageCount: number;
 }
 
+/** @experimental */
 export interface ContextInspection {
   readonly instructionsBytes: number;
   readonly messageBytes: number;
@@ -49,6 +52,7 @@ export interface ContextInspection {
   readonly shouldCompact?: boolean;
 }
 
+/** @experimental */
 export interface ContextController {
   /** 保存替换后的 Context 成功时，释放恢复所需的旧状态。 */
   commitCompaction?(result: ContextCompactionResult): void;
@@ -66,6 +70,7 @@ export interface ContextController {
   setAutoCompactionFailureSink?(sink: ContextCompactionFailureSink | undefined): void;
 }
 
+/** @experimental */
 export interface SnapshotContextControllerOptions {
   readonly budget?: ContextBudget;
   readonly measurement?: ContextMeasurement;
@@ -82,6 +87,7 @@ interface RequestedCompaction {
   readonly strategy: ContextCompactionStrategy;
 }
 
+/** @experimental */
 export class SnapshotContextController implements ContextController {
   invalidateMeasurement(): void {
     this.measurement = undefined;
@@ -388,6 +394,7 @@ function normalizeCompactionOutput(output: ContextCompactionOutput): ContextComp
   });
 }
 
+/** @experimental */
 export function inspectContextSnapshot(
   snapshot: ContextSnapshot,
   options: {

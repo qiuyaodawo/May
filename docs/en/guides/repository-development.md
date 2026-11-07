@@ -27,6 +27,13 @@ implementation when selected; image codecs and Web server assets load when used.
 
 ## Choose the relevant checks
 
+- After building, `pnpm api:check` validates public exports against
+  `scripts/api-stability.json`, declaration tags and `api/` reports. Run
+  `pnpm api:update` after an intentional API change and review the generated
+  differences. See [API stability](../reference/stability.md).
+- `pnpm lint --max-warnings 0` runs typed ESLint checks on TypeScript source files under
+  `src/` in every workspace package and app.
+  ESLint uses TypeScript 5.9; `tsc -b` uses TypeScript 7. CI runs lint on Ubuntu with Node.js 24.
 - `pnpm format` formats the repository with Prettier (`printWidth: 120`), and
   `pnpm format:check` reports unformatted files without changing them; CI runs the
   check on Linux with Node.js 24.

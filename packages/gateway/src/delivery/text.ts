@@ -1,3 +1,4 @@
+/** @experimental */
 export function channelTextPages(text: string, limit: number): string[] {
   if (!Number.isSafeInteger(limit) || limit < 64) throw new Error("渠道文字长度限制无效。");
   if (text.length <= limit) return [text];

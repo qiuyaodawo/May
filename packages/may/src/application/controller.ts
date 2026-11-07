@@ -29,6 +29,7 @@ import type { AgentApplicationEvent, AgentRun, AgentWorkspaceEvent } from "./eve
  *
  * Applications may widen both the event and compaction-selection types while
  * retaining this lifecycle contract.
+ * @experimental
  */
 export interface AgentController<
   Event = AgentApplicationEvent,
@@ -61,7 +62,9 @@ export interface AgentController<
   updatePlugins?(plugins: readonly AnyPlugin[], options?: PluginUpdateOptions): Promise<void>;
 }
 
-/** Headless control surface for applications that expose multiple sessions. */
+/** Headless control surface for applications that expose multiple sessions.
+ * @experimental
+ */
 export interface AgentWorkspaceController<
   ApplicationEvent = AgentApplicationEvent,
   ExtensionEvent = never,
@@ -85,12 +88,16 @@ export interface AgentWorkspaceController<
   deleteSession(sessionId: string): Promise<boolean>;
 }
 
-/** 可以在当前上下文中继续执行的通用控制接口。 */
+/** 可以在当前上下文中继续执行的通用控制接口。
+ * @experimental
+ */
 export interface ContinuableAgentController extends AgentController {
   continue(options?: SessionContinueOptions): Promise<AgentRun>;
 }
 
-/** 支持持久化 Step 边界补充输入的控制接口。 */
+/** 支持持久化 Step 边界补充输入的控制接口。
+ * @experimental
+ */
 export interface SteerableAgentController extends ContinuableAgentController {
   steer(options: SessionSteerOptions): Promise<SessionSteeringInput>;
   listSteeringInputs(): readonly SessionSteeringInput[];

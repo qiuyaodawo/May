@@ -1,9 +1,11 @@
 import type { ChannelAccessSettings, ChannelAdapter, GroupTrigger } from "./types.js";
 import type { ChannelAttachment, ChannelInput } from "./store.js";
 
+/** @experimental */
 export async function boundedJson(response: Response): Promise<unknown> {
   return JSON.parse(Buffer.from(await boundedBytes(response, 1024 * 1024)).toString("utf8"));
 }
+/** @experimental */
 export async function boundedBytes(response: Response, maximum: number): Promise<Uint8Array> {
   if (!response.body) throw new Error("Empty platform response");
   const reader = response.body.getReader();
@@ -22,6 +24,7 @@ export async function boundedBytes(response: Response, maximum: number): Promise
     await reader.cancel();
   }
 }
+/** @experimental */
 export function channelAccepts(
   settings: ChannelAccessSettings,
   input: Pick<ChannelInput, "sender" | "conversation" | "kind">,
@@ -30,6 +33,7 @@ export function channelAccepts(
     ? (settings.allowGroups ?? []).includes(input.conversation)
     : settings.allowUsers.includes(input.sender);
 }
+/** @experimental */
 export function channelTrigger(
   settings: ChannelAccessSettings,
   input: Pick<ChannelInput, "conversation" | "threadId">,
@@ -45,6 +49,7 @@ export function channelTrigger(
     "explicit"
   );
 }
+/** @experimental */
 export function checkAttachment(adapter: ChannelAdapter, input: ChannelInput, attachment: ChannelAttachment): void {
   if (
     input.account !== adapter.account ||

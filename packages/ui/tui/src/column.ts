@@ -2,6 +2,7 @@ import type { Component, CursorPosition, RenderResult, RenderSize, PointerEvent 
 import { placeImages, type ImagePlacement } from "./component.js";
 import type { TextRow } from "./text-selection.js";
 
+/** @experimental */
 export interface ColumnItem {
   readonly component: Component;
   /** Exact preferred row count. Fixed regions are allocated before flex regions. */
@@ -11,11 +12,15 @@ export interface ColumnItem {
   readonly minHeight?: number;
 }
 
+/** @experimental */
 export interface ColumnOptions {
   readonly gap?: number;
 }
 
-/** Fixed/flexible vertical region layout with stable footer placement. */
+/**
+ * Fixed/flexible vertical region layout with stable footer placement.
+ * @experimental
+ */
 export class Column implements Component {
   private readonly gap: number;
   private regions: { component: Component; y: number; height: number }[] = [];

@@ -14,6 +14,12 @@ catalog to describe the current environment.
 
 ## Start the application
 
+For the `anthropic-messages` adapter, MaybeCode defaults `promptCaching` to
+`{ "ttl": "5m", "cacheInstructions": true }`. Set provider or model `options.promptCaching`
+to `false` to disable it. Five-minute writes cost 1.25x base input price, one-hour writes 2x,
+and reads normally 0.1x. Minimum cacheable length depends on the model; see
+[configuration](../reference/configuration.md). Compatible endpoints that reject `cache_control` require disabling it.
+
 MaybeCode requires Node.js 22 or newer.
 
 From the May repository root, run:
@@ -116,6 +122,15 @@ existing global development installation, use `pnpm remove --global @sortedyuan/
 
 ## Control tool approval
 
+Default coding tools are `read`, `glob`, `grep`, `shell`, `edit`, `write`, and
+`fetch`. Use `glob` for file names and `grep` for file contents; both respect
+`.gitignore` and have bounded output and runtime. Read-only sets contain `read`,
+`glob`, and `grep`. `fetch` reads HTTP/HTTPS text and converts HTML to readable
+text. It sends no host credentials or cookies. Public addresses are allowed by
+default; `apps.maybecode.fetch.allowedOrigins` restricts access to listed origins
+and can explicitly allow a local service. Every redirect is checked again.
+Network access has its own approval category and requires approval in default mode.
+
 Default mode requests approval before commands or file changes. `--yolo` enables
 automatic tool approval; `--no-yolo` overrides a configured YOLO default.
 Pause or cancel active work before changing mode with `/yolo on` or `/yolo off`.
@@ -125,6 +140,32 @@ The terminal and Web UI display **YOLO · Auto-approve** while enabled. Web UI a
 provides a **Permissions** selector. Explicit policy denials remain effective.
 See [permission mode](../reference/configuration.md#maybecode-permission-mode) for
 scope, restart behavior, persistent rules, and independent team authorization.
+
+## Configure execution isolation
+
+`apps.maybecode.execution` defaults to `{ "mode": "host" }`. Host commands use
+the launching account's permissions and environment. Container mode requires
+Docker Desktop or a compatible running Docker runtime. Pull the image before startup:
+
+```bash
+docker pull nixery.dev/shell/git/ripgrep/util-linux
+```
+
+The image must provide `bash`, `git`, `rg`, and `setsid`. Set image and resource
+limits using [configuration](../reference/configuration.md). Startup fails when
+Docker, the image, or required programs are unavailable.
+
+The application owns a long-running container. Shell, search, and delegated tools
+use its execution environment; team checks inherit the execution configuration.
+The workspace is mounted at `/workspace`; command working directories are translated
+from host paths. File tools access the same files through host workspace checks.
+The container uses a non-root user, a read-only root, temporary storage, no network,
+memory and CPU limits, and reduced privileges. Home directories, credentials, and
+the Docker socket are excluded from mounts. Cancellation waits for command termination;
+application close waits for execution cleanup and container removal.
+
+MCP servers remain on the host. `fetch` uses its separate host network policy and
+approval category.
 
 ## Send input during MaybeCode execution
 

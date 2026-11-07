@@ -2,6 +2,7 @@ import { omitUndefined, type MetricRecord, type TraceAttributes } from "@sortedy
 import type { FinishedTraceSpan, MetricRecorder, SpanObserver, StartedTraceSpan } from "./types.js";
 import { boundedAttributes } from "./limits.js";
 
+/** @experimental */
 export interface MetricSnapshot {
   readonly name: string;
   readonly kind: MetricRecord["kind"];
@@ -27,6 +28,7 @@ const LABEL_KEYS = new Set([
 ]);
 const BOUNDARIES = [1, 10, 50, 100, 500, 1_000, 5_000, 10_000, 30_000, 60_000, 300_000];
 
+/** @experimental */
 export class BoundedMetrics implements MetricRecorder {
   private readonly series = new Map<
     string,
@@ -92,10 +94,12 @@ export class BoundedMetrics implements MetricRecorder {
   }
 }
 
+/** @experimental */
 export function metricAttributes(attributes: TraceAttributes): TraceAttributes {
   return boundedAttributes(Object.fromEntries(Object.entries(attributes).filter(([key]) => LABEL_KEYS.has(key))));
 }
 
+/** @experimental */
 export class SpanMetrics implements SpanObserver {
   private readonly activeAttributes = new WeakMap<import("@sortedyuan/may/core").TraceContext, TraceAttributes>();
   constructor(private readonly metrics: MetricRecorder) {}

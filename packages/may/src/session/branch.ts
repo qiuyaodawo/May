@@ -1,6 +1,7 @@
 import type { Message } from "../core/index.js";
 import type { SessionEvent, SessionForkOrigin } from "./events.js";
 
+/** @experimental */
 export interface SessionBranchPosition {
   readonly sessionId: string;
   readonly runId: string;
@@ -12,18 +13,22 @@ export interface SessionBranchPosition {
   readonly reason?: string;
 }
 
+/** @experimental */
 export interface SessionBranchNode {
   readonly sessionId: string;
   readonly fork?: SessionForkOrigin;
   readonly positions: readonly SessionBranchPosition[];
 }
 
+/** @experimental */
 export interface SessionBranchCompletionOptions {
   /** 宿主已经验证调度暂停的请求成功完成，并保存全部状态。 */
   readonly allowYielded?: boolean;
 }
 
-/** 只有完整处理完成并保存状态的位置能够用于分支。 */
+/** 只有完整处理完成并保存状态的位置能够用于分支。
+ * @experimental
+ */
 export function readSessionBranchPositions(history: readonly SessionEvent[]): readonly SessionBranchPosition[] {
   const positions = new Map<string, SessionBranchPosition>();
   const completedRuns = new Set<string>();
@@ -91,6 +96,7 @@ export function readSessionBranchPositions(history: readonly SessionEvent[]): re
   );
 }
 
+/** @experimental */
 export function readSessionBranchNode(history: readonly SessionEvent[]): SessionBranchNode {
   const created = history[0];
   if (created?.type !== "session.created") throw new Error("Session history has no creation event");

@@ -73,7 +73,7 @@ export class MaybeCodeTerminalWeb {
       browserLogin: true,
       exit: () => {
         if (this.exit) this.exit();
-        else void this.close();
+        else this.beginClose();
       },
     });
     const server = await this.starting;
@@ -82,7 +82,16 @@ export class MaybeCodeTerminalWeb {
   }
 
   close(): Promise<void> {
-    return (this.closing ??= this.closeOwnedResources());
+    this.beginClose();
+    return this.closing!.then(() => {
+      if (this.failure !== undefined) throw this.failure;
+    });
+  }
+
+  private beginClose(): void {
+    this.closing ??= this.closeOwnedResources().catch((error) => {
+      this.failure = error;
+    });
   }
 
   private async closeOwnedResources(): Promise<void> {

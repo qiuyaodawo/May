@@ -1,12 +1,14 @@
 import type { AssistantMessage, ContentPart, ToolCall, Usage, UserMessage } from "./types.js";
 import type { RunBudgetSnapshot } from "./budget.js";
 
+/** @public */
 export interface SerializedError {
   name: string;
   message: string;
   code?: string;
 }
 
+/** @experimental */
 export interface RunResult {
   /** Present only when the host ended this Run at a safe boundary, not task completion. */
   finishReason?: "yielded";
@@ -20,6 +22,7 @@ export interface RunResult {
   budget?: RunBudgetSnapshot;
 }
 
+/** @experimental */
 export type MayEventPayload =
   | { type: "run.budget.exceeded"; dimension: string; limit: number; consumed: number; budget: RunBudgetSnapshot }
   | { type: "run.started"; continuation?: boolean }
@@ -79,12 +82,14 @@ export type MayEventPayload =
   | { type: "run.failed"; error: SerializedError }
   | { type: "run.cancelled"; reason?: string };
 
+/** @experimental */
 export type MayEvent = MayEventPayload & {
   runId: string;
   seq: number;
   timestamp: number;
 };
 
+/** @experimental */
 export function serializeError(error: unknown): SerializedError {
   if (error instanceof Error) {
     const result: SerializedError = {
@@ -105,6 +110,7 @@ export function serializeError(error: unknown): SerializedError {
   };
 }
 
+/** @experimental */
 export function isStreamingMayEvent(event: MayEvent): boolean {
   return (
     event.type === "model.text.delta" ||
@@ -114,6 +120,7 @@ export function isStreamingMayEvent(event: MayEvent): boolean {
   );
 }
 
+/** @experimental */
 export interface AsyncEventQueueOptions<T> {
   /** Preferred maximum; non-droppable values may temporarily exceed it. */
   readonly maxBufferedValues?: number;
@@ -121,6 +128,7 @@ export interface AsyncEventQueueOptions<T> {
   readonly isDroppable?: (value: T) => boolean;
 }
 
+/** @experimental */
 export class AsyncEventQueue<T> implements AsyncIterable<T> {
   private readonly values: T[] = [];
   private readonly waiters: Array<(result: IteratorResult<T>) => void> = [];

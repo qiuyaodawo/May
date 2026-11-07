@@ -1,6 +1,5 @@
 import { acquireFileLock, hasErrorCode, type FileLock } from "@sortedyuan/may/storage";
 import { createHash } from "node:crypto";
-import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, readdir, realpath, type FileHandle } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -8,6 +7,7 @@ import { isDeepStrictEqual } from "node:util";
 import { AsyncStateSerializer } from "@sortedyuan/may/core";
 import type { TaskExecution } from "@sortedyuan/coordination";
 import type { Tool } from "@sortedyuan/may/core";
+import { openCodingExecutionEnvironment, type CodingExecutionEnvironment } from "@sortedyuan/coding-tools";
 
 export type TeamCheckSpec =
   | {
@@ -123,11 +123,13 @@ export class TeamVerificationStore {
     private readonly file: FileHandle,
     private readonly lock: FileLock,
     private readonly checks: readonly TeamCheckSpec[],
+    private readonly executionFor?: (workspace: string) => Promise<CodingExecutionEnvironment>,
   ) {}
 
   static async open(options: {
     readonly directory: string;
     readonly checks?: readonly TeamCheckSpec[];
+    readonly executionFor?: (workspace: string) => Promise<CodingExecutionEnvironment>;
   }): Promise<TeamVerificationStore> {
     const checks = parseTeamChecks(options.checks ?? []);
     await mkdir(options.directory, { recursive: true });
@@ -150,7 +152,7 @@ export class TeamVerificationStore {
           await repair.close();
         }
       }
-      const store = new TeamVerificationStore(file, lock, checks);
+      const store = new TeamVerificationStore(file, lock, checks, options.executionFor);
       store.size = committed;
       for (const entry of entries) {
         store.apply(entry.event);
@@ -498,7 +500,7 @@ export class TeamVerificationStore {
     if (!fresh) return pending;
     let outcome: Pick<TeamCheckResult, "status" | "detail" | "exitCode" | "output">;
     try {
-      if (spec.type === "command") outcome = await runCommand(spec, workspace, options.signal);
+      if (spec.type === "command") outcome = await runCommand(spec, workspace, options.signal, this.executionFor);
       else {
         options.signal?.throwIfAborted();
         const bytes = await readWorkspaceFile(workspace, spec.path);
@@ -695,6 +697,23 @@ async function runCommand(
   spec: Extract<TeamCheckSpec, { type: "command" }>,
   workspace: string,
   signal?: AbortSignal,
+  executionFor?: (workspace: string) => Promise<CodingExecutionEnvironment>,
+): Promise<Pick<TeamCheckResult, "status" | "detail" | "exitCode" | "output">> {
+  const environment = executionFor
+    ? await executionFor(workspace)
+    : await openCodingExecutionEnvironment({ workspace, isolation: { mode: "host" } });
+  try {
+    return await runEnvironmentCommand(spec, workspace, environment, signal);
+  } finally {
+    if (!executionFor) await environment.close();
+  }
+}
+
+async function runEnvironmentCommand(
+  spec: Extract<TeamCheckSpec, { type: "command" }>,
+  workspace: string,
+  environment: CodingExecutionEnvironment,
+  signal?: AbortSignal,
 ): Promise<Pick<TeamCheckResult, "status" | "detail" | "exitCode" | "output">> {
   signal?.throwIfAborted();
   if (process.platform === "win32" && /\.(?:cmd|bat)$/iu.test(spec.command))
@@ -704,7 +723,7 @@ async function runCommand(
         "Command checks execute native programs directly. Use node.exe with the package manager JavaScript entry point, not .cmd/.bat.",
     };
   const cwd = await realpath(workspace);
-  const env: NodeJS.ProcessEnv = {};
+  const env: Record<string, string> = {};
   // No inherited API keys, proxy tokens, NODE_OPTIONS, package hooks, or user home config.
   for (const key of [
     "PATH",
@@ -719,24 +738,28 @@ async function runCommand(
     "LANG",
     "LC_ALL",
   ])
-    if (process.env[key] !== undefined) env[key] = process.env[key];
+    if (environment.isolation.mode === "host" && process.env[key] !== undefined) env[key] = process.env[key];
   env.CI = "1";
-  return new Promise((resolveResult) => {
+  return new Promise((resolveResult, rejectResult) => {
+    const cancellation = new AbortController();
     let output = Buffer.alloc(0);
     let reason: string | undefined;
     let settled = false;
-    const child = spawn(spec.command, [...spec.args], {
+    const child = environment.spawn(spec.command, spec.args, {
       cwd,
       env,
-      shell: false,
-      windowsHide: true,
-      stdio: ["ignore", "pipe", "pipe"],
+      signal: cancellation.signal,
     });
+    const stdout = child.stdout;
+    const stderr = child.stderr;
+    if (!stdout || !stderr) {
+      rejectResult(new Error("Execution environment must provide command output pipes"));
+      return;
+    }
     const finish = (status: "passed" | "failed" | "unknown", exitCode?: number, detail?: string) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      clearTimeout(killWait);
       signal?.removeEventListener("abort", abort);
       resolveResult({
         status,
@@ -745,17 +768,10 @@ async function runCommand(
         output: boundedOutput(output, spec.maxOutputBytes ?? 65536),
       });
     };
-    let killWait: ReturnType<typeof setTimeout> | undefined;
     const stop = (detail: string) => {
       if (reason) return;
       reason = detail;
-      child.kill("SIGKILL");
-      // A descendant may retain inherited pipes. No process-tree or OS isolation guarantee.
-      killWait = setTimeout(() => {
-        child.stdout.destroy();
-        child.stderr.destroy();
-        finish("unknown", undefined, `${detail}; child effects require inspection`);
-      }, 1000);
+      cancellation.abort();
     };
     const abort = () => stop("Check interrupted");
     const timer = setTimeout(() => stop("Check timed out"), spec.timeoutMs ?? 30000);
@@ -766,8 +782,8 @@ async function runCommand(
         stop("Check output limit exceeded");
       } else output = Buffer.concat([output, chunk]);
     };
-    child.stdout.on("data", collect);
-    child.stderr.on("data", collect);
+    stdout.on("data", collect);
+    stderr.on("data", collect);
     child.on("error", (error) => finish(child.pid === undefined ? "failed" : "unknown", undefined, message(error)));
     child.on("close", (code, terminationSignal) => {
       if (reason || terminationSignal || code === null)

@@ -1,8 +1,11 @@
+/** @experimental */
 export type JsonSchema = Readonly<Record<string, unknown>>;
 
+/** @public */
 export type MediaSource =
   { type: "url"; url: string } | { type: "base64"; mediaType: string; data: string } | { type: "file"; fileId: string };
 
+/** @public */
 export type ContentPart =
   | { type: "text"; text: string }
   | { type: "reasoning"; text: string }
@@ -22,22 +25,26 @@ export type ContentPart =
       mediaType?: string;
     };
 
+/** @public */
 export interface SystemMessage {
   role: "system";
   content: ContentPart[];
 }
 
+/** @public */
 export interface UserMessage {
   role: "user";
   content: ContentPart[];
 }
 
+/** @public */
 export interface ToolCall {
   id: string;
   name: string;
   input: unknown;
 }
 
+/** @public */
 export interface ModelState<Data = unknown> {
   /** Adapter-owned, namespaced, and versioned state identifier. */
   type: string;
@@ -45,6 +52,7 @@ export interface ModelState<Data = unknown> {
   data: Data;
 }
 
+/** @public */
 export interface AssistantMessage {
   role: "assistant";
   content: ContentPart[];
@@ -53,6 +61,7 @@ export interface AssistantMessage {
   modelState?: ModelState;
 }
 
+/** @public */
 export interface ToolMessage {
   role: "tool";
   toolCallId: string;
@@ -61,8 +70,10 @@ export interface ToolMessage {
   isError?: boolean;
 }
 
+/** @public */
 export type Message = SystemMessage | UserMessage | AssistantMessage | ToolMessage;
 
+/** @experimental */
 export interface Usage {
   inputTokens?: number;
   outputTokens?: number;
@@ -81,9 +92,12 @@ export interface Usage {
   reportedCost?: { readonly amount: number; readonly currency: string; readonly source: string };
 }
 
-/** total 表示仅计入 totalTokens，inputTokens 和 outputTokens 均不包含该项目。 */
+/** total 表示仅计入 totalTokens，inputTokens 和 outputTokens 均不包含该项目。
+ * @experimental
+ */
 export type UsageTokenRelation = "input" | "output" | "total" | "none" | "unknown";
 
+/** @experimental */
 export interface UsageItem {
   readonly id: string;
   readonly quantity: number;
@@ -92,19 +106,24 @@ export interface UsageItem {
   readonly includedIn: "input" | "output" | "cachedRead" | "cachedWrite" | "reasoning" | "cost" | "none" | "unknown";
 }
 
+/** @experimental */
 export function textContent(text: string): ContentPart[] {
   return [{ type: "text", text }];
 }
 
+/** @experimental */
 export function reasoningContent(text: string): ContentPart[] {
   return [{ type: "reasoning", text }];
 }
 
+/** @experimental */
 export function userMessage(text: string): UserMessage {
   return { role: "user", content: textContent(text) };
 }
 
-/** Close a provider tool call when its run is cancelled before execution ends. */
+/** Close a provider tool call when its run is cancelled before execution ends.
+ * @experimental
+ */
 export function toolCancellationMessage(call: Readonly<ToolCall>, reason?: string): ToolMessage {
   return {
     role: "tool",

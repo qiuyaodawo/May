@@ -1,8 +1,9 @@
-import { createApplicationConfigValidator, type MayConfig } from "@sortedyuan/may/config";
+import { createApplicationConfigValidator, MayConfigValidationError, type MayConfig } from "@sortedyuan/may/config";
 import type { RunBudget } from "@sortedyuan/may/core";
 import type { PluginModuleSelection } from "@sortedyuan/may/plugin";
 import type { MaybeCodeSubagentSettings } from "@sortedyuan/coordination/delegation/configuration";
 import section from "./config-schema.json" with { type: "json" };
+import type { CodingExecutionIsolation, FetchToolOptions } from "@sortedyuan/coding-tools";
 
 export const MAYBECODE_APPLICATION_ID = "maybecode";
 
@@ -82,6 +83,8 @@ export interface MaybeCodeRetrySettings {
 
 /** The `apps.maybecode` entry of a May configuration file, validated against `config-schema.json`. */
 export interface MaybeCodeSettings {
+  readonly execution?: CodingExecutionIsolation;
+  readonly fetch?: FetchToolOptions;
   readonly requestRecording?: "off" | "required";
   readonly providerBodyRecording?: boolean;
   readonly git?: false | MaybeCodeGitSettings;
@@ -104,5 +107,14 @@ export const maybeCodeConfigSection = section;
 const validate = createApplicationConfigValidator<MaybeCodeSettings>(MAYBECODE_APPLICATION_ID, section);
 
 export function readMaybeCodeSettings(config: MayConfig): MaybeCodeSettings {
-  return validate(config.apps?.[MAYBECODE_APPLICATION_ID] ?? {}, config.path);
+  const settings = validate(config.apps?.[MAYBECODE_APPLICATION_ID] ?? {}, config.path);
+  for (const [index, origin] of (settings.fetch?.allowedOrigins ?? []).entries()) {
+    if (!URL.canParse(origin) || new URL(origin).origin !== origin)
+      throw new MayConfigValidationError(
+        config.path,
+        `apps.maybecode.fetch.allowedOrigins.${index}`,
+        "must be a canonical HTTP or HTTPS origin",
+      );
+  }
+  return settings;
 }

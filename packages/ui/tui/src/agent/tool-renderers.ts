@@ -4,6 +4,7 @@ import type { TextDocumentLine } from "../text-selection.js";
 import { styleText, type TuiTheme } from "../theme.js";
 import type { ToolTranscriptItem } from "./transcript-store.js";
 
+/** @experimental */
 export interface ToolTranscriptRenderOptions {
   readonly expanded: boolean;
   readonly selected?: boolean;
@@ -12,12 +13,16 @@ export interface ToolTranscriptRenderOptions {
   readonly detailsHint?: string;
 }
 
+/** @experimental */
 export interface ToolTranscriptRenderer {
   render(item: ToolTranscriptItem, options: ToolTranscriptRenderOptions): string;
   renderDocument?(item: ToolTranscriptItem, options: ToolTranscriptRenderOptions): readonly TextDocumentLine[];
 }
 
-/** Instance-scoped registry: applications can replace presentation without global state. */
+/**
+ * Instance-scoped registry: applications can replace presentation without global state.
+ * @experimental
+ */
 export class ToolRendererRegistry {
   private readonly renderers = new Map<string, ToolTranscriptRenderer>();
   private generation = 0;
@@ -53,7 +58,10 @@ export class ToolRendererRegistry {
   }
 }
 
-/** Create renderers for the standard May coding tools. */
+/**
+ * Create renderers for the standard May coding tools.
+ * @experimental
+ */
 export function createCodingToolRendererRegistry(): ToolRendererRegistry {
   return new ToolRendererRegistry()
     .register("shell", shellRenderer)
@@ -272,6 +280,7 @@ function appendFailure(
   }
 }
 
+/** @experimental */
 export function renderDiff(diff: string, theme: TuiTheme): TextDocumentLine[] {
   return sanitizeTerminalText(diff)
     .split("\n")

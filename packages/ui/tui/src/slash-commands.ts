@@ -1,3 +1,4 @@
+/** @experimental */
 export interface SlashCommandDefinition<Name extends string = string> {
   readonly name: Name;
   readonly aliases?: readonly string[];
@@ -5,6 +6,7 @@ export interface SlashCommandDefinition<Name extends string = string> {
   readonly description: string;
 }
 
+/** @experimental */
 export interface SlashCommandInvocation<Definition extends SlashCommandDefinition = SlashCommandDefinition> {
   readonly type: "command";
   readonly definition: Definition;
@@ -12,11 +14,13 @@ export interface SlashCommandInvocation<Definition extends SlashCommandDefinitio
   readonly arguments: readonly string[];
 }
 
+/** @experimental */
 export type SlashCommandParseResult<Definition extends SlashCommandDefinition = SlashCommandDefinition> =
   | SlashCommandInvocation<Definition>
   | { readonly type: "not-command" }
   | { readonly type: "unknown"; readonly command: string };
 
+/** @experimental */
 export interface SlashCommandSuggestion {
   /** Full input value represented by this suggestion. */
   readonly value: string;
@@ -24,6 +28,7 @@ export interface SlashCommandSuggestion {
   readonly description?: string;
 }
 
+/** @experimental */
 export interface SlashCommandArgumentContext<Definition extends SlashCommandDefinition = SlashCommandDefinition> {
   readonly input: string;
   readonly invokedAs: string;
@@ -31,13 +36,18 @@ export interface SlashCommandArgumentContext<Definition extends SlashCommandDefi
   readonly definition: Definition;
 }
 
+/** @experimental */
 export type SlashCommandArgumentSuggester<Definition extends SlashCommandDefinition = SlashCommandDefinition> = (
   context: SlashCommandArgumentContext<Definition>,
 ) => readonly SlashCommandSuggestion[] | Promise<readonly SlashCommandSuggestion[]>;
 
+/** @experimental */
 export type SlashCommandSuggester = (input: string) => Promise<readonly SlashCommandSuggestion[]>;
 
-/** Validated, case-insensitive registry for slash-command parsing and completion. */
+/**
+ * Validated, case-insensitive registry for slash-command parsing and completion.
+ * @experimental
+ */
 export class SlashCommandRegistry<Definition extends SlashCommandDefinition = SlashCommandDefinition> {
   readonly definitions: readonly Definition[];
 
@@ -113,6 +123,7 @@ export class SlashCommandRegistry<Definition extends SlashCommandDefinition = Sl
   }
 }
 
+/** @experimental */
 export function splitSlashCommandArgumentInput(input: string):
   | {
       readonly invokedAs: string;

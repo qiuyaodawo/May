@@ -6,6 +6,7 @@ import { isDeepStrictEqual } from "node:util";
 import type { Tool } from "@sortedyuan/may/core";
 import { ResourceJournal, count, resourceId } from "./resource-journal.js";
 
+/** @experimental */
 export interface ArtifactReference {
   readonly id: string;
   readonly ownerTaskId: string;
@@ -15,12 +16,14 @@ export interface ArtifactReference {
   readonly sha256: string;
 }
 
+/** @experimental */
 export interface ArtifactContent {
   readonly name: string;
   readonly text: string;
   readonly mimeType?: string;
 }
 
+/** @experimental */
 export interface ArtifactStoreOptions {
   /** Required when supplying a custom ACL; changing it on resume is rejected. */
   readonly policyVersion?: string;
@@ -33,6 +36,7 @@ export interface ArtifactStoreOptions {
   readonly maxTotalBytes?: number;
 }
 
+/** @experimental */
 export interface TaskArtifacts {
   publish(commandId: string, content: ArtifactContent): Promise<ArtifactReference>;
   read(artifactId: string): Promise<ArtifactReference & { readonly text: string }>;
@@ -52,7 +56,9 @@ interface ArtifactState {
   readonly artifacts: readonly ArtifactReference[];
 }
 
-/** Immutable UTF-8 artifacts. Only explicit references cross task/session boundaries. */
+/** Immutable UTF-8 artifacts. Only explicit references cross task/session boundaries.
+ * @experimental
+ */
 export class FileArtifactStore {
   private constructor(
     private readonly journal: ResourceJournal<ArtifactState>,

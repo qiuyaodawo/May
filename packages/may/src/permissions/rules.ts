@@ -1,3 +1,4 @@
+/** @experimental */
 export interface PersistentPermissionRule {
   readonly id: string;
   readonly scopeId: string;
@@ -11,6 +12,7 @@ export interface PersistentPermissionRule {
   readonly expiresAt?: number;
 }
 
+/** @experimental */
 export interface PermissionRuleStore {
   list(scopeId?: string): Promise<readonly PersistentPermissionRule[]>;
   create(rule: PersistentPermissionRule): Promise<void>;
@@ -79,6 +81,7 @@ export function copyPermissionRule(value: unknown): PersistentPermissionRule {
   });
 }
 
+/** @experimental */
 export class InMemoryPermissionRuleStore implements PermissionRuleStore {
   private readonly rules = new Map<string, PersistentPermissionRule>();
 

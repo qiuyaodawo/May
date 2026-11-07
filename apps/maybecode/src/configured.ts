@@ -72,6 +72,7 @@ import {
   type MaybeCodeSubagentRole,
 } from "@sortedyuan/coordination/delegation/configuration";
 
+/** @experimental */
 export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly git?: false | Omit<ProjectGitWorkspaceOptions, "workspace">;
   readonly plugins?: readonly AnyPlugin[];
@@ -108,6 +109,7 @@ export interface OpenConfiguredMaybeCodeOptions extends MaybeCodeModelSelector {
   readonly subagents?: false | MaybeCodeSubagentConfigurationOptions;
 }
 
+/** @experimental */
 export interface MaybeCodeSubagentConfigurationOptions {
   /** 角色、限制与额度；缺省时注册 worker 角色。 */
   readonly configuration?: MaybeCodeSubagentConfiguration;
@@ -116,12 +118,14 @@ export interface MaybeCodeSubagentConfigurationOptions {
   /** 声明了自己 profile 的角色使用的模型配置工厂。 */
   readonly createModel?: (role: MaybeCodeSubagentRole) => MaybeCodeModelConfiguration;
 }
+/** @experimental */
 export interface MaybeCodeMcpOptions {
   readonly servers: readonly McpServerOptions[];
   readonly oauth?: McpOAuthManager;
   readonly taskJournal?: McpTaskJournal;
 }
 
+/** @experimental */
 export interface MaybeCodeObservabilityOptions {
   /** Absolute path, or a path relative to MaybeCode's data directory. */
   readonly file?: string;
@@ -133,6 +137,7 @@ export interface MaybeCodeObservabilityOptions {
   readonly scheduledDelayMs?: number;
 }
 
+/** @experimental */
 export interface ConfiguredMaybeCodeDependencies {
   readonly loadConfig?: (options?: LoadMayConfigOptions) => Promise<MayConfig>;
   readonly createModel?: (selection: SelectedMaybeCodeModel) => Model;
@@ -178,6 +183,7 @@ function resolveGitConfigurationPath(configPath: string, path: string): string {
   return resolve(dirname(configPath), path);
 }
 
+/** @experimental */
 export async function openConfiguredMaybeCode(
   options: OpenConfiguredMaybeCodeOptions = {},
   dependencies: ConfiguredMaybeCodeDependencies = {},
@@ -377,6 +383,7 @@ export async function openConfiguredMaybeCode(
     workspacePlugins.set(workspace, applicationPlugins);
     application = await MaybeCodeWorkspace.open({
       git,
+      ...omitUndefined({ execution: settings.execution, fetch: settings.fetch }),
       ...(await permissionsFor(workspace)),
       configureWorkspace: async (nextWorkspace) => {
         const directories = options.skillDirectories ?? resolveMaybeCodeSkillDirectories(config, nextWorkspace);

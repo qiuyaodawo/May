@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+/** @experimental */
 export function digest(value: unknown): string {
   return createHash("sha256")
     .update(JSON.stringify(canonical(value)))
@@ -17,6 +18,7 @@ function canonical(value: unknown): unknown {
   }
   return value;
 }
+/** @experimental */
 export function validateId(id: string): void {
   if (!/^[a-f0-9]{64}$/u.test(id)) throw new Error("Invalid channel record id");
 }

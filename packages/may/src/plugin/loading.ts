@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 import { resolve } from "import-meta-resolve";
 import type { AnyPlugin } from "./types.js";
 
+/** @experimental */
 export interface PluginModuleSelection {
   readonly module: string;
   readonly export?: string;
@@ -10,6 +11,7 @@ export interface PluginModuleSelection {
   readonly enabled?: boolean;
 }
 
+/** @experimental */
 export function parsePluginSelections(value: unknown): readonly PluginModuleSelection[] {
   if (value === undefined) return [];
   if (!Array.isArray(value)) throw new TypeError("Plugin selections must be an array");
@@ -39,7 +41,9 @@ export function parsePluginSelections(value: unknown): readonly PluginModuleSele
   });
 }
 
-/** 模块按照配置文件位置解析，加载期间由模块自身遵守资源初始化规则。 */
+/** 模块按照配置文件位置解析，加载期间由模块自身遵守资源初始化规则。
+ * @experimental
+ */
 export async function loadPluginModules(
   selections: readonly PluginModuleSelection[],
   parent: string | URL,

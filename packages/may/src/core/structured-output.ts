@@ -7,6 +7,7 @@ import type { AssistantMessage, JsonSchema } from "./types.js";
 
 const validators = new Map<string, ValidateFunction>();
 
+/** @experimental */
 export function modelSchemaDialect(schema: JsonSchema): "draft-07" | "2020-12" {
   if (typeof schema !== "object" || schema === null || Array.isArray(schema))
     throw new TypeError("Model schema must be a JSON Schema object");
@@ -21,6 +22,7 @@ export function modelSchemaDialect(schema: JsonSchema): "draft-07" | "2020-12" {
   throw new TypeError("Supported schema dialects are draft-07 and 2020-12");
 }
 
+/** @experimental */
 export function compileModelSchema(schema: JsonSchema): ValidateFunction {
   const dialect = modelSchemaDialect(schema);
   const key = JSON.stringify(schema);
@@ -40,6 +42,7 @@ export function compileModelSchema(schema: JsonSchema): ValidateFunction {
   return validator;
 }
 
+/** @experimental */
 export function assertModelResponseFormat(request: ModelRequest): void {
   const format = request.responseFormat;
   if (format === undefined) return;
@@ -53,6 +56,7 @@ export function assertModelResponseFormat(request: ModelRequest): void {
   compileModelSchema(format.schema);
 }
 
+/** @experimental */
 export function validateStructuredModelResponse(
   message: AssistantMessage,
   request: ModelRequest,

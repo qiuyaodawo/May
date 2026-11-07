@@ -15,8 +15,10 @@ const UTF8_DECODER = new TextDecoder("utf-8", {
   ignoreBOM: true,
 });
 
+/** @experimental */
 export type FileChangeKind = "create" | "update" | "no-change";
 
+/** @experimental */
 export type ToolChangePreview =
   | {
       readonly status: "ready";
@@ -40,15 +42,24 @@ export type ToolChangePreview =
  * The wire value intentionally retains its original identifier so sessions
  * created by earlier MaybeCode versions remain replayable after this component
  * moved into `@sortedyuan/coding-tools`.
+ * @experimental
  */
 export const TOOL_CHANGE_PREVIEW_PRESENTATION_KIND = "maybecode.change-preview";
+/** @experimental */
 export const TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION = 1;
 
-/** @deprecated Use `TOOL_CHANGE_PREVIEW_PRESENTATION_KIND`. */
+/**
+ * @deprecated Use `TOOL_CHANGE_PREVIEW_PRESENTATION_KIND`.
+ * @experimental
+ */
 export const MAYBECODE_CHANGE_PREVIEW_PRESENTATION_KIND = TOOL_CHANGE_PREVIEW_PRESENTATION_KIND;
-/** @deprecated Use `TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION`. */
+/**
+ * @deprecated Use `TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION`.
+ * @experimental
+ */
 export const MAYBECODE_CHANGE_PREVIEW_PRESENTATION_VERSION = TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION;
 
+/** @experimental */
 export function decodeToolChangePreviewPresentation(
   kind: string,
   version: number,
@@ -64,6 +75,7 @@ export function decodeToolChangePreviewPresentation(
   return data;
 }
 
+/** @experimental */
 export async function createToolChangePreview(
   workspace: string,
   toolName: string,

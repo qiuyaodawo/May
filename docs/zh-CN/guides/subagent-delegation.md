@@ -45,6 +45,13 @@ Goal 的 Run 与 steering 的 Run 同样是一次请求，因此宿主启动的�
 
 ## 配置
 
+角色工具列表接受 `read`、`glob`、`grep`、`shell`、`edit`、`write` 和 `fetch`。
+默认 worker 获得这些编码工具；只读集合包含 `read`、`glob` 和 `grep`。角色显式
+声明的列表限制其可用工具。子任务继承应用的执行环境和 fetch 配置。shell 和搜索
+在配置的宿主或容器环境执行，文件工具访问共享宿主工作区。`fetch` 使用独立的
+网络审批和地址检查。MCP server 保持在宿主运行。参阅
+[执行配置](../reference/configuration.md)。
+
 在宿主使用的 May 配置中合并 `apps.maybecode.subagents`。下文的
 `reviewer.model` 是已配置模型名称，需要替换为配置中存在的名称，并确认模型
 支持所选 reasoning effort。以下限制用于展示配置格式，实际默认值见片段之后。

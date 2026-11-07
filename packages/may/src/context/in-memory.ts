@@ -5,6 +5,7 @@ import { SnapshotContextController } from "./controller.js";
 import { PruneOldToolResultsStrategy } from "./prune-old-tool-results.js";
 import type { ContextFactory, ContextFactoryOptions, ManagedContext } from "./factory.js";
 
+/** @experimental */
 export class InMemoryContextFactory implements ContextFactory {
   create(options: ContextFactoryOptions): ManagedContext {
     const context = new ReplaceableInMemoryContext({

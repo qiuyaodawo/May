@@ -16,6 +16,7 @@ import {
 } from "@sortedyuan/may/core";
 import { ResourceJournal, amount, count, resourceId } from "./resource-journal.js";
 
+/** @experimental */
 export interface SharedBudgetLimits {
   readonly maxModelCalls: number;
   readonly maxTotalTokens?: number;
@@ -24,16 +25,20 @@ export interface SharedBudgetLimits {
   readonly pricing?: TokenPriceSchedule;
 }
 
+/** @experimental */
 export interface SharedBudgetOptions {
   readonly usagePricer?: UsagePricer;
 }
 
-/** Host-selected upper estimate. Provider output limits must be configured separately. */
+/** Host-selected upper estimate. Provider output limits must be configured separately.
+ * @experimental
+ */
 export interface ModelReservation {
   readonly totalTokens: number;
   readonly costUsd?: number;
 }
 
+/** @experimental */
 export interface SharedBudgetCall {
   readonly id: string;
   readonly status: "pending" | "settled" | "unknown";
@@ -48,6 +53,7 @@ export interface SharedBudgetCall {
   readonly reconciliation?: string;
 }
 
+/** @experimental */
 export interface SharedBudgetSnapshot {
   readonly format: 1;
   readonly revision: number;
@@ -56,6 +62,7 @@ export interface SharedBudgetSnapshot {
   readonly calls: readonly SharedBudgetCall[];
 }
 
+/** @experimental */
 export interface SharedBudgetTotals {
   readonly modelCalls: number;
   /** Includes pending/unknown reservations; not merely completed calls. */
@@ -72,13 +79,17 @@ export interface SharedBudgetTotals {
   readonly costComplete?: boolean;
 }
 
-/** 不经过 Model 接口发起的调用的结果。 */
+/** 不经过 Model 接口发起的调用的结果。
+ * @experimental
+ */
 export interface ExternalCallResult {
   /** provider 上报的 usage；缺失时按预留值计账并标记为估计值。 */
   readonly usage?: Usage;
 }
 
-/** Team-wide, single-host model-call accounting, independent of individual Run budgets. */
+/** Team-wide, single-host model-call accounting, independent of individual Run budgets.
+ * @experimental
+ */
 export class FileSharedBudget {
   private readonly active = new Set<string>();
   private failed = false;
@@ -407,6 +418,7 @@ export class FileSharedBudget {
   }
 }
 
+/** @experimental */
 export function sharedBudgetTotals(snapshot: SharedBudgetSnapshot): SharedBudgetTotals {
   // 预留超出只在账本设有 token 或成本上限时才阻塞：没有上限时真实用量就是事实。
   const bounded = snapshot.limits.maxTotalTokens !== undefined || snapshot.limits.maxCostUsd !== undefined;

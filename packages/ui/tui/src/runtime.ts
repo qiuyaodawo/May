@@ -3,6 +3,7 @@ import type { InteractiveComponent, PointerEvent, RenderResult, RenderSize } fro
 import type { TerminalWriter } from "./renderer.js";
 import type { TerminalImageSupport } from "./image-support.js";
 
+/** @experimental */
 export interface RuntimeTerminal extends TerminalWriter {
   readonly imageSupport?: TerminalImageSupport;
   readonly size: RenderSize;
@@ -14,12 +15,14 @@ export interface RuntimeTerminal extends TerminalWriter {
   onResize(listener: (size: RenderSize) => void): () => void;
 }
 
+/** @experimental */
 export interface RuntimeRenderer {
   render(result: RenderResult, size: RenderSize): void;
   invalidate(): void;
   dispose(options?: { readonly clear?: boolean }): void;
 }
 
+/** @experimental */
 export interface TuiRuntimeOptions {
   readonly terminal: RuntimeTerminal;
   readonly renderer: RuntimeRenderer;
@@ -28,7 +31,10 @@ export interface TuiRuntimeOptions {
   readonly onError?: (error: unknown) => void;
 }
 
-/** Owns terminal lifecycle, key dispatch, resize handling, and render batching. */
+/**
+ * Owns terminal lifecycle, key dispatch, resize handling, and render batching.
+ * @experimental
+ */
 export class TuiRuntime {
   private readonly terminal: RuntimeTerminal;
   private readonly renderer: RuntimeRenderer;

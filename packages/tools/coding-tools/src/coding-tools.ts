@@ -4,11 +4,19 @@ import { createEditTool, type EditToolOptions } from "./edit.js";
 import { createReadTool, type ReadToolOptions } from "./read.js";
 import { createShellTool, type ShellToolOptions } from "./shell.js";
 import { createWriteTool, type WriteToolOptions } from "./write.js";
+import { createGlobTool } from "./glob.js";
+import { createGrepTool } from "./grep.js";
+import { createFetchTool, type FetchToolOptions } from "./fetch.js";
+import type { CodingExecutionEnvironment } from "./execution.js";
 
-export type CodingToolName = "read" | "shell" | "edit" | "write";
+/** @experimental */
+export type CodingToolName = "read" | "shell" | "edit" | "write" | "glob" | "grep" | "fetch";
 
+/** @experimental */
 export interface CodingToolsOptions {
   readonly cwd: string;
+  readonly execution?: CodingExecutionEnvironment;
+  readonly fetch?: FetchToolOptions;
   readonly read?: Omit<ReadToolOptions, "cwd">;
   readonly shell?: Omit<ShellToolOptions, "cwd">;
   readonly edit?: Omit<EditToolOptions, "cwd">;
@@ -17,12 +25,23 @@ export interface CodingToolsOptions {
   readonly guard?: WorkspaceFileGuard;
 }
 
+/** @experimental */
 export function createCodingTool(name: CodingToolName, options: CodingToolsOptions): Tool {
   switch (name) {
     case "read":
       return createReadTool({ cwd: options.cwd, ...options.read, ...guardOf(options) });
     case "shell":
-      return createShellTool({ cwd: options.cwd, ...options.shell });
+      return createShellTool({
+        cwd: options.cwd,
+        ...options.shell,
+        ...omitUndefined({ execution: options.execution }),
+      });
+    case "glob":
+      return createGlobTool({ cwd: options.cwd, ...omitUndefined({ execution: options.execution }) });
+    case "grep":
+      return createGrepTool({ cwd: options.cwd, ...omitUndefined({ execution: options.execution }) });
+    case "fetch":
+      return createFetchTool(options.fetch ?? {});
     case "edit":
       return createEditTool({ cwd: options.cwd, ...options.edit, ...guardOf(options) });
     case "write":
@@ -35,15 +54,20 @@ function guardOf(options: CodingToolsOptions): { guard?: WorkspaceFileGuard } {
   return omitUndefined({ guard: options.guard });
 }
 
+/** @experimental */
 export function createCodingTools(options: CodingToolsOptions): Tool[] {
   return [
     createCodingTool("read", options),
     createCodingTool("shell", options),
     createCodingTool("edit", options),
     createCodingTool("write", options),
+    createCodingTool("glob", options),
+    createCodingTool("grep", options),
+    createCodingTool("fetch", options),
   ];
 }
 
+/** @experimental */
 export function createReadOnlyTools(options: CodingToolsOptions): Tool[] {
-  return [createCodingTool("read", options)];
+  return [createCodingTool("read", options), createCodingTool("glob", options), createCodingTool("grep", options)];
 }

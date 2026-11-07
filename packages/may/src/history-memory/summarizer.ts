@@ -9,7 +9,9 @@ errors, and remaining work. Do not invent details and do not call tools.`;
 
 const SUMMARY_REQUEST = "Produce the continuation summary now.";
 
-/** 创建用于编码会话继续执行的 Model summarizer。 */
+/** 创建用于编码会话继续执行的 Model summarizer。
+ * @experimental
+ */
 export function createModelContextSummarizer(model: Model): ContextSummarizer {
   return createReusableModelContextSummarizer(model, {
     instructions: SUMMARY_INSTRUCTIONS,

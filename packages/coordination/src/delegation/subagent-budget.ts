@@ -10,6 +10,7 @@ import {
   type SharedBudgetTotals,
 } from "../index.js";
 
+/** @experimental */
 export interface SubagentBudgetLimits extends SharedBudgetLimits {
   /**
    * 单次调用预留的 token 数。
@@ -40,6 +41,7 @@ export interface SubagentBudgetLimits extends SharedBudgetLimits {
  *   不会被当作成功；
  * - provider 原生压缩器上报 usage 时按真实用量计账；不上报时按预留值保守计账，
  *   账本把它标记为估计值，统计中不会把它当成完整用量。
+ * @experimental
  */
 export class SubagentRequestLedger {
   private readonly reservationTokens: number;
@@ -244,6 +246,7 @@ function compactionCallId(options: { readonly runId?: string; readonly step?: nu
  * 包裹模型：活动请求存在时按账本计账，没有活动请求时直接透传。
  *
  * 主会话模型与子 Agent 模型都使用这个包装，因此两者的调用计入同一本账。
+ * @experimental
  */
 export function withRequestBudget(model: Model, ledger: () => SubagentRequestLedger | undefined): Model {
   const compactor = model.contextCompactor;

@@ -76,7 +76,10 @@ export function createMcpTransport(options: McpServerOptions, oauth?: McpOAuthMa
   );
 }
 
-/** Validate before starting any endpoint, including optional endpoints. */
+/**
+ * Validate before starting any endpoint, including optional endpoints.
+ * @experimental
+ */
 export function validateMcpServerOptions(options: McpServerOptions): void {
   assertMcpServerId(options.id);
   if (options.tasks !== undefined && typeof options.tasks !== "boolean") invalid(options, "tasks must be a boolean");

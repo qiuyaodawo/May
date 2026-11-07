@@ -17,6 +17,7 @@ import {
 } from "@sortedyuan/may/core";
 import type { EvalTelemetryCollector } from "./telemetry.js";
 
+/** @experimental */
 export class EvalTrialBudget {
   private meter: RunBudgetMeter;
   private boundModels = 0;

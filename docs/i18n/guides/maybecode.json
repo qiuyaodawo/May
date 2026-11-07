@@ -13,8 +13,8 @@
     },
     {
       "heading": "Start the application",
-      "en": "ccdc0bbd76dbea50a7e558c82c8119c585bfbba02ea0080a0a984796d101e3ae",
-      "zh": "7fd2cd7caccb176c8ff94b864ff669c196b2237287fd382b9e485206861a541c"
+      "en": "690cc01b0802385df935eb338aebc8dda6a6d5ea49f8d83ec0f2509f06c17316",
+      "zh": "f43c380dd9b7ab132a84106df4465017bd85c46aee151ecfeaaef29228d05352"
     },
     {
       "heading": "First-run setup",
@@ -28,8 +28,13 @@
     },
     {
       "heading": "Control tool approval",
-      "en": "4c53195b03f35626faf83419e482ef4e074a7a746c7f8c3e72b7fd467837258b",
-      "zh": "39b6f760a166a666987989cfecc2d7c514d69d976fb199ff4582e4cead00fd03"
+      "en": "22f866616628f17ef9fa4e5ba4a165ae870bb167bdc68214f293e2083e614082",
+      "zh": "dd3d46efb77c2d28996780d76d134deb19a76e55a9da655fad826fa05b1e6dfe"
+    },
+    {
+      "heading": "Configure execution isolation",
+      "en": "bc084f072a134e5772e5fc0079d302852886a2ff7b2af441634dd78217a39cbb",
+      "zh": "9f1bf7781ec0e7ec38e685c567a84bbe5126eb5db15de0f41f6fd2bae9a0b417"
     },
     {
       "heading": "Send input during MaybeCode execution",

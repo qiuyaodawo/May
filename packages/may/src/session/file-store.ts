@@ -5,6 +5,7 @@ import type { SessionEvent } from "./events.js";
 import { syncDirectory } from "../storage/index.js";
 import { type SessionStore, validateSessionHistory } from "./store.js";
 
+/** @experimental */
 export class FileSessionStore implements SessionStore {
   readonly directory: string;
 
@@ -36,12 +37,11 @@ export class FileSessionStore implements SessionStore {
       () => undefined,
     );
     this.tails.set(sessionId, tail);
-    void tail.finally(() => {
+    return operation.finally(() => {
       if (this.tails.get(sessionId) === tail) {
         this.tails.delete(sessionId);
       }
     });
-    return operation;
   }
 
   read(sessionId: string): Promise<readonly SessionEvent[]> {

@@ -2,6 +2,7 @@ import { omitUndefined } from "../core/omit-undefined.js";
 import { MayConfigResolutionError } from "./errors.js";
 import type { MayConfig, ProviderConfig, ResolvedModelProfile, ResolveProviderOptions } from "./types.js";
 
+/** @experimental */
 export function resolveProviderConfig(
   config: MayConfig,
   name: string,
@@ -24,6 +25,7 @@ export function resolveProviderConfig(
   return resolved as unknown as ProviderConfig;
 }
 
+/** @experimental */
 export function resolveModelProfile(
   config: MayConfig,
   name?: string,

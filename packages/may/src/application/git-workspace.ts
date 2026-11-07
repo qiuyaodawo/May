@@ -8,6 +8,7 @@ import writeFileAtomic from "write-file-atomic";
 import { omitUndefined } from "../core/index.js";
 import { acquireFileLock, hasErrorCode, withFileAccess, type FileLock } from "../storage/index.js";
 
+/** @experimental */
 export interface ProjectGitWorkspaceOptions {
   readonly workspace: string;
   readonly autoCommit?: boolean;
@@ -20,6 +21,7 @@ export interface ProjectGitWorkspaceOptions {
   readonly deferInitialization?: boolean;
 }
 
+/** @experimental */
 export interface GitCommitRequest {
   readonly workspace: string;
   readonly sessionId: string;
@@ -30,6 +32,7 @@ export interface GitCommitRequest {
   readonly paths: readonly string[];
 }
 
+/** @experimental */
 export interface GitWorkspaceStatus {
   readonly workspace: string;
   readonly repository?: string;
@@ -43,6 +46,7 @@ export interface GitWorkspaceStatus {
   readonly dirty: boolean;
 }
 
+/** @experimental */
 export interface GitCheckpoint {
   readonly id: string;
   readonly sessionId: string;
@@ -60,12 +64,14 @@ export interface GitCheckpoint {
   readonly error?: string;
 }
 
+/** @experimental */
 export interface GitRoundOptions {
   readonly sessionId: string;
   readonly runId?: string;
   readonly historyPosition?: number | string;
 }
 
+/** @experimental */
 export interface GitRoundCompletion {
   readonly outcome: "completed" | "failed" | "cancelled";
   readonly commitMessage?: string;
@@ -74,12 +80,14 @@ export interface GitRoundCompletion {
   readonly historyPosition?: number | string;
 }
 
+/** @experimental */
 export interface GitRoundLease {
   readonly fromCommit?: string;
   complete(options: GitRoundCompletion): Promise<GitCheckpoint>;
   close(): Promise<void>;
 }
 
+/** @experimental */
 export interface GitWorkspaceDiff {
   readonly from: string;
   readonly to?: string;
@@ -90,6 +98,7 @@ export interface GitWorkspaceDiff {
   readonly untracked: readonly string[];
 }
 
+/** @experimental */
 export interface GitDiffFile {
   readonly path: string;
   readonly previousPath?: string;
@@ -100,6 +109,7 @@ export interface GitDiffFile {
   readonly deletions: number;
 }
 
+/** @experimental */
 export interface GitRestorePreview {
   readonly checkpointId: string;
   readonly commit: string;
@@ -107,6 +117,7 @@ export interface GitRestorePreview {
   readonly files: readonly GitRestoreFile[];
 }
 
+/** @experimental */
 export interface GitRestoreFile {
   readonly path: string;
   readonly beforeFingerprint?: string;
@@ -116,6 +127,7 @@ export interface GitRestoreFile {
   readonly patch: string;
 }
 
+/** @experimental */
 export interface GitRestoreOptions {
   readonly sessionId: string;
   readonly runId?: string;
@@ -123,6 +135,7 @@ export interface GitRestoreOptions {
   readonly commitMessage?: string;
 }
 
+/** @experimental */
 export interface ManagedGitWorktree {
   readonly id: string;
   readonly projectId: string;
@@ -149,6 +162,7 @@ interface CommitIntent {
   readonly commit?: string;
 }
 
+/** @experimental */
 export class GitCheckpointError extends Error {
   constructor(
     readonly checkpoint: GitCheckpoint,
@@ -159,6 +173,7 @@ export class GitCheckpointError extends Error {
   }
 }
 
+/** @experimental */
 export class GitWorkspaceConflictError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
@@ -166,7 +181,9 @@ export class GitWorkspaceConflictError extends Error {
   }
 }
 
-/** 项目文件版本、checkpoint 和登记的 worktree 使用相同的 Git 仓库。 */
+/** 项目文件版本、checkpoint 和登记的 worktree 使用相同的 Git 仓库。
+ * @experimental
+ */
 export class ProjectGitWorkspace {
   readonly workspace: string;
   private repositoryPath: string | undefined;

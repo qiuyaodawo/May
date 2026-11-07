@@ -5,6 +5,7 @@ import stringWidth from "string-width";
 import type { Component, InteractiveComponent, RenderResult, RenderSize, PointerEvent } from "./component.js";
 import { styleText, type TextStyle } from "./theme.js";
 
+/** @experimental */
 export interface OverlayOptions {
   readonly width?: number;
   readonly height?: number;
@@ -12,6 +13,7 @@ export interface OverlayOptions {
   readonly vertical?: "top" | "center" | "bottom";
 }
 
+/** @experimental */
 export class Overlay implements Component {
   private bounds: { left: number; top: number; width: number; height: number } | undefined;
   private captured = false;
@@ -66,12 +68,14 @@ export class Overlay implements Component {
   }
 }
 
+/** @experimental */
 export interface PanelOptions {
   readonly title?: string;
   readonly borderStyle?: TextStyle;
   readonly titleStyle?: TextStyle;
 }
 
+/** @experimental */
 export class Panel implements Component {
   private size: RenderSize | undefined;
   private captured = false;
@@ -144,13 +148,17 @@ export class Panel implements Component {
   }
 }
 
+/** @experimental */
 export interface DialogOptions extends OverlayOptions, PanelOptions {
   readonly open?: boolean;
   readonly dismissOnEscape?: boolean;
   readonly onClose?: () => void;
 }
 
-/** Modal input routing plus a bordered overlay. */
+/**
+ * Modal input routing plus a bordered overlay.
+ * @experimental
+ */
 export class Dialog implements InteractiveComponent {
   private opened: boolean;
   private readonly overlay: Overlay;

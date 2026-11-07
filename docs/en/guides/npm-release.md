@@ -47,6 +47,7 @@ consumer impact. Inspect the pending release without changing versions:
 
 ```sh
 pnpm release:status
+pnpm release:registry
 ```
 
 Run `pnpm changeset version` only after version preparation is explicitly
@@ -54,6 +55,16 @@ requested. Then run `pnpm install --lockfile-only`, review generated versions,
 internal dependency ranges, changelogs and the lockfile, and repeat verification.
 Every Git commit requires explicit confirmation. Commit, push and publication
 are separately authorized operations.
+
+`release:registry` reports repository versions, registry dist-tags, whether each
+repository version is published, and satisfiable published versions for runtime,
+optional and peer dependencies. Workspace dependencies are checked at their
+repository versions. The default registry is `https://registry.npmjs.org`, tag is
+`latest`, and manifest is `scripts/release-packages.json`. Override them with
+`--registry`, `--tag` and `--manifest`. The default mode only reports findings;
+`--expect-published` exits with a nonzero status for missing packages or versions,
+tag mismatches, unsatisfied dependencies or query failures. HTTP 404,
+authentication failures (401/403) and network failures are reported separately.
 
 ## Verify the candidate
 
@@ -64,6 +75,7 @@ and record `git rev-parse HEAD` with the verification results.
 ```sh
 pnpm install --frozen-lockfile
 pnpm release:check
+pnpm release:registry --registry <approved-registry> --tag <approved-tag>
 pnpm build
 pnpm test
 pnpm docs:check
@@ -111,12 +123,20 @@ Keep Git checks enabled. Creating or pushing release tags, changing dist-tags
 after publication, and creating GitHub Releases each require explicit
 authorization covering that operation.
 
-If a command fails, inspect the selected registry for each approved package and
-version before retrying. Record versions already present and retry only missing
-versions. Report partial completion accurately.
+If publication partially fails, run the following check before retrying. Record
+versions already present and retry only missing versions. Report partial
+completion accurately. Its nonzero status identifies incomplete publication or
+another inconsistency that requires review.
+
+```sh
+pnpm release:registry --registry <approved-registry> --tag <approved-tag> --expect-published
+```
 
 After publication, create a fresh external consumer with no local overrides or
 workspace links. Install the approved exact versions from the selected registry,
 verify representative public imports and `maybecode --help`, and check registry
 versions and dist-tags against the approved list. Retain the command results as
 release evidence.
+
+Run the same `--expect-published` check after publication and retain its output
+with the external consumer installation results.

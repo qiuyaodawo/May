@@ -13,6 +13,7 @@ import {
   type McpTaskStatus,
 } from "./tasks.js";
 
+/** @experimental */
 export interface McpTaskBinding {
   readonly serverId: string;
   readonly protocolVersion: "2026-07-28";
@@ -23,6 +24,7 @@ export interface McpTaskBinding {
   readonly toolDefinitionHash: string;
 }
 
+/** @experimental */
 export interface McpTaskInputClaim {
   readonly id: string;
   readonly fingerprint: string;
@@ -32,6 +34,7 @@ export interface McpTaskInputClaim {
   readonly expiresAt?: number;
 }
 
+/** @experimental */
 export interface McpTaskRecord {
   readonly version: 1;
   /** Host-generated handle. The remote id is never a filename or ownership proof. */
@@ -63,6 +66,7 @@ interface Journal {
  * Write-ahead, owner-partitioned persistence for the task lifecycle. Supply a
  * secure transactional store, normally a separate KeyringMcpCredentialStore.
  * It never performs RPCs, replays operations, polls, approves or invokes models.
+ * @experimental
  */
 export class McpTaskJournal {
   constructor(private readonly store: McpCredentialStore) {}

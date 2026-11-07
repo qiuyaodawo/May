@@ -8,6 +8,7 @@ import type { runMaybeCodeMcpCommand } from "./mcp-auth.js";
 import type { runMaybeCodeTeamCommand } from "./team.js";
 import type { runMaybeCodeWebUI } from "./web-ui.js";
 
+/** @experimental */
 export interface RunMaybeCodeDependencies {
   readonly terminal?: TerminalIO;
   readonly open?: (options: OpenConfiguredMaybeCodeOptions) => Promise<MaybeCodeController>;
@@ -17,6 +18,7 @@ export interface RunMaybeCodeDependencies {
   readonly runWebUI?: typeof runMaybeCodeWebUI;
 }
 
+/** @experimental */
 export async function runMaybeCode(
   args: readonly string[],
   dependencies: RunMaybeCodeDependencies = {},
@@ -33,16 +35,16 @@ export async function runMaybeCode(
   } catch (error) {
     if (error instanceof MaybeCodeUsageError) {
       outputTerminal().write(`Error: ${error.message}\n\n${MAYBE_CODE_USAGE}`);
-      outputTerminal().close();
+      await outputTerminal().close();
       return 2;
     }
-    terminal?.close();
+    await terminal?.close();
     throw error;
   }
 
   if (command.type === "help") {
     outputTerminal().write(MAYBE_CODE_USAGE);
-    outputTerminal().close();
+    await outputTerminal().close();
     return 0;
   }
 
@@ -59,7 +61,7 @@ export async function runMaybeCode(
         });
       } finally {
         process.removeListener("SIGINT", interrupt);
-        outputTerminal().close();
+        await outputTerminal().close();
       }
     }
     if (command.type === "mcp") {
@@ -75,7 +77,7 @@ export async function runMaybeCode(
       } finally {
         process.removeListener("SIGINT", interrupt);
       }
-      outputTerminal().close();
+      await outputTerminal().close();
       return 0;
     }
     if (dependencies.open === undefined) {
@@ -84,7 +86,7 @@ export async function runMaybeCode(
       if (path !== undefined) {
         const { runMaybeCodeOnboarding } = await import("./onboarding.js");
         if (!(await runMaybeCodeOnboarding(path, command))) {
-          terminal?.close();
+          await terminal?.close();
           return 130;
         }
       }
@@ -109,15 +111,15 @@ export async function runMaybeCode(
     );
     if (command.ui === "web") {
       await runWebUI!(app, { ...omitUndefined({ port: command.port }), write: (text) => outputTerminal().write(text) });
-      terminal?.close();
+      await terminal?.close();
     } else {
-      terminal?.close();
+      await terminal?.close();
       await runRetainedUI!(app);
     }
     return 0;
   } catch (error) {
     outputTerminal().write(`\nError: ${errorMessage(error)}\n`);
-    outputTerminal().close();
+    await outputTerminal().close();
     return 1;
   }
 }

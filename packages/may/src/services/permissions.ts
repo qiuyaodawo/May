@@ -2,11 +2,13 @@ import type { PermissionPolicy } from "../permissions/index.js";
 import { definePlugin, type PluginContext, type PluginDefinition } from "../plugin/index.js";
 import { services, factoryMetadata, type PluginFactoryMetadata } from "./index.js";
 
+/** @experimental */
 export interface PermissionPluginOptions<C = unknown> extends PluginFactoryMetadata<C> {
   readonly id?: string;
   readonly create: (context: PluginContext<C>) => PermissionPolicy | Promise<PermissionPolicy>;
   readonly dispose?: (policy: PermissionPolicy) => void | Promise<void>;
 }
+/** @experimental */
 export function createPermissionPlugin<C = unknown>(options: PermissionPluginOptions<C>): PluginDefinition<C> {
   return definePlugin({
     ...factoryMetadata(options),

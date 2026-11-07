@@ -1,5 +1,6 @@
 import { omitUndefined } from "@sortedyuan/may/core";
 
+/** @experimental */
 export class OpenAIResponsesError extends Error {
   readonly status: number | undefined;
   readonly providerType: string | undefined;
@@ -28,6 +29,7 @@ export class OpenAIResponsesError extends Error {
   }
 }
 
+/** @experimental */
 export class OpenAIResponsesProtocolError extends OpenAIResponsesError {
   constructor(message: string, options: ErrorOptions = {}) {
     super(message, omitUndefined({ cause: options.cause }));

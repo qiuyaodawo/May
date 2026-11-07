@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { createMayMcpServer, createMayMcpBearerAuthenticator } from "../dist/server.js";
 import { openMcpClientPool } from "../dist/index.js";
 import { PermissionToolExecutor } from "@sortedyuan/may/permissions";
+import { defineTool } from "@sortedyuan/may/core";
+import { z } from "zod";
 
 test(
   "independent HTTP export authenticates and isolates principals, filters capabilities and uses the normal permission pipeline",
@@ -23,9 +25,14 @@ test(
     let ask = false;
     let executions = 0;
     const contexts = [];
+    const checkedInputs = [];
+    const parseEntered = Promise.withResolvers();
+    const parseReleased = Promise.withResolvers();
+    let parsingSignal;
     const executor = new PermissionToolExecutor({
       policy: (check) => {
         contexts.push(check.context);
+        checkedInputs.push(check.input);
         return ask ? "ask" : allow ? "allow" : "deny";
       },
     });
@@ -60,18 +67,29 @@ test(
       workspaceId: "one",
       authenticate: auth.authenticate,
       executor,
-      authorize: async ({ principal, target }) => target === undefined || principal.id === "alice",
+      authorize: async ({ principal, target, signal }) => {
+        if (target === "run") parsingSignal = signal;
+        return target === undefined || principal.id === "alice";
+      },
       tools: [
         {
-          tool: {
+          tool: defineTool({
             name: "run",
             description: "Explicit export",
-            inputSchema: { type: "object", properties: { value: { type: "integer" } }, required: ["value"] },
+            schema: z.object({ value: z.number().int() }).transform(async ({ value }) => {
+              if (value === 99) {
+                parseEntered.resolve();
+                await parseReleased.promise;
+              }
+              return { value: value * 2 };
+            }),
             async execute(input, context) {
+              assert.deepEqual(input, checkedInputs.at(-1));
+              assert.equal(Object.isFrozen(input), true);
               executions++;
               return { value: input.value, private: "host-private-value", scope: context.scope };
             },
-          },
+          }),
           result: (output) => ({
             content: [{ type: "text", text: JSON.stringify({ value: output.value, scope: output.scope }) }],
           }),
@@ -133,6 +151,8 @@ test(
     assert.equal(executions, 0);
     allow = true;
     const result = await tool.execute({ value: 2 }, context);
+    assert.equal(JSON.parse(result.content[0].text).value, 4);
+    assert.deepEqual(checkedInputs.at(-1), { value: 4 });
     assert.doesNotMatch(JSON.stringify(result), /host-private-value|stolen|untrusted-run/u);
     assert.equal(contexts.at(-1).scope.workspaceId, "one");
     assert.equal(contexts.at(-1).scope.principalId, "alice");
@@ -145,6 +165,15 @@ test(
     );
     await assert.rejects(bob.readResource("export", "may://public/config"));
     await assert.rejects(alice.readResource("export", "file:///host-history"));
+    const cancellation = new AbortController();
+    const cancelled = assert.rejects(tool.execute({ value: 99 }, { ...context, signal: cancellation.signal }));
+    await parseEntered.promise;
+    const parsingAborted = once(parsingSignal, "abort");
+    cancellation.abort();
+    await parsingAborted;
+    parseReleased.resolve();
+    await cancelled;
+    assert.equal(executions, 1);
     assert.equal(
       (
         await fetch(endpoint, {
@@ -173,7 +202,12 @@ test(
   "independent stdio export binds launcher identity and serves modern or explicitly selected legacy clients",
   { timeout: 10_000 },
   async (t) => {
-    for (const legacy of [false, true]) {
+    for (const [legacy, undefinedInput] of [
+      [false, false],
+      [true, false],
+      [false, true],
+      [true, true],
+    ]) {
       const pool = await openMcpClientPool({
         servers: [
           {
@@ -183,6 +217,7 @@ test(
             args: [
               fileURLToPath(new URL("./fixtures/export-server.mjs", import.meta.url)),
               ...(legacy ? ["--legacy"] : []),
+              ...(undefinedInput ? ["--undefined"] : []),
             ],
           },
         ],

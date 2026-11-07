@@ -2,31 +2,38 @@ import type { ServiceToken } from "../plugin/index.js";
 import type { SessionBranchCompletionOptions, SessionBranchPosition, SessionRecovery } from "../session/index.js";
 import type { ContinuableAgentController } from "./controller.js";
 
+/** @experimental */
 export interface ApplicationExecution extends Pick<
   ContinuableAgentController,
   "sessionId" | "isRunning" | "submit" | "continue" | "resolveApproval"
 > {}
 
+/** @experimental */
 export interface ApplicationHistory extends Pick<ContinuableAgentController, "history" | "queryHistory"> {
   branchPositions(): Promise<readonly SessionBranchPosition[]>;
   saveBranchPosition(runId: string, options?: SessionBranchCompletionOptions): Promise<void>;
   listRecoveries(): readonly SessionRecovery[];
 }
 
+/** @experimental */
 export interface ApplicationState {
   recordState(key: string, value: unknown): Promise<void>;
 }
 
+/** @experimental */
 export interface ApplicationFacade extends ApplicationExecution, ApplicationHistory, ApplicationState {
   getService<T>(service: ServiceToken<T>): T;
   getOptionalService<T>(service: ServiceToken<T>): T | undefined;
 }
 
+/** @experimental */
 export interface ApplicationServiceAccess<T> {
   get(): T;
 }
+/** @experimental */
 export type ApplicationAccess = ApplicationServiceAccess<ApplicationFacade>;
 
+/** @experimental */
 export function createApplicationAccess(resolve: () => ApplicationFacade) {
   const execution = Object.freeze<ApplicationExecution>({
     get sessionId() {

@@ -400,7 +400,10 @@ Terminal primitives and Agent-aware projections use these import paths:
 Call `question(prompt, { password: true, signal })` to read hidden input. Both input
 and output must be TTYs. Password questions isolate and restore input history,
 never display entered characters, and reject `suggestions`. The returned string
-is the entered value. Abort through `signal`; call `close()` when finished.
+is the entered value. Abort through `signal`; await `close()` when finished.
+The Node adapter waits for active suggestion providers and propagates their
+failures through `close()`. Custom `TerminalIO.close()` implementations may
+return `void` or `Promise<void>`.
 The `password` option defaults to `false`.
 In interactive terminals, `question(prompt, { onEscape, signal })` calls
 `onEscape` when Esc is pressed while that question is active. The callback can
@@ -416,6 +419,11 @@ calls. See [Custom UI](../guides/custom-ui.md).
 `/reading`, `/projection` and `/server` subpaths provide application adapters,
 reading state, projections and server support. `@sortedyuan/web-ui` provides browser
 workbench components; `/styles.css` and `/assets` expose styles and asset support.
+`UiClient.disconnect()` and the cleanup function returned by `mountWebUI()`
+return `Promise<void>`. Await them before releasing the client or view.
+Standalone transcript reader, inspector, workspace UI, and navigation `dispose()`
+methods also return promises. The shell waits for accepted UI work and custom
+navigation cleanup; navigation cleanup callbacks may return `void` or `Promise<void>`.
 Product adapters preserve their Session/task semantics. See the
 [Web UI guide](../guides/web-ui.md),
 [UI client README](../../../packages/ui/client/README.md) and

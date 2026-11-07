@@ -71,6 +71,32 @@ test("shared host authenticates, deduplicates commands, restores approvals and s
   });
   const server = await startUiServer({ host, token, port: 0, assets: new Map(), close: () => host.close() });
   t.after(() => server.close());
+  await t.test("unauthorized SSE ends its watch and disconnect remains awaitable", async () => {
+    const client = new UiClient(server.url, (url, init) =>
+      fetch(url, String(url).endsWith("/api/ui/events") ? { ...init, headers: {} } : init),
+    );
+    await client.connect(token);
+    await until(() => client.state.connection === "disconnected");
+    assert.match(client.state.error, /连接凭据已失效/);
+    await client.disconnect();
+  });
+  await t.test("server shutdown waits for the listener after its owner fails", async () => {
+    const failure = new Error("Owner shutdown failed");
+    const service = await startUiServer({
+      host,
+      token,
+      port: 0,
+      assets: new Map(),
+      async close() {
+        throw failure;
+      },
+    });
+    const containsFailure = (error) => error instanceof AggregateError && error.errors.includes(failure);
+    const closed = assert.rejects(service.closed, containsFailure);
+    await assert.rejects(service.close(), containsFailure);
+    await closed;
+    await assert.rejects(fetch(service.url));
+  });
   const request = (path, body, headers = {}) =>
     fetch(server.url + path, {
       method: body ? "POST" : "GET",
@@ -93,11 +119,11 @@ test("shared host authenticates, deduplicates commands, restores approvals and s
     args: { text: "Check" },
   };
   const clients = [new UiClient(server.url), new UiClient(server.url)];
-  t.after(() => clients.forEach((c) => c.disconnect()));
+  t.after(() => Promise.all(clients.map((c) => c.disconnect())));
   await Promise.all(clients.map((c) => c.connect(token)));
   const submitted = await Promise.all([request("/api/ui/commands", command), request("/api/ui/commands", command)]);
   assert.ok(submitted.every((r) => r.status === 200));
-  clients[0].disconnect();
+  await clients[0].disconnect();
   assert.equal((await request("/api/ui/commands", { ...command, args: { text: "changed" } })).status, 409);
   const pending = await until(async () => {
     const s = await (await request("/api/ui/snapshot")).json();
@@ -206,7 +232,7 @@ test("client preserves the browser fetch receiver, ignores stale selections and 
   await assert.rejects(client.command("message.submit", { text: "hi" }), /Response lost/);
   assert.equal(posts, 1);
   assert.match(client.state.error, /未自动重发/);
-  client.disconnect();
+  await client.disconnect();
 });
 
 test("projection separates approval evidence, terminal outcomes and unknown effects", () => {

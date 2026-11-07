@@ -6,10 +6,14 @@ import { hasErrorCode } from "../storage/index.js";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parseDocument } from "yaml";
 
+/** @experimental */
 export const MAX_SKILL_BYTES = 64 * 1024;
+/** @experimental */
 export const MAX_RESOURCE_BYTES = 256 * 1024;
+/** @experimental */
 export const MAX_SKILLS = 128;
 
+/** @experimental */
 export interface SkillMetadata {
   readonly name: string;
   readonly description: string;
@@ -18,23 +22,28 @@ export interface SkillMetadata {
   readonly allowedTools?: string;
   readonly metadata?: Readonly<Record<string, string>>;
 }
+/** @experimental */
 export interface SkillDescriptor extends SkillMetadata {
   readonly directory: string;
   readonly source: string;
   readonly revision: string;
 }
+/** @experimental */
 export interface SkillDocument extends SkillDescriptor {
   readonly body: string;
 }
+/** @experimental */
 export interface SkillDiagnostic {
   readonly path: string;
   readonly message: string;
 }
+/** @experimental */
 export interface SkillRoot {
   readonly directory: string;
   readonly source?: string;
 }
 
+/** @experimental */
 export function parseSkill(source: string, directoryName?: string): SkillMetadata & { body: string } {
   if (Buffer.byteLength(source, "utf8") > MAX_SKILL_BYTES) throw new Error("SKILL.md exceeds 64 KiB");
   const match = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/u.exec(source);
@@ -72,7 +81,9 @@ export function parseSkill(source: string, directoryName?: string): SkillMetadat
   };
 }
 
-/** Immutable discovery snapshot. Later roots override earlier roots with a diagnostic. */
+/** Immutable discovery snapshot. Later roots override earlier roots with a diagnostic.
+ * @experimental
+ */
 export class SkillRegistry {
   private constructor(
     private readonly entries: ReadonlyMap<string, SkillDescriptor>,

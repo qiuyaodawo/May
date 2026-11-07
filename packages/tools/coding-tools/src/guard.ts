@@ -6,6 +6,7 @@ import { stat } from "node:fs/promises";
  *
  * `run()` 在同一把按规范化路径取得的锁内执行，宿主在锁内做检查和版本记录，
  * 因此“读取并记录版本”与“检查并写入”各自是一个完整的操作边界。
+ * @experimental
  */
 export interface WorkspaceFileOperation<T> {
   readonly tool: "read" | "edit" | "write";
@@ -17,9 +18,13 @@ export interface WorkspaceFileOperation<T> {
   run(): Promise<T>;
 }
 
+/** @experimental */
 export type WorkspaceFileGuard = <T>(operation: WorkspaceFileOperation<T>) => Promise<T>;
 
-/** 目标文件当前是否存在；软链接、目录与路径不存在都视为不可用。 */
+/**
+ * 目标文件当前是否存在；软链接、目录与路径不存在都视为不可用。
+ * @experimental
+ */
 export async function assertFileExistence(path: WorkspacePath, signal?: AbortSignal): Promise<boolean> {
   signal?.throwIfAborted();
   try {
@@ -33,7 +38,10 @@ export async function assertFileExistence(path: WorkspacePath, signal?: AbortSig
   }
 }
 
-/** Windows 文件系统不区分大小写，统一为小写键值。 */
+/**
+ * Windows 文件系统不区分大小写，统一为小写键值。
+ * @experimental
+ */
 export function workspaceFileKey(path: WorkspacePath): string {
   const normalized = path.absolute.replace(/\\/gu, "/");
   return process.platform === "win32" ? normalized.toLowerCase() : normalized;

@@ -2,6 +2,7 @@ import { replaceJournalFile, withFileAccess } from "@sortedyuan/may/storage";
 import { access, open, readFile, type FileHandle } from "node:fs/promises";
 import { digest, validateId } from "./identity.js";
 
+/** @experimental */
 export interface ChannelInput {
   account: string;
   eventId: string;
@@ -18,6 +19,7 @@ export interface ChannelInput {
   occurredAt?: string;
   attachments?: ChannelAttachment[];
 }
+/** @experimental */
 export interface ChannelAttachment {
   id: string;
   kind: "image" | "file" | "audio" | "video" | "unsupported";
@@ -26,14 +28,17 @@ export interface ChannelAttachment {
   size?: number;
   source: ChannelAttachmentSource;
 }
+/** @experimental */
 export interface ChannelAttachmentSource {
   platform: string;
   [key: string]: string;
 }
+/** @experimental */
 export interface ChannelDeliveryReceipt {
   messageId: string;
   threadId?: string;
 }
+/** @experimental */
 export interface InboxRecord {
   kind: "inbox";
   id: string;
@@ -42,6 +47,7 @@ export interface InboxRecord {
   taskId?: string;
   terminalNotified?: boolean;
 }
+/** @experimental */
 export interface DeliveryRecord {
   imageId?: string;
   after?: string;
@@ -63,8 +69,10 @@ interface CursorRecord {
   id: string;
   offset: number;
 }
+/** @experimental */
 export type ChannelRecord = InboxRecord | DeliveryRecord | CursorRecord;
 
+/** @experimental */
 export class ChannelStore {
   private records = new Map<string, ChannelRecord>();
   private tail: Promise<void> = Promise.resolve();
@@ -185,9 +193,11 @@ export class ChannelStore {
     })());
   }
 }
+/** @experimental */
 export function inboxId(input: ChannelInput): string {
   return digest({ account: input.account, eventId: input.eventId });
 }
+/** @experimental */
 export function cursorId(account: string): string {
   return digest({ account, type: "cursor" });
 }
@@ -219,6 +229,7 @@ function validateRecord(value: ChannelRecord): void {
     if (value.taskId) validateId(value.taskId);
   } else throw new Error("Unknown channel record");
 }
+/** @experimental */
 export function validateChannelInput(input: ChannelInput): void {
   for (const key of ["account", "eventId", "sender", "conversation"] as const) {
     if (typeof input[key] !== "string" || !input[key] || input[key].length > 256)

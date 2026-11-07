@@ -7,6 +7,7 @@ import { readFileManifest, within, type FileManifestEntry } from "./environment.
 import { startEvalProcess, type CommandOutcome, type EvalCommand } from "./process.js";
 import { nodeEvalCommand, type NodeEvalCommand } from "./command.js";
 
+/** @experimental */
 export function createCommandEvaluator(options: {
   readonly id: string;
   readonly version: string;
@@ -66,6 +67,7 @@ export function createCommandEvaluator(options: {
   };
 }
 
+/** @experimental */
 export function createNodeCommandEvaluator(options: {
   readonly id: string;
   readonly version: string;
@@ -82,6 +84,7 @@ export function createNodeCommandEvaluator(options: {
   });
 }
 
+/** @experimental */
 export function createJsonSchemaEvaluator(options: {
   readonly id?: string;
   readonly version?: string;
@@ -111,6 +114,7 @@ export function createJsonSchemaEvaluator(options: {
   };
 }
 
+/** @experimental */
 export interface FileRequirement {
   readonly path: string;
   readonly exists?: boolean;
@@ -118,6 +122,7 @@ export interface FileRequirement {
   readonly includes?: string;
   readonly sha256?: string;
 }
+/** @experimental */
 export function createFileChangesEvaluator(options: {
   readonly id?: string;
   readonly version?: string;
@@ -195,6 +200,7 @@ export function createFileChangesEvaluator(options: {
   };
 }
 
+/** @experimental */
 export function createCompositeEvaluator(options: {
   readonly id: string;
   readonly version: string;
@@ -229,6 +235,7 @@ export function createCompositeEvaluator(options: {
   };
 }
 
+/** @experimental */
 export function createHumanEvaluator(id = "human", version = "1"): EvalEvaluator {
   return {
     id,
@@ -240,6 +247,7 @@ export function createHumanEvaluator(id = "human", version = "1"): EvalEvaluator
   };
 }
 
+/** @experimental */
 export async function readEvaluationFile(
   directory: string,
   path: string,

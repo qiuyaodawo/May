@@ -22,7 +22,7 @@ test("workspace files plugin creates real tools and removes its catalog contribu
   assert.ok(application.get(workspaceFilesService) instanceof SharedWorkspaceFileGuard);
   assert.deepEqual(
     [...sources.snapshot()].map((tool) => tool.name),
-    ["read", "shell", "edit", "write"],
+    ["read", "shell", "edit", "write", "glob", "grep", "fetch"],
   );
   await host.close();
   assert.equal(sources.snapshot().size, 0);

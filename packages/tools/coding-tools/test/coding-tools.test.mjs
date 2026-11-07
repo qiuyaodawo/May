@@ -54,6 +54,6 @@ test("registers a created read tool in a May tool loop", async (t) => {
   assert.equal(result.message.content[0].text, "hello from the workspace");
   assert.deepEqual(
     requests[0].tools.map((tool) => tool.name),
-    ["read"],
+    ["read", "glob", "grep"],
   );
 });

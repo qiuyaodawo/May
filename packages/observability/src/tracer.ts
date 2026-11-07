@@ -21,6 +21,7 @@ import type {
 import { boundedAttributes, telemetryLimits, type TelemetryLimits } from "./limits.js";
 import { SpanMetrics } from "./metrics.js";
 
+/** @experimental */
 export interface BasicTracerOptions {
   readonly processor: SpanProcessor;
   readonly resourceAttributes?: TraceAttributes;
@@ -36,6 +37,7 @@ export interface BasicTracerOptions {
 /**
  * A small May-native tracer. It records completed spans synchronously into a
  * processor, while processors isolate asynchronous export from Agent work.
+ * @experimental
  */
 export class BasicTracer implements Tracer {
   private readonly processor: SpanProcessor;
@@ -233,10 +235,15 @@ class BasicTraceSpan implements TraceSpan {
   }
 }
 
+/** @experimental */
 export const alwaysOnSampler: TraceSampler = () => true;
+/** @experimental */
 export const alwaysOffSampler: TraceSampler = () => false;
 
-/** Deterministic trace-id sampling; child spans inherit the parent decision. */
+/**
+ * Deterministic trace-id sampling; child spans inherit the parent decision.
+ * @experimental
+ */
 export function ratioSampler(ratio: number): TraceSampler {
   if (!Number.isFinite(ratio) || ratio < 0 || ratio > 1) {
     throw new RangeError("sampling ratio must be between 0 and 1");
@@ -251,6 +258,7 @@ export function ratioSampler(ratio: number): TraceSampler {
   };
 }
 
+/** @experimental */
 export const randomTraceIdGenerator: TraceIdGenerator = {
   generateTraceId: () => randomHex(16),
   generateSpanId: () => randomHex(8),

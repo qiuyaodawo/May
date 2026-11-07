@@ -7,8 +7,10 @@ import { assertTextWithinLimit } from "./text-file.js";
 import { resolveWritableWorkspacePath } from "./workspace-path.js";
 import { assertFileExistence, type WorkspaceFileGuard } from "./guard.js";
 
+/** @experimental */
 export const DEFAULT_WRITE_MAX_BYTES = 1024 * 1024;
 
+/** @experimental */
 export interface WriteToolOptions {
   readonly cwd: string;
   readonly maxBytes?: number;
@@ -17,16 +19,19 @@ export interface WriteToolOptions {
   readonly guard?: WorkspaceFileGuard;
 }
 
+/** @experimental */
 export interface WriteToolInput {
   readonly path: string;
   readonly content: string;
 }
 
+/** @experimental */
 export interface WriteToolOutput {
   readonly path: string;
   readonly bytesWritten: number;
 }
 
+/** @experimental */
 export function createWriteTool(options: WriteToolOptions): Tool<WriteToolInput, WriteToolOutput> {
   const maxBytes = requirePositiveIntegerOption(options.maxBytes, DEFAULT_WRITE_MAX_BYTES, "maxBytes");
 

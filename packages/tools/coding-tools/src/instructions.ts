@@ -3,32 +3,41 @@ import { dirname, isAbsolute, resolve, relative, sep } from "node:path";
 import { omitUndefined } from "@sortedyuan/may/core";
 import { shellRuntimeInstructions, type ShellToolInfo } from "./shell.js";
 import { isMissingPathError } from "./missing-path.js";
+import type { CodingExecutionIsolation } from "./execution.js";
 
+/** @experimental */
 export const DEFAULT_CODING_INSTRUCTIONS_MAX_BYTES = 32 * 1024;
+/** @experimental */
 export const DEFAULT_SYSTEM_INSTRUCTIONS_FILENAME = "system.md";
+/** @experimental */
 export const DEFAULT_PROJECT_INSTRUCTIONS_FILENAME = "AGENTS.md";
 
+/** @experimental */
 export interface CodingInstructionSectionLabels {
   readonly runtime: string;
   readonly project: string;
 }
 
+/** @experimental */
 export const DEFAULT_CODING_INSTRUCTION_SECTION_LABELS: CodingInstructionSectionLabels = {
   runtime: "Runtime environment",
   project: "Project instructions",
 };
 
+/** @experimental */
 export type CodingInstructionSource =
   | { readonly type: "built-in" }
   | { readonly type: "explicit" }
   | { readonly type: "runtime" }
   | { readonly type: "file"; readonly path: string };
 
+/** @experimental */
 export interface CodingInstructionDocument {
   readonly source: CodingInstructionSource;
   readonly content: string;
 }
 
+/** @experimental */
 export interface CodingInstructions {
   readonly system: CodingInstructionDocument;
   readonly runtime?: CodingInstructionDocument;
@@ -39,8 +48,10 @@ export interface CodingInstructions {
   readonly effective: string;
 }
 
+/** @experimental */
 export interface CodingRuntimeInstructionsOptions {
   readonly workspace: string;
+  readonly execution?: CodingExecutionIsolation;
   readonly shell?: ShellToolInfo;
   readonly agentRole?: "main agent" | "sub-agent";
   readonly sessionOrigin?: "new session" | "resumed session" | "historical branch";
@@ -50,6 +61,7 @@ export interface CodingRuntimeInstructionsOptions {
   readonly historicalSource?: string;
 }
 
+/** @experimental */
 export function codingRuntimeInstructions(options: Readonly<CodingRuntimeInstructionsOptions>): string {
   if (options.workspace.trim() === "") {
     throw invalidOption("workspace must not be empty");
@@ -65,7 +77,12 @@ export function codingRuntimeInstructions(options: Readonly<CodingRuntimeInstruc
   const sessionOrigin = options.sessionOrigin ?? "new session";
   const lines = [
     `Workspace: ${resolve(options.workspace)}`,
-    `Operating system: ${operatingSystem}`,
+    `Operating system: ${options.execution?.mode === "container" ? "Linux (container)" : operatingSystem}`,
+    ...(options.execution?.mode === "container"
+      ? [
+          "Execution workspace: /workspace. Shell commands use Linux paths; file tools use workspace-relative paths. Network access is disabled inside the container.",
+        ]
+      : []),
     ...(options.shell === undefined ? [] : [`Shell: ${options.shell.displayName}`]),
     `Agent role: ${options.agentRole ?? "main agent"}`,
     `Session origin: ${sessionOrigin}`,
@@ -96,6 +113,7 @@ export function codingRuntimeInstructions(options: Readonly<CodingRuntimeInstruc
   return sections.join("\n\n");
 }
 
+/** @experimental */
 export interface LoadCodingInstructionsOptions {
   /** 启动目录，也是项目规则搜索的终点。 */
   readonly workspace: string;
@@ -123,6 +141,7 @@ export interface LoadCodingInstructionsOptions {
   readonly signal?: AbortSignal;
 }
 
+/** @experimental */
 export type CodingInstructionsErrorCode =
   | "CODING_INSTRUCTIONS_INVALID_OPTION"
   | "CODING_INSTRUCTIONS_INVALID_WORKSPACE"
@@ -134,6 +153,7 @@ export type CodingInstructionsErrorCode =
   | "CODING_INSTRUCTIONS_INVALID_UTF8"
   | "CODING_INSTRUCTIONS_EMPTY";
 
+/** @experimental */
 export class CodingInstructionsError extends Error {
   readonly code: CodingInstructionsErrorCode;
 
@@ -147,6 +167,7 @@ export class CodingInstructionsError extends Error {
 /**
  * 组合 system、runtime 和项目根目录到 workspace 的规则。
  * 文件使用有大小限制的 strict UTF-8，并拒绝不安全链接。
+ * @experimental
  */
 export async function loadCodingInstructions(
   options: Readonly<LoadCodingInstructionsOptions>,
@@ -192,6 +213,7 @@ export async function loadCodingInstructions(
   });
 }
 
+/** @experimental */
 export function formatCodingProjectInstructions(
   projects: readonly CodingInstructionDocument[],
   label = DEFAULT_CODING_INSTRUCTION_SECTION_LABELS.project,

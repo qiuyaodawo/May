@@ -2,6 +2,7 @@ import type { ContextSnapshot, Message, ModelContextCompactor } from "../core/in
 
 import type { ContextInspection } from "./controller.js";
 
+/** @experimental */
 export interface ContextCompactionStrategy {
   readonly name: string;
   compact(
@@ -10,12 +11,14 @@ export interface ContextCompactionStrategy {
   ): ContextCompactionOutput | Promise<ContextCompactionOutput>;
 }
 
+/** @experimental */
 export interface ContextCompactionOptions {
   readonly signal?: AbortSignal;
   readonly runId?: string;
   readonly step?: number;
 }
 
+/** @experimental */
 export interface ContextCompactionDetails {
   readonly messages: readonly Message[];
   readonly effectiveTokens?: number;
@@ -23,8 +26,10 @@ export interface ContextCompactionDetails {
   readonly terminal?: boolean;
 }
 
+/** @experimental */
 export type ContextCompactionOutput = readonly Message[] | ContextCompactionDetails;
 
+/** @experimental */
 export interface ContextCompactionResult {
   readonly strategy: string;
   readonly changed: boolean;
@@ -34,11 +39,13 @@ export interface ContextCompactionResult {
   readonly terminal?: boolean;
 }
 
+/** @experimental */
 export type ContextCompactionSink = (
   result: ContextCompactionResult,
   options: ContextCompactionOptions,
 ) => void | Promise<void>;
 
+/** @experimental */
 export interface ContextCompactionFailure {
   readonly strategy: string;
   readonly error: Error;
@@ -46,8 +53,10 @@ export interface ContextCompactionFailure {
   readonly continuing: boolean;
 }
 
+/** @experimental */
 export type ContextCompactionFailureSink = (failure: ContextCompactionFailure) => void | Promise<void>;
 
+/** @experimental */
 export class ContextCompactionExhaustedError extends Error {
   readonly inspection: ContextInspection;
   readonly failures: readonly ContextCompactionFailure[];
@@ -67,6 +76,7 @@ export class ContextCompactionExhaustedError extends Error {
   }
 }
 
+/** @experimental */
 export class ModelContextCompactionStrategy implements ContextCompactionStrategy {
   readonly name: string;
 

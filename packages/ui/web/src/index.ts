@@ -20,6 +20,7 @@ export {
 import { createInspector, createTranscriptReader } from "./reading.js";
 import { createCommandUI } from "./commands.js";
 import { createWorkspaceUI } from "./workspace.js";
+import { createUiTasks } from "./tasks.js";
 export { createWorkspaceUI } from "./workspace.js";
 import {
   createNavigation,
@@ -37,11 +38,13 @@ export type {
 export { createNavigation } from "./navigation.js";
 export { markdown } from "./markdown.js";
 
+/** @experimental */
 export interface WebUiAuthentication {
   readonly label: string;
   login(password: string): Promise<string>;
   logout(): Promise<void>;
 }
+/** @experimental */
 export interface WebUiOptions {
   readonly title?: string;
   readonly kind?: "session" | "task";
@@ -54,8 +57,11 @@ export interface WebUiOptions {
   readonly navigation?: WebUiNavigation | readonly WebUiNavigationGroup[];
 }
 
-/** Optional shell. Products can instead compose the exported components with UiClient. */
-export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOptions = {}): () => void {
+/**
+ * Optional shell. Products can instead compose the exported components with UiClient.
+ * @experimental
+ */
+export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOptions = {}): () => Promise<void> {
   if (options.authentication && options.initialToken !== undefined)
     throw new Error("authentication and initialToken cannot be combined");
 
@@ -69,8 +75,9 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     errorBox.textContent = localError;
     errorBox.hidden = false;
   };
+  const tasks = createUiTasks(showError);
   const act = (name: string, args: Record<string, string> = {}) => {
-    void client.command(name, args).catch(showError);
+    tasks.run(client.command(name, args));
   };
   const pending = () => state.busy || state.selecting;
   const has = (name: string) => state.snapshot?.commands.includes(name) ?? false;
@@ -101,7 +108,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
         try {
           const result = options.onNew(currentContext());
           if (result && typeof (result as Promise<void>).then === "function") {
-            void (result as Promise<void>).catch(showError);
+            tasks.run(result as Promise<void>);
           }
         } catch (error) {
           showError(error);
@@ -109,7 +116,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
       } else if (state.snapshot?.product.resourceKind === "session") {
         act("session.new");
       } else {
-        void client.select().then(() => composer.focus(), showError);
+        tasks.run(client.select().then(() => composer.focus()));
       }
       hideSidebar();
     },
@@ -135,7 +142,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   connectionButton.prepend(connectionDot);
   footer.append(connectionButton, element("span", "local-label", "LOCAL WORKSPACE"));
   const resourceMore = button("加载更多记录", () => {
-    void loadResources(true);
+    tasks.run(loadResources(true));
   });
   resourceMore.hidden = true;
   const resourceInfo = element("p", "list-empty");
@@ -272,7 +279,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     "",
     () => {
       const controls = state.snapshot?.controls;
-      if (controls) void client.interact(controls.cancelCommand).catch(showError);
+      if (controls) tasks.run(client.interact(controls.cancelCommand));
       else act(state.snapshot?.product.resourceKind === "task" ? "task.cancel" : "run.cancel");
     },
     "send-button stop-button",
@@ -373,14 +380,16 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   const connectSubmit = element("button", "button primary", "连接");
   connectSubmit.type = "submit";
   const disconnect = button("断开连接", () => {
-    client.disconnect();
+    tasks.run(client.disconnect());
     tokenInput.value = "";
     if (options.authentication)
-      void options.authentication.logout().then(
-        () => dialog.close(),
-        (error) => {
-          dialogError.textContent = error instanceof Error ? error.message : "退出失败";
-        },
+      tasks.run(
+        options.authentication.logout().then(
+          () => dialog.close(),
+          (error) => {
+            dialogError.textContent = error instanceof Error ? error.message : "退出失败";
+          },
+        ),
       );
     else dialog.close();
   });
@@ -484,15 +493,17 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
         return;
       }
       remove.disabled = true;
-      void client.command("session.delete", {}, resource.id).then(
-        () => {
-          drafts.delete(resource.id);
-          confirmation.close();
-        },
-        (reason) => {
-          error.textContent = reason instanceof Error ? reason.message : "删除失败。";
-          remove.disabled = false;
-        },
+      tasks.run(
+        client.command("session.delete", {}, resource.id).then(
+          () => {
+            drafts.delete(resource.id);
+            confirmation.close();
+          },
+          (reason) => {
+            error.textContent = reason instanceof Error ? reason.message : "删除失败。";
+            remove.disabled = false;
+          },
+        ),
       );
     };
     confirmation.onclose = () => confirmation.remove();
@@ -520,7 +531,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
       const item = button(
         "",
         () => {
-          void client.select(resource.id).catch(showError);
+          tasks.run(client.select(resource.id));
           hideSidebar();
         },
         `resource-item${resource.id === snapshot?.selectedId ? " selected" : ""}`,
@@ -602,7 +613,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     if (changedHost || resourceVersion !== nextResourceVersion) {
       resourceVersion = nextResourceVersion;
       clearTimeout(searchTimer);
-      if (snapshot?.reads?.resources) void loadResources();
+      if (snapshot?.reads?.resources) tasks.run(loadResources());
     }
     const sig = JSON.stringify([
       snapshot?.resources,
@@ -789,20 +800,22 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     if (send.disabled) return;
     const text = composer.value,
       key = draftKey;
-    void commandUI
-      .submit(text)
-      .then((handled) =>
-        handled
-          ? undefined
-          : client.command(state.snapshot?.product.resourceKind === "task" ? "task.submit" : "message.submit", {
-              text,
-            }),
-      )
-      .then(() => {
-        drafts.delete(key);
-        if (draftKey === key && composer.value === text) composer.value = "";
-        updateComposer();
-      }, showError);
+    tasks.run(
+      commandUI
+        .submit(text)
+        .then((handled) =>
+          handled
+            ? undefined
+            : client.command(state.snapshot?.product.resourceKind === "task" ? "task.submit" : "message.submit", {
+                text,
+              }),
+        )
+        .then(() => {
+          drafts.delete(key);
+          if (draftKey === key && composer.value === text) composer.value = "";
+          updateComposer();
+        }),
+    );
   };
   dialogForm.onsubmit = (event) => {
     event.preventDefault();
@@ -814,19 +827,21 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     const login = options.authentication
       ? options.authentication.login(credential)
       : Promise.resolve(credential.trim());
-    void login
-      .then((token) => client.connect(token))
-      .then(
-        () => {
-          dialog.close();
-        },
-        (error) => {
-          dialogError.textContent = error instanceof Error ? error.message : "连接失败";
-        },
-      )
-      .finally(() => {
-        connectSubmit.disabled = false;
-      });
+    tasks.run(
+      login
+        .then((token) => client.connect(token))
+        .then(
+          () => {
+            dialog.close();
+          },
+          (error) => {
+            dialogError.textContent = error instanceof Error ? error.message : "连接失败";
+          },
+        )
+        .finally(() => {
+          connectSubmit.disabled = false;
+        }),
+    );
   };
   search.maxLength = 256;
   search.oninput = () => {
@@ -840,7 +855,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
       resourceItems = [];
       renderList();
       searchTimer = setTimeout(() => {
-        void loadResources();
+        tasks.run(loadResources());
       }, 250);
     }
   };
@@ -901,26 +916,41 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   syncDetails();
   const unsubscribe = client.subscribe(render);
   let disposed = false;
-  void options.initialToken
-    ?.then((token) => {
-      if (!disposed && token !== undefined) return client.connect(token);
-    })
-    .catch((error) => {
-      if (!disposed) showError(error);
-    });
-  return () => {
-    disposed = true;
-    resourceRequest++;
-    clearTimeout(searchTimer);
-    navComponent?.dispose();
-    versionUI.dispose();
-    commandUI.dispose();
-    reader.dispose();
-    inspector.dispose();
-    unsubscribe();
-    client.disconnect();
-    document.removeEventListener("keydown", keyboard);
-    mobileQuery.removeEventListener("change", onMobileChange);
-    root.replaceChildren();
-  };
+  if (options.initialToken)
+    tasks.run(
+      options.initialToken
+        .then((token) => {
+          if (!disposed && token !== undefined) return client.connect(token);
+        })
+        .catch((error) => {
+          if (!disposed) showError(error);
+        }),
+    );
+  let closing: Promise<void> | undefined;
+  return () =>
+    (closing ??= (async () => {
+      disposed = true;
+      resourceRequest++;
+      clearTimeout(searchTimer);
+      const navigationClosed = navComponent?.dispose();
+      const versionsClosed = versionUI.dispose();
+      commandUI.dispose();
+      const readerClosed = reader.dispose();
+      const inspectorClosed = inspector.dispose();
+      unsubscribe();
+      const clientClosed = client.disconnect();
+      document.removeEventListener("keydown", keyboard);
+      mobileQuery.removeEventListener("change", onMobileChange);
+      root.replaceChildren();
+      const results = await Promise.allSettled([
+        clientClosed,
+        navigationClosed,
+        versionsClosed,
+        readerClosed,
+        inspectorClosed,
+        tasks.close(),
+      ]);
+      const errors = results.filter((result) => result.status === "rejected").map((result) => result.reason as unknown);
+      if (errors.length) throw new AggregateError(errors, "Web UI shutdown failed");
+    })());
 }

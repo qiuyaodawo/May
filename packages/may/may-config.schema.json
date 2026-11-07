@@ -355,6 +355,19 @@
     "anthropicOptions": {
       "type": "object",
       "properties": {
+        "promptCaching": {
+          "oneOf": [
+            { "const": false },
+            {
+              "type": "object",
+              "properties": {
+                "ttl": { "enum": ["5m", "1h"] },
+                "cacheInstructions": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
         "unknownCapabilityPolicy": { "enum": ["allow", "require-known"] },
         "thinking": { "$ref": "#/$defs/anthropicThinking" },
         "reasoningEffort": { "$ref": "#/$defs/reasoningEffort" },

@@ -8,8 +8,11 @@ import {
   type SessionHistoryQuery,
 } from "./index.js";
 
+/** @experimental */
 export const DEFAULT_SESSION_HISTORY_MAX_EVENTS = 50;
+/** @experimental */
 export const DEFAULT_SESSION_HISTORY_MAX_OUTPUT_BYTES = 32 * 1024;
+/** @experimental */
 export const DEFAULT_SESSION_HISTORY_MAX_EVENT_BYTES = 8 * 1024;
 const MINIMUM_SESSION_HISTORY_OUTPUT_BYTES = utf8Bytes(
   JSON.stringify({
@@ -20,10 +23,12 @@ const MINIMUM_SESSION_HISTORY_OUTPUT_BYTES = utf8Bytes(
   }),
 );
 
+/** @experimental */
 export interface SessionHistorySource {
   queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage>;
 }
 
+/** @experimental */
 export interface SessionHistoryToolOptions {
   readonly source: SessionHistorySource | (() => SessionHistorySource);
   readonly maxEvents?: number;
@@ -31,8 +36,10 @@ export interface SessionHistoryToolOptions {
   readonly maxEventBytes?: number;
 }
 
+/** @experimental */
 export interface SessionHistoryToolInput extends SessionHistoryQuery {}
 
+/** @experimental */
 export interface SessionHistoryEntry {
   readonly seq: number;
   readonly timestamp: number;
@@ -42,6 +49,7 @@ export interface SessionHistoryEntry {
   readonly truncated?: boolean;
 }
 
+/** @experimental */
 export interface SessionHistoryToolOutput {
   readonly events: readonly SessionHistoryEntry[];
   readonly hasMore: boolean;
@@ -49,6 +57,7 @@ export interface SessionHistoryToolOutput {
   readonly outputTruncated: boolean;
 }
 
+/** @experimental */
 export function createSessionHistoryTool(
   options: SessionHistoryToolOptions,
 ): Tool<SessionHistoryToolInput, SessionHistoryToolOutput> {
@@ -218,7 +227,9 @@ function createOutput(
   };
 }
 
-/** Omit replacement views to avoid recursively returning compacted history. */
+/** Omit replacement views to avoid recursively returning compacted history.
+ * @experimental
+ */
 export function sessionHistoryEventContent(event: SessionEvent): unknown {
   if (event.type === "tool.completed") {
     const { output, ...details } = event;

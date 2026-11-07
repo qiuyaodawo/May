@@ -50,7 +50,9 @@ export interface AttachedApplicationAgentOptions {
   readonly identity?: (execution: TaskExecution, turn: AttachedApplicationTurn) => string;
 }
 
-/** 宿主已经持有 Session 的任务使用的 coordination agent。 */
+/** 宿主已经持有 Session 的任务使用的 coordination agent。
+ * @experimental
+ */
 export function createAttachedApplicationAgent(options: AttachedApplicationAgentOptions): CoordinationAgent {
   name(options.version, "agent version");
   // 宿主 Session 可能已经保存了更早请求的输入，按输入身份定位本轮。

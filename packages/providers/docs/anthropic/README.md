@@ -2,6 +2,15 @@
 
 Anthropic Messages API adapter for May.
 
+`promptCaching` defaults to disabled. Enable automatic caching with
+`{ ttl: "5m", cacheInstructions: true }` or choose `ttl: "1h"`.
+Instruction caching marks the last system block and tool with the same TTL as the
+automatic breakpoint. Five-minute writes cost 1.25x base input price, one-hour
+writes cost 2x, and reads normally cost 0.1x. Minimum lengths vary by model
+(Sonnet 4: 1,024 tokens; Opus 4.6: 4,096 tokens). Compatible endpoints may reject
+`cache_control`; disable it with `promptCaching: false`. See the bilingual
+[configuration reference](../../../../docs/en/reference/configuration.md).
+
 ```ts
 import { InMemoryContext, May } from "@sortedyuan/may/core";
 import { AnthropicModel } from "@sortedyuan/providers/anthropic";

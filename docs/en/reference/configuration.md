@@ -108,7 +108,7 @@ the command form `/model <profile-prefix> --default` is used.
 | `deepseek-chat`           | `thinking`, `reasoningEffort`, `maxTokens`                                                                    |
 | `zhipu-chat`              | `thinking`, `clearThinking`, `reasoningEffort`, `maxTokens`                                                   |
 | `kimi-chat`               | `thinking`, `reasoningEffort`, `maxTokens`                                                                    |
-| `anthropic-messages`      | `thinking`, `reasoningEffort`, `maxTokens`, `apiVersion`                                                      |
+| `anthropic-messages`      | `thinking`, `reasoningEffort`, `maxTokens`, `apiVersion`, `promptCaching`                                     |
 | `google-gemini`           | `maxOutputTokens`, `reasoningEffort`, `thinkingBudget`, `includeThoughts`, `responseFormat`                   |
 
 For `google-gemini`, `baseURL` includes the API version and defaults to
@@ -305,6 +305,29 @@ Anthropic accepts disabled, adaptive, or explicitly budgeted thinking:
 }
 ```
 
+### Anthropic prompt caching
+
+Anthropic `options.promptCaching` accepts `false` or an object such as
+`{ "ttl": "5m", "cacheInstructions": true }`. `ttl` accepts `"5m"` (default) or
+`"1h"`; `cacheInstructions` defaults to `false`. Provider `options` supply defaults;
+model `options` replace the caching setting, including explicit `false` or `{}`.
+The providers package defaults to disabled. MaybeCode defaults to
+`{ "ttl": "5m", "cacheInstructions": true }` for the `anthropic-messages` adapter.
+Provider or model settings override that application default.
+
+Automatic caching marks the last cacheable block. `cacheInstructions` also marks
+the last system block and last tool with the same TTL. There are four breakpoint
+slots; automatic caching uses one. Conflicting TTLs on the last block produce HTTP 400.
+Thinking history is preserved without adding explicit breakpoints to thinking blocks.
+
+Five-minute writes cost 1.25x base input price, one-hour writes cost 2x, and reads
+normally cost 0.1x. Minimum cacheable lengths depend on the model (for example,
+Sonnet 4: 1,024 tokens; Opus 4.6: 4,096 tokens). Shorter prompts are processed
+without caching. See the
+[Anthropic caching reference](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
+for current model thresholds and pricing exceptions. Compatible endpoints may
+reject `cache_control`; set `options.promptCaching: false` for those endpoints.
+
 ## Application plugins
 
 MaybeCode accepts `apps.maybecode.plugins`; MaybeClaw May Agents accept
@@ -362,17 +385,67 @@ The terminal and Web UI show **YOLO · Auto-approve**, with English notification
 Web UI uses `UiSnapshot.badges`; classic terminals update the prompt through
 `TerminalIO.updatePrompt` while preserving drafts and cursors. Tool validation,
 cancellation, and records remain active. MCP user-input requests require answers.
-Shell commands use host-account authority. Team authorization is configured separately.
+Shell authority follows `apps.maybecode.execution`. Team authorization is configured separately.
 
-`apps.maybecode.persistentRules` defaults to `false`. When enabled, `edit` and
-`write` grants use `.may/permission-rules.json` in the active project and show
-the canonical file path at approval. Scope includes local user, project/worktree,
+`apps.maybecode.persistentRules` defaults to `false`. When enabled, `edit`,
+`write`, and `fetch` grants use `.may/permission-rules.json` in the active project.
+File approvals show the canonical path; network approvals use the URL origin.
+Scope includes local user, project/worktree,
 and main Agent; changing Session or model preserves matching rules. The host holds
 the single-writer lock until shutdown. Rule and lock files are excluded from Git
 checkpoints. `/permissions [list|allow <id>|deny <id>|revoke <id>]` and Web UI manage
 existing ranges. Rules record an operator, and deny takes precedence.
 `openConfiguredMaybeCode({ persistentRules })` overrides configuration. See
 [Permission policies](../guides/permission-policy.md).
+
+## MaybeCode execution and web access
+
+`apps.maybecode.execution` defaults to `{ "mode": "host" }`. Container mode
+requires all fields below. `network` accepts only `"none"`; `memoryBytes` must
+be a positive safe integer and `cpuCount` a positive finite number. `image` must
+be nonempty. Invalid fields raise `MayConfigValidationError` with field paths.
+
+```json
+{
+  "apps": {
+    "maybecode": {
+      "execution": {
+        "mode": "container",
+        "image": "nixery.dev/shell/git/ripgrep/util-linux",
+        "network": "none",
+        "memoryBytes": 1073741824,
+        "cpuCount": 2
+      },
+      "fetch": {
+        "maxBytes": 1048576,
+        "timeoutMs": 30000,
+        "maxRedirects": 5
+      }
+    }
+  }
+}
+```
+
+Docker Desktop or a compatible running daemon is required. Pull the image before
+startup; it must contain `bash`, `git`, `rg`, and `setsid`. Only the workspace is
+mounted, at `/workspace`. The root is read-only, temporary storage is provided,
+capabilities are removed, and privilege escalation is disabled. Unix uses the
+host UID:GID; Windows uses `1000:1000`. Shell, search, delegated tools, and team
+checks inherit execution configuration. File tools access the shared workspace
+on the host; application close waits for cleanup. MCP servers remain on the host.
+
+`apps.maybecode.fetch` is optional; the tool remains available when omitted.
+`maxBytes` defaults to 1,048,576 and `timeoutMs` to 30,000, both positive safe
+integers. `maxRedirects` defaults to 5 and accepts a non-negative safe integer.
+`allowedOrigins` is an optional array of HTTP/HTTPS origins such as
+`["http://127.0.0.1:8080"]`; only listed origins are allowed, including local
+addresses explicitly listed by the host. Without it, private, loopback, link-local,
+and reserved addresses are rejected. Each redirect is checked independently and
+connections use the checked DNS address. Requests send no host credentials or
+cookies. HTML becomes readable text; text and JSON retain their content. Other
+types fail. Byte limits truncate output; timeout and cancellation abort requests.
+Network approvals are separate from file and shell approvals. YOLO uses existing
+automatic approval rules, including persistent denials.
 
 ## MaybeCode settings
 

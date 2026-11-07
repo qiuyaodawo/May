@@ -30,11 +30,14 @@ const OPENAI_REASONING_SUMMARIES = new Set<OpenAIReasoningSummary>(["auto", "con
 const THINKING_TYPES = new Set(["enabled", "disabled"] as const);
 const ANTHROPIC_THINKING_TYPES = new Set(["enabled", "adaptive", "disabled"] as const);
 const THINKING_DISPLAYS = new Set(["summarized", "omitted"] as const);
+const ANTHROPIC_CACHE_TTLS = new Set(["5m", "1h"] as const);
 
+/** @experimental */
 export interface BuiltinProviderAdapterRegistryOptions extends CapabilityValidatedModelOptions {
   readonly fetch?: typeof globalThis.fetch;
 }
 
+/** @experimental */
 export function createBuiltinProviderAdapterRegistry(
   options: BuiltinProviderAdapterRegistryOptions = {},
 ): ProviderAdapterRegistry {
@@ -73,6 +76,7 @@ export function createBuiltinProviderAdapterRegistry(
   return registry;
 }
 
+/** @experimental */
 export function createBuiltinProviderModel(
   selection: ProviderModelSelection,
   options: BuiltinProviderAdapterRegistryOptions = {},
@@ -215,10 +219,34 @@ function createAnthropicModel(
     selection.limits?.maxOutputTokens;
   const baseURL = providerBaseURL(selection);
   const apiVersion = optionalString(tuningOption(selection, "apiVersion"), optionField(selection, "apiVersion"));
+  const caching = Object.hasOwn(selection.options, "promptCaching")
+    ? tuningOption(selection, "promptCaching")
+    : selection.providerConfig.options?.promptCaching;
+  const cachingRecord =
+    caching === undefined || caching === false
+      ? undefined
+      : requireRecord(caching, optionField(selection, "promptCaching"));
+  const promptCaching =
+    caching === false
+      ? false
+      : cachingRecord === undefined
+        ? undefined
+        : omitUndefined({
+            ttl: optionalEnum(
+              cachingRecord.ttl,
+              `${optionField(selection, "promptCaching")}.ttl`,
+              ANTHROPIC_CACHE_TTLS,
+            ),
+            cacheInstructions: optionalBoolean(
+              cachingRecord.cacheInstructions,
+              `${optionField(selection, "promptCaching")}.cacheInstructions`,
+            ),
+          });
   const options: AnthropicModelOptions = omitUndefined({
     ...credentials(selection),
     baseURL,
     apiVersion,
+    promptCaching,
     thinking,
     reasoningEffort,
     maxTokens,

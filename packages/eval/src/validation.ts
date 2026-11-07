@@ -4,6 +4,7 @@ import { omitUndefined, resolveRunBudget } from "@sortedyuan/may/core";
 import type { EvalRegistry } from "./registry.js";
 import type { EvalExperiment, EvalFingerprints, EvalPlan, EvalTrial, EvidencePolicy, JsonValue } from "./types.js";
 
+/** @experimental */
 export const DEFAULT_EVIDENCE_POLICY: EvidencePolicy = Object.freeze({
   maxItemBytes: 65_536,
   maxTrialBytes: 1_048_576,
@@ -73,10 +74,12 @@ const messageValidator = new Ajv({ strict: false, allErrors: true }).compile({
     allOf: [{ if: { properties: { role: { const: "tool" } } }, then: { required: ["toolCallId", "name"] } }],
   },
 });
+/** @experimental */
 export function validateIdentifier(value: unknown, label: string): asserts value is string {
   if (typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(value) || value === "." || value === "..")
     throw new TypeError(`${label} must be a safe identifier`);
 }
+/** @experimental */
 export function assertJson(value: unknown, label = "value", depth = 0): asserts value is JsonValue {
   if (depth > 32) throw new RangeError(`${label} exceeds the nesting limit`);
   if (typeof value === "string") {
@@ -103,6 +106,7 @@ export function assertJson(value: unknown, label = "value", depth = 0): asserts 
   }
   throw new TypeError(`${label} must contain lossless JSON data`);
 }
+/** @experimental */
 export function fingerprint(value: unknown): string {
   return createHash("sha256")
     .update(JSON.stringify(canonical(value)))
@@ -118,6 +122,7 @@ function canonical(value: unknown): unknown {
     );
   return value;
 }
+/** @experimental */
 export function serializableExperiment(experiment: EvalExperiment): EvalExperiment {
   const policy = experiment.evidencePolicy;
   const evidencePolicy =
@@ -133,6 +138,7 @@ export function serializableExperiment(experiment: EvalExperiment): EvalExperime
         });
   return structuredClone({ ...experiment, ...omitUndefined({ evidencePolicy }) });
 }
+/** @experimental */
 export function validateExperiment(experiment: EvalExperiment, registry: EvalRegistry): void {
   validateIdentifier(experiment.id, "experiment.id");
   integer(experiment.repetitions, "repetitions");
@@ -205,6 +211,7 @@ export function validateExperiment(experiment: EvalExperiment, registry: EvalReg
   if (Buffer.byteLength(JSON.stringify(serializableExperiment(experiment))) > 16_777_216)
     throw new RangeError("Experiment configuration exceeds 16 MiB");
 }
+/** @experimental */
 export function createEvalPlan(experiment: EvalExperiment): EvalPlan {
   const trials: EvalTrial[] = [];
   let randomState = experiment.seed >>> 0;
@@ -240,6 +247,7 @@ export function createEvalPlan(experiment: EvalExperiment): EvalPlan {
     fingerprints,
   };
 }
+/** @experimental */
 export function trialFingerprints(experiment: EvalExperiment, trial: EvalTrial): EvalFingerprints {
   const item = experiment.cases.find((value) => value.id === trial.caseId)!;
   const variant = experiment.variants.find((value) => value.id === trial.variantId)!;

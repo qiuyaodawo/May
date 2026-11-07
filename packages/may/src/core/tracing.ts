@@ -1,35 +1,46 @@
-/** Scalar values that are safe to attach to operational telemetry. */
+/** Scalar values that are safe to attach to operational telemetry.
+ * @experimental
+ */
 export type TraceAttributeValue =
   string | number | boolean | readonly string[] | readonly number[] | readonly boolean[];
 
+/** @experimental */
 export type TraceAttributes = Readonly<Record<string, TraceAttributeValue>>;
 
-/** Propagated identity for one trace and its current parent span. */
+/** Propagated identity for one trace and its current parent span.
+ * @experimental
+ */
 export interface TraceContext {
   readonly traceId: string;
   readonly spanId: string;
   readonly sampled?: boolean;
 }
 
+/** @experimental */
 export interface TraceError {
   readonly name: string;
   readonly code?: string;
 }
 
+/** @experimental */
 export type TraceSpanStatus = "ok" | "error" | "cancelled";
 
+/** @experimental */
 export interface TraceSpanStartOptions {
   readonly parent?: TraceContext;
   readonly attributes?: TraceAttributes;
 }
 
+/** @experimental */
 export interface TraceSpanEndOptions {
   readonly status?: TraceSpanStatus;
   readonly attributes?: TraceAttributes;
   readonly error?: TraceError;
 }
 
-/** A synchronous, fail-open instrumentation handle. */
+/** A synchronous, fail-open instrumentation handle.
+ * @experimental
+ */
 export interface TraceSpan {
   readonly context: TraceContext;
   setAttributes(attributes: TraceAttributes): void;
@@ -40,12 +51,14 @@ export interface TraceSpan {
 /**
  * Minimal tracing port owned by Core. Implementations belong in optional
  * packages and must not make Agent execution depend on telemetry delivery.
+ * @experimental
  */
 export interface Tracer {
   startSpan(name: string, options?: TraceSpanStartOptions): TraceSpan;
   recordMetric?(record: MetricRecord): void;
 }
 
+/** @experimental */
 export interface MetricRecord {
   readonly name: string;
   readonly kind: "counter" | "histogram" | "gauge" | "updown";
@@ -54,6 +67,7 @@ export interface MetricRecord {
   readonly unit?: string;
 }
 
+/** @experimental */
 export function recordMetric(tracer: Tracer | undefined, record: MetricRecord): void {
   try {
     tracer?.recordMetric?.(record);
@@ -62,7 +76,9 @@ export function recordMetric(tracer: Tracer | undefined, record: MetricRecord): 
   }
 }
 
-/** Start a span without allowing a third-party tracer failure to affect May. */
+/** Start a span without allowing a third-party tracer failure to affect May.
+ * @experimental
+ */
 export function startTraceSpan(
   tracer: Tracer | undefined,
   name: string,
@@ -76,7 +92,9 @@ export function startTraceSpan(
   }
 }
 
-/** Set attributes without putting telemetry on the execution failure path. */
+/** Set attributes without putting telemetry on the execution failure path.
+ * @experimental
+ */
 export function setTraceAttributes(span: TraceSpan | undefined, attributes: TraceAttributes): void {
   try {
     span?.setAttributes(attributes);
@@ -85,7 +103,9 @@ export function setTraceAttributes(span: TraceSpan | undefined, attributes: Trac
   }
 }
 
-/** Add an instantaneous span event without affecting Agent execution. */
+/** Add an instantaneous span event without affecting Agent execution.
+ * @experimental
+ */
 export function addTraceEvent(span: TraceSpan | undefined, name: string, attributes?: TraceAttributes): void {
   try {
     span?.addEvent(name, attributes);
@@ -94,7 +114,9 @@ export function addTraceEvent(span: TraceSpan | undefined, name: string, attribu
   }
 }
 
-/** End a span without allowing exporter or processor failures to escape. */
+/** End a span without allowing exporter or processor failures to escape.
+ * @experimental
+ */
 export function endTraceSpan(span: TraceSpan | undefined, options?: TraceSpanEndOptions): void {
   try {
     span?.end(options);
@@ -103,7 +125,9 @@ export function endTraceSpan(span: TraceSpan | undefined, options?: TraceSpanEnd
   }
 }
 
-/** Convert an arbitrary failure into content-free trace error metadata. */
+/** Convert an arbitrary failure into content-free trace error metadata.
+ * @experimental
+ */
 export function traceError(error: unknown): TraceError {
   if (!(error instanceof Error)) return { name: "Error" };
   const code = "code" in error && typeof error.code === "string" ? error.code : undefined;

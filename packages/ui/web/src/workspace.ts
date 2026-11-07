@@ -1,7 +1,11 @@
 import type { UiClient, UiClientState, UiForkPoint, UiWorkspaceDiff } from "@sortedyuan/ui-client";
 import { button, element } from "./components.js";
+import { createUiTasks } from "./tasks.js";
 
-/** 工作区版本信息和分支入口使用宿主提供的结构化状态。 */
+/**
+ * 工作区版本信息和分支入口使用宿主提供的结构化状态。
+ * @experimental
+ */
 export function createWorkspaceUI(client: UiClient) {
   const status = element("span", "workspace-git-status");
   status.setAttribute("role", "status");
@@ -28,6 +32,7 @@ export function createWorkspaceUI(client: UiClient) {
   const report = (value: unknown) => {
     error.textContent = value instanceof Error ? value.message : "操作失败。";
   };
+  const tasks = createUiTasks(report);
   const ready = (name: string) =>
     state.connection === "connected" &&
     !state.busy &&
@@ -55,9 +60,9 @@ export function createWorkspaceUI(client: UiClient) {
         element("p", "checkpoint-version", [point.branch, point.commit?.slice(0, 12)].filter(Boolean).join(" · ")),
       );
     if (!point.available) content.append(element("p", "dialog-error", point.reason ?? "该历史位置无法恢复。"));
-    const current = button("当前工作区", () => fork("current"));
+    const current = button("当前工作区", () => tasks.run(fork("current")));
     current.disabled = !point.available || !ready("session.fork");
-    const separate = button("新建 worktree", () => fork("worktree"));
+    const separate = button("新建 worktree", () => tasks.run(fork("worktree")));
     separate.disabled = !point.available || !point.worktreeAvailable || !ready("session.fork");
     content.append(
       element("p", "", "当前工作区保留现有文件与 Git branch；新建 worktree 使用该回复关联的 commit。"),
@@ -79,9 +84,11 @@ export function createWorkspaceUI(client: UiClient) {
   function viewChanges(scope: "run" | "session" | "workspace", runId?: string) {
     show("diff");
     content.replaceChildren(element("p", "", "正在读取文件变化…"));
-    void client.command("changes.view", { scope, ...(runId ? { runId } : {}) }).then(() => {
-      if (!client.state.diff) content.replaceChildren(element("p", "", "宿主未提供文件变化。"));
-    }, report);
+    tasks.run(
+      client.command("changes.view", { scope, ...(runId ? { runId } : {}) }).then(() => {
+        if (!client.state.diff) content.replaceChildren(element("p", "", "宿主未提供文件变化。"));
+      }),
+    );
   }
   function renderDiff() {
     patchScroll = undefined;
@@ -110,7 +117,7 @@ export function createWorkspaceUI(client: UiClient) {
       const apply = button(
         "确认恢复文件",
         () => {
-          void client.command("changes.restore.apply", { previewId }).then(() => dialog.close(), report);
+          tasks.run(client.command("changes.restore.apply", { previewId }).then(() => dialog.close()));
         },
         "button primary",
       );
@@ -152,7 +159,7 @@ export function createWorkspaceUI(client: UiClient) {
         const restore = button(
           `预览恢复 ${file.path}`,
           () => {
-            void client.command("changes.restore.preview", { runId, path: file.path }).catch(report);
+            tasks.run(client.command("changes.restore.preview", { runId, path: file.path }));
           },
           "text-button",
         );
@@ -240,12 +247,12 @@ export function createWorkspaceUI(client: UiClient) {
       );
       if (item.error) section.append(element("p", "dialog-error", item.error));
       const open = button("打开", () => {
-        void client.command("worktree.open", { id: item.id }).then(() => dialog.close(), report);
+        tasks.run(client.command("worktree.open", { id: item.id }).then(() => dialog.close()));
       });
       open.disabled = !ready("worktree.open") || item.status !== "ready";
       const remove = button("删除 worktree", () => {
         if (!confirm(`删除 worktree ${item.path}？宿主将检查关联会话、进程及需要保留的修改。`)) return;
-        void client.command("worktree.delete", { id: item.id }).then(renderWorktrees, report);
+        tasks.run(client.command("worktree.delete", { id: item.id }).then(renderWorktrees));
       });
       remove.disabled = !ready("worktree.delete");
       section.append(open, remove);
@@ -319,8 +326,9 @@ export function createWorkspaceUI(client: UiClient) {
         else if (dialog.open && mode === "diff" && diff) renderDiff();
       }
     },
-    dispose() {
+    async dispose() {
       dialog.remove();
+      await tasks.close();
     },
   };
 }

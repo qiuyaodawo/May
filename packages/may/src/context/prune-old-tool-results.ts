@@ -2,11 +2,13 @@ import type { ContextSnapshot, Message, ToolMessage } from "../core/index.js";
 
 import type { ContextCompactionStrategy } from "./compaction.js";
 
+/** @experimental */
 export interface PruneOldToolResultsOptions {
   readonly keepRecentToolResults?: number;
   readonly minimumResultBytes?: number;
 }
 
+/** @experimental */
 export class PruneOldToolResultsStrategy implements ContextCompactionStrategy {
   readonly name = "prune-old-tool-results";
 

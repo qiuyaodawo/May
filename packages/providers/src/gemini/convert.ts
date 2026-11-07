@@ -10,6 +10,7 @@ import {
   type GeminiUsageMetadata,
 } from "./protocol.js";
 
+/** @experimental */
 export function toGeminiRequestParts(
   messages: readonly Message[],
 ): Pick<GeminiGenerateContentRequest, "contents" | "systemInstruction"> {
@@ -113,6 +114,7 @@ function toGeminiPart(part: ContentPart, role: Message["role"]): GeminiPart {
   throw new UnsupportedContentError("Google Gemini", part.type, role);
 }
 
+/** @experimental */
 export function convertGeminiUsage(metadata: GeminiUsageMetadata): Usage {
   const input = tokenCount(metadata.promptTokenCount, "promptTokenCount");
   const candidates = tokenCount(metadata.candidatesTokenCount, "candidatesTokenCount");

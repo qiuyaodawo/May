@@ -3,6 +3,7 @@ import stringWidth from "string-width";
 import type { CursorPosition, RenderResult, RenderSize } from "./component.js";
 import { assertRenderSize } from "./component.js";
 
+/** @experimental */
 export class ScreenBuffer {
   readonly width: number;
   readonly height: number;

@@ -2,10 +2,12 @@ import { SkillSession, type SkillRegistry } from "../skills/index.js";
 import { definePlugin, type PluginDefinition, type PluginContext } from "../plugin/index.js";
 import { services, factoryMetadata, type PluginFactoryMetadata } from "./index.js";
 
+/** @experimental */
 export interface SkillsPluginOptions<C = unknown> extends Omit<PluginFactoryMetadata<C>, "state"> {
   readonly id?: string;
   readonly create: (context: PluginContext<C>) => SkillRegistry | Promise<SkillRegistry>;
 }
+/** @experimental */
 export function createSkillsPlugin<C = unknown>(options: SkillsPluginOptions<C>): PluginDefinition<C> {
   return definePlugin({
     ...factoryMetadata(options, [{ service: services.toolSources }, { service: services.instructionSources }]),

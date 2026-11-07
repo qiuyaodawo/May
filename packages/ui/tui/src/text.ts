@@ -3,6 +3,7 @@ import type { Component, RenderResult, RenderSize } from "./component.js";
 import { renderTextDocument, type TextCopyRange } from "./text-selection.js";
 import { styleText, type TextStyle } from "./theme.js";
 
+/** @experimental */
 export interface TextOptions {
   readonly wrap?: boolean;
   /** 续行的最少缩进列数，同时保留逻辑行已有的缩进。 */
@@ -13,6 +14,7 @@ export interface TextOptions {
   readonly copyRanges?: readonly (TextCopyRange | undefined)[];
 }
 
+/** @experimental */
 export class Text implements Component {
   constructor(
     private readonly value: string | (() => string),
@@ -32,7 +34,10 @@ export class Text implements Component {
   }
 }
 
-/** Neutralize terminal control sequences in model, tool, or user supplied text. */
+/**
+ * Neutralize terminal control sequences in model, tool, or user supplied text.
+ * @experimental
+ */
 export function sanitizeTerminalText(value: string): string {
   return value
     .replace(/\r\n?/gu, "\n")

@@ -146,6 +146,11 @@ Use `NodeTerminalDriver` for a raw-mode retained screen. Use
 UI. They own different input modes and should not control the same terminal at
 the same time.
 
+Await `terminal.close()` when a line-oriented UI exits. The Node adapter waits
+for active suggestion providers; provider failures interrupt input and are
+reported by `close()`. Custom `TerminalIO.close()` implementations may return
+`void` or `Promise<void>`.
+
 ## Event consistency
 
 Application queues may discard high-volume streaming deltas under buffer
@@ -188,6 +193,13 @@ disconnect. Password spaces are preserved and the input clears after submission.
 Use `connectionHint` for login instructions; `authentication` and `initialToken`
 are mutually exclusive. HTTP authentication and origin requirements are described
 in the [shared Web UI guide](web-ui.md).
+
+Await `client.disconnect()` to stop and finish its event subscription. The
+cleanup function returned by `mountWebUI()` also returns `Promise<void>`; await
+it to finish client disconnection, pending UI reads and actions, and navigation
+cleanup. Standalone transcript reader, inspector, workspace UI, and navigation
+`dispose()` methods are asynchronous. Custom navigation cleanup callbacks may
+return `void` or `Promise<void>`.
 
 ## MCP user interactions
 

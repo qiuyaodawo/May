@@ -6,6 +6,7 @@ import type {
   EvalExecutionAdapter,
 } from "./types.js";
 
+/** @experimental */
 export class EvalRegistry {
   private readonly environments = new Map<string, EvalEnvironmentAdapter>();
   private readonly executions = new Map<string, EvalExecutionAdapter>();

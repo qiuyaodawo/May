@@ -1,4 +1,5 @@
 import type { AnyPlugin } from "@sortedyuan/may/plugin";
+import type { CodingExecutionEnvironment } from "@sortedyuan/coding-tools";
 import type { ContextBudget } from "@sortedyuan/may/context";
 import { InMemoryContextFactory } from "@sortedyuan/may/context";
 import { omitUndefined, type UserMessage } from "@sortedyuan/may/core";
@@ -40,6 +41,7 @@ export function createMaybeCodePlugins(
   options: MaybeCodeApplicationOptions,
   environment: {
     readonly workspace: string;
+    readonly execution: CodingExecutionEnvironment;
     readonly gitRequest: GitRequestController;
     readonly instructions: string;
     readonly contextBudget?: ContextBudget;
@@ -73,7 +75,12 @@ export function createMaybeCodePlugins(
         }),
     }),
     createContextPlugin({ create: () => options.contextFactory ?? new InMemoryContextFactory() }),
-    createWorkspaceFilesPlugin({ workspace, defaultTools: options.tools === undefined }),
+    createWorkspaceFilesPlugin({
+      workspace,
+      defaultTools: options.tools === undefined,
+      execution: environment.execution,
+      ...omitUndefined({ fetch: options.fetch }),
+    }),
     createHistoryMemoryPlugin({
       mode: autoMode,
       budget: (model) => withDefaultCompactionThreshold(options.contextBudget ?? contextBudgetFromModel(model)),
@@ -159,6 +166,8 @@ export function createMaybeCodePlugins(
     defaults.push(
       createDelegationPlugin({
         workspace,
+        execution: environment.execution,
+        ...omitUndefined({ fetch: options.fetch }),
         instructions,
         requestRecording: options.requestRecording ?? "required",
         providerBodyRecording: options.providerBodyRecording ?? false,

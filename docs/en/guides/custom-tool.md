@@ -19,52 +19,29 @@ construction boundary.
 
 ## A complete tool
 
-Create `add-tool.ts` in your TypeScript application and add `@sortedyuan/may` as a
-direct dependency. This file implements addition; its `execute()` result has
+Create `add-tool.ts` in your TypeScript application and add `@sortedyuan/may` and
+`zod` 4.6.7 or newer as direct dependencies. This file implements addition; its `execute()` result has
 the shape `{ value: number }`.
 
 ```ts
-import type { Tool } from "@sortedyuan/may/core";
-
-interface AddInput {
-  readonly left: number;
-  readonly right: number;
-}
+import { defineTool } from "@sortedyuan/may/core";
+import { z } from "zod";
 
 interface AddOutput {
   readonly value: number;
 }
 
-export const addTool: Tool<AddInput, AddOutput> = {
+export const addTool = defineTool({
   name: "add",
   description: "Add two finite numbers.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      left: { type: "number" },
-      right: { type: "number" },
-    },
-    required: ["left", "right"],
-    additionalProperties: false,
-  },
-
-  parse(input): AddInput {
-    if (typeof input !== "object" || input === null) {
-      throw new TypeError("add input must be an object");
-    }
-    const value = input as Record<string, unknown>;
-    if (!Number.isFinite(value.left) || !Number.isFinite(value.right)) {
-      throw new TypeError("left and right must be finite numbers");
-    }
-    return { left: value.left as number, right: value.right as number };
-  },
+  schema: z.strictObject({ left: z.number(), right: z.number() }),
 
   async execute(input, context): Promise<AddOutput> {
     context.signal.throwIfAborted();
     context.report({ type: "progress", message: "Adding values" });
     return { value: input.left + input.right };
   },
-};
+});
 ```
 
 In the application's composition module, import `addTool` from `./add-tool.js`
@@ -91,6 +68,11 @@ const application = await agent.open({ store });
 `inputSchema` is sent to the model; it is not a runtime validator. Always
 validate in `parse()` (or inside `execute()` if no separate parser is useful).
 The permission policy receives the parsed value.
+`defineTool` converts Standard JSON Schema input to draft-07 at definition time and
+awaits Standard Schema validation. Defaults and transforms apply before permission
+checks and execution. `ToolInputValidationError.issues` contains field paths.
+Direct callers of `tool.parse()` must await its result. Execution checks cancellation
+after parsing and freezes the parsed input.
 
 ## Registry composition and lookup
 

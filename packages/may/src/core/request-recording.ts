@@ -2,6 +2,7 @@ import type { Model, ModelRequest, ModelEvent } from "./model.js";
 import { RunCheckpointError } from "./errors.js";
 import { omitUndefined } from "./omit-undefined.js";
 
+/** @experimental */
 export interface ModelRequestRecord {
   readonly version: 1;
   readonly adapter: string;
@@ -14,6 +15,7 @@ export interface ModelRequestRecord {
   readonly externalResourcePaths?: readonly string[];
 }
 
+/** @experimental */
 export type ModelRequestObservation =
   | { readonly type: "prepared"; readonly record: ModelRequestRecord }
   | { readonly type: "started" }
@@ -26,8 +28,10 @@ export type ModelRequestObservation =
       readonly httpStatus?: number;
     };
 
+/** @experimental */
 export type ModelRequestRecorder = (event: ModelRequestObservation) => Promise<void>;
 
+/** @experimental */
 export type ModelRequestSink = (
   event: ModelRequestObservation & {
     readonly runId: string;
@@ -36,7 +40,9 @@ export type ModelRequestSink = (
   },
 ) => Promise<void>;
 
-/** 在发送请求前等待记录完成，执行时使用同一份序列化内容。 */
+/** 在发送请求前等待记录完成，执行时使用同一份序列化内容。
+ * @experimental
+ */
 export async function* executeRecordedRequest(
   record: ModelRequestRecord,
   recorder: ModelRequestRecorder | undefined,
@@ -61,6 +67,7 @@ export async function* executeRecordedRequest(
   await recorder?.(omitUndefined({ type: "completed", durationMs: performance.now() - started, usage }));
 }
 
+/** @experimental */
 export async function executeRecordedOperation<T>(
   record: ModelRequestRecord,
   recorder: ModelRequestRecorder | undefined,
@@ -98,6 +105,7 @@ function requestFailure(
   };
 }
 
+/** @experimental */
 export function requestEndpoint(url: string): string {
   const parsed = new URL(url);
   return `${parsed.origin}${parsed.pathname}`;
@@ -140,7 +148,9 @@ function snapshotRequestRecord(record: ModelRequestRecord): ModelRequestRecord {
   };
 }
 
-/** 让应用自行发起的摘要和原生压缩调用使用同一记录通道。 */
+/** 让应用自行发起的摘要和原生压缩调用使用同一记录通道。
+ * @experimental
+ */
 export function withModelRequestRecording(model: Model, sink: ModelRequestSink): Model {
   if (model.supportsRequestRecording !== true) throw new Error("Model does not support complete request recording");
   const recorder = (

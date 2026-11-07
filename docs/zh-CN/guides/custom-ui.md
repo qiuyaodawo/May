@@ -133,6 +133,10 @@ Raw-mode retained TUI 使用 `NodeTerminalDriver`；逐行提示界面使用
 `@sortedyuan/tui/node-terminal` 的 `createNodeTerminal()`。二者管理不同输入模式，
 同一终端只能由其中一个控制。
 
+逐行提示界面退出时，等待 `terminal.close()`。Node adapter 等待活动的建议提供函数；
+提供函数失败时终止输入，并通过 `close()` 报告错误。自定义 `TerminalIO.close()`
+实现可以返回 `void` 或 `Promise<void>`。
+
 ## 事件一致性
 
 事件缓冲压力增大时，application 队列可以丢弃高频流式增量，同时保留生命周期
@@ -168,6 +172,12 @@ Raw-mode retained TUI 使用 `NodeTerminalDriver`；逐行提示界面使用
 返回临时 UiClient 凭据，断开连接时撤销凭据。密码中的空格保留，提交后清空输入。
 `connectionHint` 提供登录说明；`authentication` 与 `initialToken` 不能同时使用。
 HTTP 认证与来源检查参阅[共享 Web UI](web-ui.md)。
+
+等待 `client.disconnect()`，停止并结束事件订阅。`mountWebUI()` 返回的清理函数
+也返回 `Promise<void>`；等待该函数结束客户端连接、等待中的 UI 读取与操作，以及
+navigation 清理。独立的 transcript reader、inspector、workspace UI 和 navigation
+的 `dispose()` 方法均为异步方法。自定义 navigation 清理回调可以返回 `void` 或
+`Promise<void>`。
 
 ## MCP 用户交互
 

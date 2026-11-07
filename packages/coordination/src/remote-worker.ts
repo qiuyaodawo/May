@@ -34,6 +34,7 @@ interface Active {
   cursor: number;
 }
 
+/** @experimental */
 export interface CoordinationWorkerOptions {
   readonly directory: string;
   /** Bearer secret, never persisted or added to task/model inputs. Use HTTPS off loopback. */
@@ -47,7 +48,9 @@ export interface CoordinationWorkerOptions {
   readonly maxJournalBytes?: number;
 }
 
-/** Authenticated worker endpoint. One durable writer; remote workers do not own the graph. */
+/** Authenticated worker endpoint. One durable writer; remote workers do not own the graph.
+ * @experimental
+ */
 export class CoordinationWorker {
   private readonly serial = new AsyncStateSerializer();
   private readonly jobs = new Map<string, Job>();
@@ -513,6 +516,7 @@ export class CoordinationWorker {
   }
 }
 
+/** @experimental */
 export interface RemoteAgentOptions {
   readonly url: string;
   readonly token: string;
@@ -523,7 +527,9 @@ export interface RemoteAgentOptions {
   readonly maxResponseBytes?: number;
 }
 
-/** Independent remote worker adapter. The coordinator keeps graph ownership and recovery policy. */
+/** Independent remote worker adapter. The coordinator keeps graph ownership and recovery policy.
+ * @experimental
+ */
 export function createRemoteAgent(options: RemoteAgentOptions): CoordinationAgent {
   options = { ...options };
   validateToken(options.token);

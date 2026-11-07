@@ -1,5 +1,6 @@
 import type { UiPanel } from "./protocol.js";
 
+/** @experimental */
 export interface UiTelemetryRecord {
   readonly name: string;
   readonly startTime: number;
@@ -11,6 +12,7 @@ export interface UiTelemetryRecord {
   readonly parentSpanId?: string;
 }
 
+/** @experimental */
 export interface UiTelemetryData {
   readonly spans: readonly UiTelemetryRecord[];
   readonly total: number;
@@ -18,7 +20,10 @@ export interface UiTelemetryData {
   readonly evictedSpans: number;
 }
 
-/** 显示每项独立耗时，保留父子身份，供不同宿主复用。 */
+/**
+ * 显示每项独立耗时，保留父子身份，供不同宿主复用。
+ * @experimental
+ */
 export function createTelemetryPanel(data: UiTelemetryData | undefined): UiPanel {
   if (data === undefined)
     return { id: "telemetry", title: "运行诊断", fields: [{ label: "状态", value: "当前宿主没有启用遥测。" }] };

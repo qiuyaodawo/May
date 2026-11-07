@@ -14,6 +14,7 @@ import type { ContextBudget, ContextCompactionStrategy } from "@sortedyuan/may/c
 import { omitUndefined, type Model, type Tool, type TraceAttributes } from "@sortedyuan/may/core";
 import type { SkillRegistry } from "@sortedyuan/may/skills";
 import { SubagentHost } from "./subagent-host.js";
+import type { CodingExecutionEnvironment, FetchToolOptions } from "@sortedyuan/coding-tools";
 import { SharedWorkspaceFileGuard } from "./subagent-files.js";
 import { withRequestBudget } from "./subagent-budget.js";
 import {
@@ -24,21 +25,30 @@ import {
 } from "./subagents.js";
 import type { MaybeCodeDelegationRequest } from "./delegation.js";
 
+/** @experimental */
 export interface DelegationAccess {
   get(): SubagentHost;
 }
+/** @experimental */
 export const delegationService = defineService<DelegationAccess>({
   id: "may.delegation",
   version: "1.0.0",
   scope: "application",
 });
+/** @experimental */
 export const workspaceFilesService = defineService<SharedWorkspaceFileGuard>({
   id: "may.workspace-files",
   version: "1.0.0",
   scope: "application",
 });
 
-export function createWorkspaceFilesPlugin(options: { readonly workspace: string; readonly defaultTools?: boolean }) {
+/** @experimental */
+export function createWorkspaceFilesPlugin(options: {
+  readonly workspace: string;
+  readonly defaultTools?: boolean;
+  readonly execution?: CodingExecutionEnvironment;
+  readonly fetch?: FetchToolOptions;
+}) {
   return definePlugin({
     id: "may.workspace-files",
     version: "1.0.0",
@@ -46,7 +56,10 @@ export function createWorkspaceFilesPlugin(options: { readonly workspace: string
     provides: [workspaceFilesService],
     requires: [{ service: applicationServices.toolSources }],
     setup(context) {
-      const guard = new SharedWorkspaceFileGuard(resolve(options.workspace));
+      const guard = new SharedWorkspaceFileGuard(
+        resolve(options.workspace),
+        omitUndefined({ execution: options.execution, fetch: options.fetch }),
+      );
       context.provide(workspaceFilesService, guard);
       if (options.defaultTools !== false) {
         const tools = guard.create({ names: [...SUBAGENT_TOOL_NAMES], requireRead: false }).tools;
@@ -60,8 +73,11 @@ export function createWorkspaceFilesPlugin(options: { readonly workspace: string
   });
 }
 
+/** @experimental */
 export interface DelegationPluginOptions {
   readonly workspace: string;
+  readonly execution?: CodingExecutionEnvironment;
+  readonly fetch?: FetchToolOptions;
   readonly requestRecording?: "off" | "required";
   readonly providerBodyRecording?: boolean;
   readonly configuration?: MaybeCodeSubagentConfiguration;
@@ -87,6 +103,7 @@ interface RequestState {
   readonly requests: readonly MaybeCodeDelegationRequest[];
 }
 
+/** @experimental */
 export function createDelegationPlugin(options: DelegationPluginOptions) {
   return definePlugin({
     id: "may.delegation",
@@ -172,6 +189,8 @@ export function createDelegationPlugin(options: DelegationPluginOptions) {
             fileGuard: context.get(workspaceFilesService),
             autoCompactionMode: options.autoCompactionMode ?? "prune-summary",
             ...omitUndefined({
+              execution: options.execution,
+              fetch: options.fetch,
               instructionsSource: options.instructionsSource,
               projectInstructionsSource: options.projectInstructionsSource,
               prepareInstructions: options.prepareInstructions,

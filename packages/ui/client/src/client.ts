@@ -13,6 +13,7 @@ import {
   type UiWorkspaceDiff,
 } from "./protocol.js";
 
+/** @experimental */
 export interface UiClientState {
   readonly snapshot: UiSnapshot | null;
   readonly connection: "disconnected" | "connecting" | "connected" | "reconnecting";
@@ -23,7 +24,10 @@ export interface UiClientState {
   readonly diff?: UiWorkspaceDiff | null;
 }
 
-/** Browser-safe client. Credentials are memory-only; commands are never auto-retried. */
+/**
+ * Browser-safe client. Credentials are memory-only; commands are never auto-retried.
+ * @experimental
+ */
 export class UiClient {
   private token = "";
   private selectedId: string | undefined;
@@ -31,6 +35,7 @@ export class UiClient {
   private generation = 0;
   private refreshId = 0;
   private selectionVersion = 0;
+  private readonly watches = new Set<Promise<void>>();
   private listeners = new Set<(state: UiClientState) => void>();
   private value: UiClientState = {
     snapshot: null,
@@ -56,23 +61,40 @@ export class UiClient {
     for (const listener of this.listeners) listener(this.value);
   }
   async connect(token: string): Promise<void> {
-    this.disconnect();
+    const disconnected = this.disconnect();
+    const generation = this.generation;
+    await disconnected;
+    if (generation !== this.generation) return;
     this.token = token;
     this.lifetime = new AbortController();
-    const generation = this.generation;
     this.update({ connection: "connecting", error: null });
     try {
       await this.refresh();
     } catch (error) {
       if (generation === this.generation) {
-        this.disconnect();
+        await this.disconnect();
         this.update({ error: describe(error) });
       }
       throw error;
     }
-    if (generation === this.generation) void this.watch(this.lifetime!.signal, generation);
+    if (generation === this.generation) {
+      const watch = this.watch(this.lifetime!.signal, generation).then(
+        () => {
+          this.watches.delete(watch);
+        },
+        (error: unknown) => {
+          this.watches.delete(watch);
+          if (generation === this.generation) this.update({ error: describe(error) });
+        },
+      );
+      this.watches.add(watch);
+    }
   }
-  disconnect(): void {
+  async disconnect(): Promise<void> {
+    this.reset(null);
+    await Promise.all([...this.watches]);
+  }
+  private reset(error: string | null): void {
     this.generation++;
     this.lifetime?.abort();
     this.lifetime = undefined;
@@ -84,7 +106,7 @@ export class UiClient {
       connection: "disconnected",
       busy: false,
       selecting: false,
-      error: null,
+      error,
       output: null,
       diff: null,
     });
@@ -240,7 +262,7 @@ export class UiClient {
       const receipt = (await this.json("/api/ui/commands", command)) as UiReceipt;
       if (generation !== this.generation) return;
       if (receipt.disconnect) {
-        this.disconnect();
+        await this.disconnect();
         return;
       }
       if (selectionVersion === this.selectionVersion)
@@ -297,8 +319,7 @@ export class UiClient {
       } catch (error) {
         if (signal.aborted || generation !== this.generation) return;
         if (error instanceof UiError && error.status === 401) {
-          this.disconnect();
-          this.update({ error: "连接凭据已失效，请重新连接。" });
+          this.reset("连接凭据已失效，请重新连接。");
           return;
         }
       }

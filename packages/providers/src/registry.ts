@@ -4,6 +4,7 @@ import { ProviderAdapterRegistryError } from "./errors.js";
 import { createCapabilityValidatedModel, type CapabilityValidatedModelOptions } from "./capability-validated-model.js";
 import type { ProviderAdapterFactory, ProviderModelSelection } from "./types.js";
 
+/** @experimental */
 export class ProviderAdapterRegistry {
   private readonly factories = new Map<string, ProviderAdapterFactory>();
 

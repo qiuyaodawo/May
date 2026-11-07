@@ -2,7 +2,15 @@ import { randomUUID } from "node:crypto";
 import { mkdir, open, readFile, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { defineAgent } from "@sortedyuan/may";
-import { createEditTool, createReadTool, createWriteTool } from "@sortedyuan/coding-tools";
+import {
+  createEditTool,
+  createReadTool,
+  createWriteTool,
+  createGlobTool,
+  createGrepTool,
+  createFetchTool,
+} from "@sortedyuan/coding-tools";
+import { TeamExecutionEnvironments } from "./team-execution.js";
 import { loadMayConfig, type MayConfig } from "@sortedyuan/may/config";
 import {
   CoordinationRuntime,
@@ -21,7 +29,7 @@ import { hasErrorCode, withFileAccess } from "@sortedyuan/may/storage";
 import writeFileAtomic from "write-file-atomic";
 import type { MaybeCodeTeamCommand } from "./args.js";
 import { getDefaultMaybeCodeDataDirectory, resolveMaybeCodeRecording, type MaybeCodeRecording } from "./configured.js";
-import { readMaybeCodeSettings } from "./settings.js";
+import { readMaybeCodeSettings, type MaybeCodeSettings } from "./settings.js";
 import { createMaybeCodeModel, selectMaybeCodeModel, type SelectedMaybeCodeModel } from "./model.js";
 import { createListTool, type RunMaybeCodeTeamDependencies } from "./team.js";
 import {
@@ -40,6 +48,8 @@ const VERSION = "maybecode-team-v2";
 const RESERVATION = 32_768;
 const DEFAULT_RUN_BUDGET: RunBudget = { maxSteps: 10, maxModelCalls: 10, maxToolCalls: 24, maxDurationMs: 180_000 };
 interface Manifest {
+  readonly execution?: MaybeCodeSettings["execution"];
+  readonly fetch?: MaybeCodeSettings["fetch"];
   readonly format: 1;
   readonly version: typeof VERSION;
   readonly id: string;
@@ -102,6 +112,8 @@ export async function runTeamV2Command(
       roleModels[name] = { profile: selected.profile, fingerprint: modelFingerprint(selected), runBudget };
     }
     manifest = {
+      execution: readMaybeCodeSettings(config).execution ?? { mode: "host" },
+      fetch: readMaybeCodeSettings(config).fetch ?? {},
       format: 1,
       version: VERSION,
       id,
@@ -162,6 +174,13 @@ export async function runTeamV2Command(
   }
 
   const ledger = await FileSharedBudget.open(join(directory, "budget"), id, budgetLimits);
+  const settings = readMaybeCodeSettings({
+    providers: {},
+    models: {},
+    path: manifest.configPath,
+    apps: { maybecode: { execution: manifest.execution ?? { mode: "host" }, fetch: manifest.fetch ?? {} } },
+  });
+  const executionEnvironments = new TeamExecutionEnvironments(settings.execution);
   let workspaces: TaskWorkspaceManager | undefined;
   let artifacts: FileArtifactStore | undefined;
   let verification: TeamVerificationStore | undefined;
@@ -170,9 +189,31 @@ export async function runTeamV2Command(
   let timer: ReturnType<typeof setInterval> | undefined;
   let cancelling: Promise<void> | undefined;
   let retryAuthorized = false;
+  const backgroundTasks = new Set<Promise<void>>();
+  const backgroundErrors: unknown[] = [];
+  let failBackground!: (error: unknown) => void;
+  const backgroundFailed = new Promise<unknown>((resolve) => {
+    failBackground = resolve;
+  });
+  const trackBackground = (operation: Promise<void>): void => {
+    const task = operation.then(
+      () => {
+        backgroundTasks.delete(task);
+      },
+      (error) => {
+        backgroundTasks.delete(task);
+        backgroundErrors.push(error);
+        failBackground(error);
+        cancel();
+      },
+    );
+    backgroundTasks.add(task);
+  };
   const cancel = () => {
-    if (runtime) cancelling ??= runtime.cancel(`cancel-${id}`);
-    void cancelling?.catch(() => undefined);
+    if (runtime && !cancelling) {
+      cancelling = runtime.cancel(`cancel-${id}`);
+      trackBackground(cancelling);
+    }
   };
   try {
     artifacts = await FileArtifactStore.open(join(directory, "artifacts"), id, {
@@ -189,6 +230,7 @@ export async function runTeamV2Command(
     verification = await TeamVerificationStore.open({
       directory: join(directory, "verification"),
       checks: manifest.plan.checks,
+      executionFor: (workspace) => executionEnvironments.get(workspace),
     });
     const sessionStore = new FileSessionStore(join(directory, "sessions"));
     const models = new Map<string, Model>();
@@ -218,8 +260,9 @@ export async function runTeamV2Command(
     };
     const agents: Record<string, CoordinationAgent> = {};
     for (const [name, role] of Object.entries(manifest.plan.roles)) {
-      const scoped = (execution: TaskExecution, workspace: string) =>
-        createApplicationAgent({
+      const scoped = async (execution: TaskExecution, workspace: string) => {
+        const environment = await executionEnvironments.get(workspace);
+        return createApplicationAgent({
           version: authorityVersion,
           store: sessionStore,
           delegation: role.delegateTo.length > 0,
@@ -227,6 +270,9 @@ export async function runTeamV2Command(
           definition: ({ tools }) => {
             const available: Tool[] = [
               createReadTool({ cwd: workspace, maxBytes: 262_144, maxLines: 160 }),
+              createGlobTool({ cwd: workspace, execution: environment }),
+              createGrepTool({ cwd: workspace, execution: environment }),
+              createFetchTool(settings?.fetch ?? {}),
               createListTool(workspace),
               ...artifacts!.forTask(execution.task.id).tools(),
               ...verification!.forTask(execution, workspace, { allowCommands: manifest.allowChecks }).tools(),
@@ -273,6 +319,7 @@ export async function runTeamV2Command(
             });
           },
         });
+      };
       const publish = async (execution: TaskExecution, output: { text: string }) => {
         await artifacts!
           .forTask(execution.task.id)
@@ -314,7 +361,7 @@ export async function runTeamV2Command(
             });
           }
           const submitted = { ...execution, dependencies: dependencyResults };
-          const output = await scoped(submitted, isolated.directory).execute(submitted, context);
+          const output = await (await scoped(submitted, isolated.directory)).execute(submitted, context);
           if (!("yielded" in output)) {
             await publish(execution, output);
             // Only deterministic file checks run automatically; command checks need explicit invocation.
@@ -332,7 +379,7 @@ export async function runTeamV2Command(
           return output;
         },
         async recover(execution) {
-          const output = await scoped(execution, manifest.workspace).recover(execution);
+          const output = await (await scoped(execution, manifest.workspace)).recover(execution);
           if (output.status === "completed") await publish(execution, output.output);
           return output;
         },
@@ -413,7 +460,7 @@ export async function runTeamV2Command(
         else if (event.type === "runtime.failed") write("Team runtime failed; inspect recovery records.\n");
       }
     })();
-    void relay.catch(cancel);
+    trackBackground(relay);
 
     if (command.action === "retry" || command.action === "reconcile") {
       const state = runtime.snapshot(),
@@ -534,7 +581,7 @@ export async function runTeamV2Command(
       };
       await observeCancellation();
       timer = setInterval(() => {
-        void observeCancellation().catch(() => controller.abort("Cancellation monitoring failed"));
+        trackBackground(observeCancellation());
       }, 300);
       const state = runtime.snapshot();
       for (const check of manifest.plan.checks) {
@@ -575,7 +622,7 @@ export async function runTeamV2Command(
     await checkCancellation();
     if (dependencies.signal?.aborted) cancel();
     timer = setInterval(() => {
-      void checkCancellation().catch(cancel);
+      trackBackground(checkCancellation());
     }, 300);
     await cancelling;
     if (
@@ -587,7 +634,12 @@ export async function runTeamV2Command(
       );
       return 1;
     }
-    const result = await runtime.wait();
+    const result = await Promise.race([
+      runtime.wait(),
+      backgroundFailed.then((error) => {
+        throw error;
+      }),
+    ]);
     await cancelling;
     const final = result.tasks.find((task) => task.id === manifest.plan.resultTaskId);
     if (final?.output?.text) write(`\n${final.output.text}\n`);
@@ -605,10 +657,23 @@ export async function runTeamV2Command(
     if (timer) clearInterval(timer);
     dependencies.signal?.removeEventListener("abort", cancel);
     try {
-      await runtime?.close();
-      await relay;
+      const results = await Promise.allSettled([...(runtime ? [runtime.close()] : []), ...(relay ? [relay] : [])]);
+      while (backgroundTasks.size) await Promise.all(backgroundTasks);
+      const failures = [
+        ...new Set([
+          ...backgroundErrors,
+          ...results.flatMap((result) => (result.status === "rejected" ? [result.reason] : [])),
+        ]),
+      ];
+      if (failures.length) throw new AggregateError(failures, "Team background operations failed");
     } finally {
-      await Promise.all([verification?.close(), workspaces?.close(), artifacts?.close(), ledger.close()]);
+      await Promise.all([
+        verification?.close(),
+        workspaces?.close(),
+        artifacts?.close(),
+        ledger.close(),
+        executionEnvironments.close(),
+      ]);
     }
   }
 }

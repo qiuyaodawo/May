@@ -5,10 +5,12 @@ import {
   createCodingTool,
   workspaceFileKey,
   type CodingToolName,
+  type CodingToolsOptions,
   type WorkspaceFileOperation,
 } from "@sortedyuan/coding-tools";
 import type { SubagentToolName } from "./subagents.js";
 
+/** @experimental */
 export interface SubagentFileGuard {
   readonly tools: readonly Tool[];
   /** 本任务通过文件工具修改过的工作区相对路径。 */
@@ -27,12 +29,16 @@ export interface SubagentFileGuard {
  * 保证范围：锁只在进程内生效，覆盖本应用提供的文件工具；工作区之外的进程
  * （例如用户自己打开的 shell、编辑器或其他程序）不受本守卫约束，任务指令中
  * 说明了这一点。符号链接与别名解析为同一把锁。
+ * @experimental
  */
 export class SharedWorkspaceFileGuard {
   private readonly workspace: string;
   private readonly locks = new Map<string, Promise<void>>();
 
-  constructor(workspace: string) {
+  constructor(
+    workspace: string,
+    private readonly options: Pick<CodingToolsOptions, "execution" | "fetch"> = {},
+  ) {
     this.workspace = workspace;
   }
 
@@ -62,10 +68,9 @@ export class SharedWorkspaceFileGuard {
         () => undefined,
       );
       this.locks.set(key, tail);
-      void tail.then(() => {
+      return result.finally(() => {
         if (this.locks.get(key) === tail) this.locks.delete(key);
       });
-      return result;
     };
 
     const guard = async <T>(operation: WorkspaceFileOperation<T>): Promise<T> => {
@@ -109,7 +114,9 @@ export class SharedWorkspaceFileGuard {
     };
 
     return {
-      tools: options.names.map((name) => createCodingTool(name as CodingToolName, { cwd: this.workspace, guard })),
+      tools: options.names.map((name) =>
+        createCodingTool(name as CodingToolName, { cwd: this.workspace, ...this.options, guard }),
+      ),
       changedFiles: () => [...changed],
       note: () =>
         changed.size === 0

@@ -29,7 +29,13 @@ import {
   type Tracer,
   type UserMessage,
 } from "@sortedyuan/may/core";
-import { codingRuntimeInstructions, createCodingTools, getShellToolInfo } from "@sortedyuan/coding-tools";
+import {
+  codingRuntimeInstructions,
+  createCodingTools,
+  getShellToolInfo,
+  type CodingExecutionEnvironment,
+  type FetchToolOptions,
+} from "@sortedyuan/coding-tools";
 import {
   CoordinationRuntime,
   createApplicationAgent,
@@ -87,14 +93,18 @@ function automaticCompactionStrategies(
   }
 }
 
-/** 主请求在协调图中的任务 id 与 agent 名称。 */
+/** 主请求在协调图中的任务 id 与 agent 名称。
+ * @experimental
+ */
 export const MAIN_TASK_ID = "request";
+/** @experimental */
 export const MAIN_AGENT = "main";
 const VERSION = "maybecode-subagent-v1";
 const OUTPUT_LIMIT = 4_000;
 const MAX_TOOL_RECORDS = 64;
 const MAX_INDEXED_REQUESTS = 16;
 
+/** @experimental */
 export interface SubagentRequestPlan {
   /** 第一轮输入；具体内容与媒体由调用方决定。 */
   readonly input: string | UserMessage;
@@ -108,7 +118,10 @@ export interface SubagentRequestPlan {
   readonly traceAttributes?: TraceAttributes;
 }
 
+/** @experimental */
 export interface SubagentHostOptions {
+  readonly execution?: CodingExecutionEnvironment;
+  readonly fetch?: FetchToolOptions;
   readonly configuration: MaybeCodeSubagentConfiguration;
   readonly workspace: string;
   /** 每次请求一个持久目录的根目录。 */
@@ -152,6 +165,7 @@ export interface SubagentHostOptions {
  * 每次用户请求都是一张持久协调图：主 Session 执行根任务，模型可以在其中创建
  * 长度有界的子任务，子任务在自己的 Session 中运行。根任务持有主 Session，
  * 子任务不会写入它；同一个 Session 不会被第二个执行方认领。
+ * @experimental
  */
 export class SubagentHost {
   readonly options: SubagentHostOptions;
@@ -235,7 +249,7 @@ export class SubagentHost {
     try {
       if (request !== undefined) {
         await request.cancel("MaybeCode is closing");
-        await request.settled;
+        await request.waitForSettlement();
       }
     } finally {
       this.approvals.clear();
@@ -535,7 +549,13 @@ export class SubagentHost {
         const request = host.active;
         if (request === undefined) throw new Error("The sub-agent request is no longer active");
         const coding = role.tools;
-        const files = (options.fileGuard ?? new SharedWorkspaceFileGuard(options.workspace)).create(
+        const files = (
+          options.fileGuard ??
+          new SharedWorkspaceFileGuard(
+            options.workspace,
+            omitUndefined({ execution: options.execution, fetch: options.fetch }),
+          )
+        ).create(
           omitUndefined({
             names: coding,
             requireRead: true,
@@ -596,6 +616,7 @@ export class SubagentHost {
                     codingRuntimeInstructions(
                       omitUndefined({
                         workspace: options.workspace,
+                        execution: options.execution?.isolation,
                         shell,
                         agentRole: "sub-agent",
                         assignedRole: role.name,
@@ -760,12 +781,16 @@ class SubagentRequest {
   private resolveResult!: (result: RunResult) => void;
   private rejectResult!: (error: unknown) => void;
   private readonly result: Promise<RunResult>;
+  private readonly outcomes: Promise<PromiseSettledResult<unknown>[]>;
+  private settlement: Promise<PromiseSettledResult<void>[]> | undefined;
   private relay: Promise<void> | undefined;
   private cancelCommands = 0;
   private cancelling: string | undefined;
   private failure: Error | undefined;
+  private backgroundFailure: Error | undefined;
   private ended = false;
   private cancellingPromise: Promise<boolean> | undefined;
+  private readonly background = new Set<Promise<void>>();
 
   constructor(
     readonly host: SubagentHost,
@@ -780,9 +805,7 @@ class SubagentRequest {
       this.resolveResult = resolve;
       this.rejectResult = reject;
     });
-    // 调用方会观察结果；请求本身不会留下无人处理的结果。
-    void this.firstRun.catch(() => undefined);
-    void this.result.catch(() => undefined);
+    this.outcomes = Promise.allSettled([this.firstRun, this.result]);
     const self = this;
     this.run = {
       get id(): string {
@@ -791,7 +814,7 @@ class SubagentRequest {
       requestId: this.requestId,
       result: this.result,
       cancel: (reason?: string) => {
-        void this.cancel(reason ?? "Cancelled by user");
+        this.own(this.cancel(reason ?? "Cancelled by user"));
       },
       runs: () => this.mainRuns(),
     };
@@ -811,7 +834,7 @@ class SubagentRequest {
 
   /** 一轮主会话的 submit 选项；身份与取消由 agent 负责。 */
   submitOptions(turn: { readonly first: boolean }): SessionSubmitOptions {
-    if (this.budgetReason !== undefined) void this.cancel(this.budgetReason);
+    if (this.budgetReason !== undefined) this.own(this.cancel(this.budgetReason));
     return omitUndefined({
       input: this.plan.input,
       runBudget: this.plan.runBudget,
@@ -831,8 +854,8 @@ class SubagentRequest {
       this.firstRunId = runId;
       this.resolveFirstRun(runId);
     }
-    void result
-      .then(
+    this.own(
+      result.then(
         async (value) => {
           record.settled = { ok: true, value };
           await this.checkBudget();
@@ -845,8 +868,8 @@ class SubagentRequest {
           }
           this.refresh();
         },
-      )
-      .catch(() => undefined);
+      ),
+    );
   }
 
   /** @internal 真实主 Run 的身份，在 Run 启动时捕获。 */
@@ -891,7 +914,9 @@ class SubagentRequest {
     this.cancellingPromise ??= runtime.cancel(`cancel-${this.requestId}-${this.cancelCommands++}`).then(
       () => true,
       (error: unknown) => {
-        this.failure ??= error instanceof Error ? error : new Error(String(error));
+        const failure = asError(error);
+        this.failure ??= failure;
+        this.backgroundFailure ??= failure;
         return false;
       },
     );
@@ -959,12 +984,17 @@ class SubagentRequest {
     host.emit({ type: "delegation.started", state: this.state });
     await this.save();
     this.relay = this.relayEvents(runtime);
+    this.own(this.relay);
     this.settled = this.settle(runtime);
-    void this.settled.catch(() => undefined);
-    void runtime.start().catch((error: unknown) => {
-      this.failure ??= asError(error);
-    });
+    this.settlement = Promise.allSettled([this.settled]);
+    this.own(runtime.start());
     await this.firstRun;
+  }
+
+  async waitForSettlement(): Promise<void> {
+    const results = await this.settlement;
+    const failed = results?.find((result) => result.status === "rejected");
+    if (failed?.status === "rejected") throw failed.reason;
   }
 
   private async settle(runtime: CoordinationRuntime): Promise<void> {
@@ -984,8 +1014,9 @@ class SubagentRequest {
       await this.closeRuntime(runtime);
     } catch (error) {
       // 资源释放失败必须让调用者看到，不能以成功结果掩盖。
-      this.failure ??= asError(error);
-      outcome = this.failure;
+      const failure = asError(error);
+      this.failure ??= failure;
+      outcome = failure;
     }
     // 先释放宿主再结束请求结果，保证新的用户输入不会遇到活动请求。
     try {
@@ -1005,6 +1036,7 @@ class SubagentRequest {
     } else {
       this.resolveResult(outcome);
     }
+    await this.outcomes;
   }
 
   private resultOf(main: CoordinationTask): RunResult | Error {
@@ -1019,9 +1051,33 @@ class SubagentRequest {
 
   private async closeRuntime(runtime: CoordinationRuntime): Promise<void> {
     this.ended = true;
-    await runtime.close();
-    await this.relay;
-    await this.ledger?.close();
+    try {
+      await runtime.close();
+    } finally {
+      try {
+        await Promise.all(this.background);
+        await this.cancellingPromise;
+        await this.relay;
+      } finally {
+        await this.ledger?.close();
+      }
+    }
+    if (this.backgroundFailure !== undefined) throw this.backgroundFailure;
+  }
+
+  private own(operation: Promise<unknown>): void {
+    const task = operation.then(
+      () => {
+        this.background.delete(task);
+      },
+      (error: unknown) => {
+        const failure = asError(error);
+        this.failure ??= failure;
+        this.backgroundFailure ??= failure;
+        this.background.delete(task);
+      },
+    );
+    this.background.add(task);
   }
 
   private async relayEvents(runtime: CoordinationRuntime): Promise<void> {

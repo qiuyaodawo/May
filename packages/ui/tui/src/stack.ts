@@ -2,10 +2,12 @@ import type { Component, CursorPosition, RenderResult, RenderSize, PointerEvent 
 import { placeImages, type ImagePlacement } from "./component.js";
 import type { TextRow } from "./text-selection.js";
 
+/** @experimental */
 export interface StackOptions {
   readonly gap?: number;
 }
 
+/** @experimental */
 export class Stack implements Component {
   private readonly gap: number;
   private bounds: Array<{ child: Component; y: number; height: number }> = [];

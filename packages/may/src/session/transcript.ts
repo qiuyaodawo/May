@@ -2,6 +2,7 @@ import type { SerializedError, UserMessage } from "../core/index.js";
 import type { SessionEvent } from "./events.js";
 import { sessionToolFailureHasUnknownEffects } from "./outcome.js";
 
+/** @experimental */
 export interface SessionTranscriptMessage {
   readonly type: "user-message";
   readonly source: "input" | "recovery" | "steering";
@@ -27,6 +28,7 @@ type MessageEvent = Extract<
   }
 >;
 
+/** @experimental */
 export type SessionTranscriptEntry =
   | SessionTranscriptMessage
   | {
@@ -34,7 +36,9 @@ export type SessionTranscriptEntry =
       readonly event: Exclude<SessionEvent, MessageEvent>;
     };
 
-/** 顺序读取同一 Session 的记录，统一恢复结论与 steering 的消息语义。 */
+/** 顺序读取同一 Session 的记录，统一恢复结论与 steering 的消息语义。
+ * @experimental
+ */
 export class SessionTranscriptReader {
   private readonly steering = new Map<string, UserMessage>();
 
@@ -90,14 +94,18 @@ export class SessionTranscriptReader {
   }
 }
 
+/** @experimental */
 export function* readSessionTranscript(events: Iterable<SessionEvent>): Iterable<SessionTranscriptEntry> {
   const reader = new SessionTranscriptReader();
   for (const event of events) yield* reader.read(event);
 }
 
+/** @experimental */
 export type SessionToolStatus = "running" | "completed" | "failed" | "denied" | "not-started" | "unknown";
 
-/** 工具失败结果保留权限拒绝、尚未执行及效果未知的区别。 */
+/** 工具失败结果保留权限拒绝、尚未执行及效果未知的区别。
+ * @experimental
+ */
 export function sessionToolFailureStatus(error: SerializedError, approvalCancelled = false): SessionToolStatus {
   if (error.code === "PERMISSION_DENIED") return "denied";
   if (error.code === "TOOL_SKIPPED" || (error.code === "RUN_CANCELLED" && approvalCancelled)) return "not-started";

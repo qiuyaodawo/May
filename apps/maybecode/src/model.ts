@@ -18,7 +18,13 @@ export type SelectedMaybeCodeModel = ProviderModelSelection;
 
 export function selectMaybeCodeModel(config: MayConfig, selector: MaybeCodeModelSelector = {}): SelectedMaybeCodeModel {
   try {
-    return selectProviderModel(config, selector);
+    const selection = selectProviderModel(config, selector);
+    return selection.adapter === "anthropic-messages"
+      ? {
+          ...selection,
+          options: { promptCaching: { ttl: "5m", cacheInstructions: true }, ...selection.options },
+        }
+      : selection;
   } catch (error) {
     if (error instanceof ProviderConfigurationError) {
       throw new MaybeCodeConfigError(error.message, { cause: error });

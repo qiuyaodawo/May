@@ -11,12 +11,14 @@ import {
   type ToolSource,
 } from "./index.js";
 
+/** @experimental */
 export interface RuntimePluginOptions<C = unknown> extends PluginFactoryMetadata<C> {
   readonly id?: string;
   readonly factory?: RuntimeFactory;
   readonly create?: (context: PluginContext<C>) => RuntimeFactory | Promise<RuntimeFactory>;
   readonly dispose?: (factory: RuntimeFactory) => void | Promise<void>;
 }
+/** @experimental */
 export function createRuntimePlugin<C = unknown>(
   factoryOrOptions: RuntimeFactory | RuntimePluginOptions<C> = {},
   id = "may.runtime",
@@ -39,12 +41,14 @@ export function createRuntimePlugin<C = unknown>(
   });
 }
 
+/** @experimental */
 export interface ContextPluginOptions<C = unknown> extends PluginFactoryMetadata<C> {
   readonly id?: string;
   readonly create?: (context: PluginContext<C>) => ContextFactory | Promise<ContextFactory>;
   readonly options?: ContextOptionsSource;
   readonly dispose?: (factory: ContextFactory) => void | Promise<void>;
 }
+/** @experimental */
 export function createContextPlugin<C = unknown>(options: ContextPluginOptions<C> = {}): PluginDefinition<C> {
   return definePlugin({
     ...factoryMetadata(options),
@@ -60,11 +64,13 @@ export function createContextPlugin<C = unknown>(options: ContextPluginOptions<C
   });
 }
 
+/** @experimental */
 export interface ContextWrapperPluginOptions<C = unknown>
   extends Omit<ContributionOptions, "pluginOrder">, PluginFactoryMetadata<C> {
   readonly create: (context: PluginContext<C>) => ContextWrapper | Promise<ContextWrapper>;
   readonly dispose?: Disposer;
 }
+/** @experimental */
 export function createContextWrapperPlugin<C = unknown>(options: ContextWrapperPluginOptions<C>): PluginDefinition<C> {
   return definePlugin({
     ...factoryMetadata(options, [{ service: services.contextWrappers }]),
@@ -85,11 +91,13 @@ export function createContextWrapperPlugin<C = unknown>(options: ContextWrapperP
   });
 }
 
+/** @experimental */
 export interface ToolsPluginOptions<C = unknown>
   extends Omit<ContributionOptions, "pluginOrder">, PluginFactoryMetadata<C> {
   readonly create: (context: PluginContext<C>) => ToolSource | Promise<ToolSource>;
   readonly dispose?: Disposer;
 }
+/** @experimental */
 export function createToolsPlugin<C = unknown>(options: ToolsPluginOptions<C>): PluginDefinition<C> {
   return definePlugin({
     ...factoryMetadata(options, [{ service: services.toolSources }]),

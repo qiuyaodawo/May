@@ -8,6 +8,7 @@ import TerminalEvents from "tty-events";
 import { TerminalImageSupport } from "./image-support.js";
 import type { TerminalInput } from "./terminal-driver.js";
 
+/** @experimental */
 export interface TerminalSuggestion {
   /** Full input value represented by the suggestion. */
   readonly value: string;
@@ -15,10 +16,12 @@ export interface TerminalSuggestion {
   readonly description?: string;
 }
 
+/** @experimental */
 export type TerminalSuggestionProvider = (
   input: string,
 ) => readonly TerminalSuggestion[] | Promise<readonly TerminalSuggestion[]>;
 
+/** @experimental */
 export interface TerminalQuestionOptions {
   readonly signal?: AbortSignal;
   /** 在交互终端中按 Esc 时调用；调用方可以通过 signal 取消当前问题。 */
@@ -36,6 +39,7 @@ export interface TerminalQuestionOptions {
  *
  * This is separate from {@link NodeTerminalDriver}, which owns raw input and
  * retained full-screen rendering.
+ * @experimental
  */
 export interface TerminalIO {
   readonly imageSupport?: TerminalImageSupport;
@@ -53,9 +57,10 @@ export interface TerminalIO {
   addHistory?(value: string): void;
   write(text: string): void;
   onInterrupt?(listener: () => void): () => void;
-  close(): void;
+  close(): void | Promise<void>;
 }
 
+/** @experimental */
 export interface NodeTerminalOptions {
   readonly input?: NodeJS.ReadableStream;
   readonly output?: NodeJS.WritableStream & {
@@ -65,7 +70,10 @@ export interface NodeTerminalOptions {
   readonly colors?: boolean;
 }
 
-/** Create a readline-backed, line-oriented Node terminal adapter. */
+/**
+ * Create a readline-backed, line-oriented Node terminal adapter.
+ * @experimental
+ */
 export function createNodeTerminal(options: NodeTerminalOptions = {}): TerminalIO {
   const source: TerminalInput = options.input ?? process.stdin;
   source.ref?.();
@@ -137,6 +145,21 @@ export function createNodeTerminal(options: NodeTerminalOptions = {}): TerminalI
   let activeSuggestions: readonly TerminalSuggestion[] = [];
   let renderedSuggestionCount = 0;
   let suggestionVersion = 0;
+  const suggestionTasks = new Set<Promise<void>>();
+  const suggestionErrors: unknown[] = [];
+  const ownSuggestion = (task: Promise<void>): void => {
+    const pending = task.then(
+      () => {
+        suggestionTasks.delete(pending);
+      },
+      (error: unknown) => {
+        suggestionTasks.delete(pending);
+        suggestionErrors.push(error);
+        lifetime.abort(error);
+      },
+    );
+    suggestionTasks.add(pending);
+  };
   let activeSuggestionInput: string | undefined;
   let activeKeyRead: KeyRead | undefined;
   let suppressInterrupt = false;
@@ -211,17 +234,12 @@ export function createNodeTerminal(options: NodeTerminalOptions = {}): TerminalI
 
   const refreshSuggestions = async (): Promise<void> => {
     const provider = activeSuggestionProvider;
-    if (!interactive || activePrompt === undefined || provider === undefined) {
+    if (closed || !interactive || activePrompt === undefined || provider === undefined) {
       return;
     }
     const line = readline.line;
     const version = ++suggestionVersion;
-    let suggestions: readonly TerminalSuggestion[];
-    try {
-      suggestions = await provider(line);
-    } catch {
-      suggestions = [];
-    }
+    const suggestions = await provider(line);
     if (
       version !== suggestionVersion ||
       provider !== activeSuggestionProvider ||
@@ -279,11 +297,13 @@ export function createNodeTerminal(options: NodeTerminalOptions = {}): TerminalI
           readline.write(undefined, { ctrl: true, name: "u" });
           readline.write(expected);
         }
-        void refreshSuggestions().then(() => {
-          if (!completed && activePrompt !== undefined && readline.line === line) {
-            completeActiveSuggestion(line);
-          }
-        });
+        ownSuggestion(
+          refreshSuggestions().then(() => {
+            if (!completed && activePrompt !== undefined && readline.line === line) {
+              completeActiveSuggestion(line);
+            }
+          }),
+        );
       });
       return;
     }
@@ -293,7 +313,9 @@ export function createNodeTerminal(options: NodeTerminalOptions = {}): TerminalI
       activeSuggestions = [];
       return;
     }
-    queueMicrotask(() => void refreshSuggestions());
+    queueMicrotask(() => {
+      if (!closed) ownSuggestion(refreshSuggestions());
+    });
   };
   if (interactive) input.prependListener("keypress", onKeypress);
   const updateImageSize = () => {
@@ -466,7 +488,7 @@ export function createNodeTerminal(options: NodeTerminalOptions = {}): TerminalI
         interruptListeners.delete(wrapped);
       };
     },
-    close() {
+    async close() {
       closed = true;
       lifetime.abort(new Error("Terminal closed"));
       wakeInputWaiters();
@@ -483,6 +505,8 @@ export function createNodeTerminal(options: NodeTerminalOptions = {}): TerminalI
       source.removeListener("end", endFilteredInput);
       filtered?.destroy();
       source.unref?.();
+      await Promise.all([...suggestionTasks]);
+      if (suggestionErrors.length) throw new AggregateError(suggestionErrors, "Terminal suggestion processing failed");
     },
   };
 }

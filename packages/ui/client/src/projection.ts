@@ -14,6 +14,7 @@ const LIMIT = 65_536;
 function bounded(text: string): string {
   return text.length > LIMIT ? text.slice(0, LIMIT) + "\n…显示已截断，请在宿主中查看完整内容。" : text;
 }
+/** @experimental */
 export function displayValue(value: unknown): string {
   try {
     return bounded(typeof value === "string" ? value : (JSON.stringify(value, null, 2) ?? ""));
@@ -21,6 +22,7 @@ export function displayValue(value: unknown): string {
     return "[无法显示的数据]";
   }
 }
+/** @experimental */
 export function contentText(content: readonly ContentPart[], kind = "text"): string {
   return bounded(
     content
@@ -44,7 +46,10 @@ type ApprovalEvent = Extract<
   { type: "approval.requested" | "approval.resolved" | "approval.cancelled" }
 >;
 
-/** UI-neutral, bounded projection; never imports a terminal renderer or provider state. */
+/**
+ * UI-neutral, bounded projection; never imports a terminal renderer or provider state.
+ * @experimental
+ */
 export class UiProjection {
   readonly mediaSources = new Map<string, MediaSource>();
   private content(parts: readonly ContentPart[]) {

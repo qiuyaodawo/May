@@ -2,6 +2,43 @@
   "type": "object",
   "description": "MaybeCode settings.",
   "properties": {
+    "execution": {
+      "default": { "mode": "host" },
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": { "mode": { "const": "host" } },
+          "required": ["mode"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "mode": { "const": "container" },
+            "image": { "$ref": "#/$defs/nonEmptyString" },
+            "network": { "const": "none" },
+            "memoryBytes": { "$ref": "#/$defs/positiveInteger" },
+            "cpuCount": { "type": "number", "exclusiveMinimum": 0 }
+          },
+          "required": ["mode", "image", "network", "memoryBytes", "cpuCount"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "fetch": {
+      "type": "object",
+      "properties": {
+        "allowedOrigins": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^https?://(?:[A-Za-z0-9.-]+|\\[[A-Fa-f0-9:]+\\])(?::[0-9]{1,5})?$" }
+        },
+        "maxBytes": { "$ref": "#/$defs/positiveInteger" },
+        "timeoutMs": { "$ref": "#/$defs/positiveInteger" },
+        "maxRedirects": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
     "requestRecording": { "enum": ["off", "required"], "default": "required" },
     "providerBodyRecording": { "type": "boolean", "default": false },
     "git": {
@@ -181,9 +218,9 @@
         "instructions": { "type": "string", "pattern": "^[^\\u0000]*\\S[^\\u0000]*$", "maxLength": 16384 },
         "tools": {
           "type": "array",
-          "maxItems": 4,
+          "maxItems": 7,
           "uniqueItems": true,
-          "items": { "enum": ["read", "shell", "edit", "write"] }
+          "items": { "enum": ["read", "shell", "edit", "write", "glob", "grep", "fetch"] }
         },
         "delegateTo": {
           "type": "array",

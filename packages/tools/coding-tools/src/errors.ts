@@ -1,3 +1,4 @@
+/** @experimental */
 export class CodingToolError extends Error {
   readonly code: string;
 

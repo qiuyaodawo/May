@@ -36,6 +36,7 @@ const RETRYABLE_PROVIDER_TYPES = new Set([
   "server_error",
 ]);
 
+/** @experimental */
 export interface ModelRetryContext {
   /** The attempt that just failed (one-based). */
   readonly attempt: number;
@@ -43,6 +44,7 @@ export interface ModelRetryContext {
   readonly signal: AbortSignal;
 }
 
+/** @experimental */
 export interface RetryingModelOptions {
   /** Total attempts, including the initial request. Defaults to 3. */
   readonly maxAttempts?: number;
@@ -64,6 +66,7 @@ export interface RetryingModelOptions {
  * completed tool calls are not replayed when a later model request fails.
  * Once a content delta has reached the consumer, the attempt is never retried
  * because the model stream has no reset or retraction event.
+ * @experimental
  */
 export class RetryingModel implements Model {
   get supportsRequestRecording(): boolean {
@@ -211,10 +214,12 @@ export class RetryingModel implements Model {
   }
 }
 
+/** @experimental */
 export function withModelRetry(model: Model, options: RetryingModelOptions = {}): Model {
   return new RetryingModel(model, options);
 }
 
+/** @experimental */
 export function defaultShouldRetryModelError(error: unknown): boolean {
   return classifyRetryable(error, new Set());
 }

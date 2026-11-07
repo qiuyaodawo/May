@@ -1,6 +1,7 @@
 import { omitUndefined } from "@sortedyuan/may/core";
 import type { EvalPlan, TrialState, MeasuredValue } from "./types.js";
 
+/** @experimental */
 export interface MetricDistribution {
   readonly count: number;
   readonly planned: number;
@@ -11,6 +12,7 @@ export interface MetricDistribution {
   readonly mean?: number;
   readonly median?: number;
 }
+/** @experimental */
 export interface EvalVariantReport {
   readonly variantId: string;
   readonly assisted: boolean;
@@ -29,6 +31,7 @@ export interface EvalVariantReport {
     readonly successRate: number;
   }[];
 }
+/** @experimental */
 export interface EvalReport {
   readonly schemaVersion: 1;
   readonly experimentId: string;
@@ -38,11 +41,13 @@ export interface EvalReport {
   readonly trials: readonly TrialState[];
   readonly plan: EvalPlan;
 }
+/** @experimental */
 export interface EvalComparisonThresholds {
   readonly minimumSuccessRate?: number;
   readonly allowedRegressedCases?: readonly string[];
   readonly maxCostIncreaseRatio?: number;
 }
+/** @experimental */
 export interface EvalComparison {
   readonly compatible: boolean;
   readonly passed: boolean;
@@ -56,6 +61,7 @@ export interface EvalComparison {
   readonly candidate: EvalVariantReport;
 }
 
+/** @experimental */
 export function createEvalReport(plan: EvalPlan, states: readonly TrialState[]): EvalReport {
   const byId = new Map(states.map((value) => [value.trial.id, value]));
   const variants = plan.experiment.variants.map((variant) => {
@@ -124,6 +130,7 @@ export function createEvalReport(plan: EvalPlan, states: readonly TrialState[]):
     plan,
   };
 }
+/** @experimental */
 export function isSuccessful(state: TrialState): boolean {
   return (
     state.endedAt !== undefined &&
@@ -132,6 +139,7 @@ export function isSuccessful(state: TrialState): boolean {
     state.infrastructureStatus === "ready"
   );
 }
+/** @experimental */
 export function compareEvalReports(
   baseline: EvalReport,
   candidate: EvalReport,
@@ -230,6 +238,7 @@ export function compareEvalReports(
     candidate: right,
   };
 }
+/** @experimental */
 export function renderEvalReportMarkdown(report: EvalReport): string {
   const lines = [
     `# Eval ${report.experimentId}`,

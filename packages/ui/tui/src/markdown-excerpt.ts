@@ -1,6 +1,7 @@
 import { lexer, type Token, type Tokens } from "marked";
 import { sanitizeTerminalText } from "./text.js";
 
+/** @experimental */
 export interface MarkdownExcerptOptions {
   /** 包含省略号的最大可见字符数量，按 grapheme 计算；换行不计数。 */
   readonly maxCharacters?: number;
@@ -10,7 +11,10 @@ export interface MarkdownExcerptOptions {
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
-/** 完整解析 Markdown 后生成纯文本节选，保留代码内容和 Unicode 字符。 */
+/**
+ * 完整解析 Markdown 后生成纯文本节选，保留代码内容和 Unicode 字符。
+ * @experimental
+ */
 export function renderMarkdownExcerpt(source: string, options: MarkdownExcerptOptions = {}): string {
   const maxCharacters = options.maxCharacters ?? 400;
   const maxLines = options.maxLines ?? 6;

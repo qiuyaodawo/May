@@ -1,22 +1,27 @@
 import type { TelemetryCorrelation, Tracer } from "@sortedyuan/may/core";
 
+/** @experimental */
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 
+/** @experimental */
 export type Trigger =
   | { readonly type: "at"; readonly time: string }
   | { readonly type: "cron"; readonly expression: string; readonly timezone: string }
   | { readonly type: "event"; readonly topic: string };
 
+/** @experimental */
 export interface ScheduledTask {
   readonly handler: string;
   readonly payload: JsonValue;
 }
 
+/** @experimental */
 export interface MisfirePolicy {
   readonly policy: "skip" | "latest";
   readonly graceMs: number;
 }
 
+/** @experimental */
 export interface CreateJobInput {
   readonly id: string;
   readonly enabled: boolean;
@@ -25,8 +30,10 @@ export interface CreateJobInput {
   readonly misfire: MisfirePolicy;
 }
 
+/** @experimental */
 export type UpdateJobInput = Partial<Omit<CreateJobInput, "id">>;
 
+/** @experimental */
 export interface ScheduledJob extends CreateJobInput {
   readonly revision: number;
   readonly createdAt: string;
@@ -34,6 +41,7 @@ export interface ScheduledJob extends CreateJobInput {
   readonly nextAt?: string;
 }
 
+/** @experimental */
 export interface SchedulerEvent {
   readonly source: string;
   readonly id: string;
@@ -42,8 +50,10 @@ export interface SchedulerEvent {
   readonly payload: JsonValue;
 }
 
+/** @experimental */
 export type ExecutionStatus = "pending" | "dispatching" | "submitted" | "failed" | "skipped";
 
+/** @experimental */
 export interface ExecutionRecord {
   readonly id: string;
   readonly seq: number;
@@ -57,6 +67,7 @@ export interface ExecutionRecord {
   readonly detail?: string;
 }
 
+/** @experimental */
 export interface TaskSubmission {
   readonly telemetry?: TelemetryCorrelation;
   readonly executionId: string;
@@ -66,11 +77,15 @@ export interface TaskSubmission {
   readonly event?: SchedulerEvent;
 }
 
+/** @experimental */
 export interface TaskDispatcher {
   submit(request: TaskSubmission): Promise<{ taskId: string }>;
 }
 
-/** 宿主仅在能够确认没有接受任务时使用此错误。 */
+/**
+ * 宿主仅在能够确认没有接受任务时使用此错误。
+ * @experimental
+ */
 export class TaskRejectedError extends Error {
   readonly code = "TASK_REJECTED";
   constructor(message: string) {
@@ -79,7 +94,10 @@ export class TaskRejectedError extends Error {
   }
 }
 
-/** transaction 必须同步执行并原子提交，打开存储时取得独占使用权。 */
+/**
+ * transaction 必须同步执行并原子提交，打开存储时取得独占使用权。
+ * @experimental
+ */
 export interface SchedulerStore {
   get<T>(collection: string, id: string): T | undefined;
   list<T>(collection: string): T[];
@@ -89,6 +107,7 @@ export interface SchedulerStore {
   close(): void;
 }
 
+/** @experimental */
 export interface SchedulerOptions {
   readonly tracer?: Tracer;
   readonly telemetry?: TelemetryCorrelation;
@@ -99,6 +118,7 @@ export interface SchedulerOptions {
   readonly onError?: (error: unknown) => void;
 }
 
+/** @experimental */
 export interface ExecutionQuery {
   readonly jobId?: string;
   readonly status?: ExecutionStatus;
@@ -106,11 +126,13 @@ export interface ExecutionQuery {
   readonly limit?: number;
 }
 
+/** @experimental */
 export interface ExecutionPage {
   readonly records: readonly ExecutionRecord[];
   readonly nextAfterSeq?: number;
 }
 
+/** @experimental */
 export interface TickResult {
   readonly created: number;
   readonly submitted: number;

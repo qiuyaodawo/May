@@ -10,10 +10,12 @@ import {
   type PersistentPermissionRule,
 } from "./rules.js";
 
+/** @experimental */
 export interface FilePermissionRuleStoreOptions {
   readonly path: string;
 }
 
+/** @experimental */
 export class FilePermissionRuleStore implements PermissionRuleStore {
   private readonly serial = new AsyncStateSerializer();
   private failure: Error | undefined;

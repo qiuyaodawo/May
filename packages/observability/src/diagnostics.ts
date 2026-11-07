@@ -2,6 +2,7 @@ import type { TraceAttributes } from "@sortedyuan/may/core";
 import type { FinishedTraceSpan, SpanObserver, SpanProcessor, StartedTraceSpan } from "./types.js";
 import { boundedAttributes } from "./limits.js";
 
+/** @experimental */
 export interface DiagnosticSpan extends StartedTraceSpan {
   readonly ended: boolean;
   readonly sampled: boolean;
@@ -12,6 +13,7 @@ export interface DiagnosticSpan extends StartedTraceSpan {
   readonly error?: FinishedTraceSpan["error"];
 }
 
+/** @experimental */
 export interface TaskAssessment {
   readonly taskId: string;
   readonly sessionId?: string;
@@ -26,6 +28,7 @@ export interface TaskAssessment {
   readonly timestamp?: number;
 }
 
+/** @experimental */
 export interface DiagnosticQuery {
   readonly traceId?: string;
   readonly taskId?: string;
@@ -36,6 +39,7 @@ export interface DiagnosticQuery {
   readonly offset?: number;
 }
 
+/** @experimental */
 export interface DiagnosticResult {
   readonly spans: readonly DiagnosticSpan[];
   readonly assessments: readonly TaskAssessment[];
@@ -45,6 +49,7 @@ export interface DiagnosticResult {
   readonly hasMore: boolean;
 }
 
+/** @experimental */
 export class DiagnosticsStore implements SpanProcessor, SpanObserver {
   private readonly spans = new Map<string, DiagnosticSpan>();
   private readonly assessments: TaskAssessment[] = [];

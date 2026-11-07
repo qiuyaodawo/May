@@ -17,12 +17,16 @@ import type {
 import { mcpToolResultContent } from "./content.js";
 import { hostBounded, hostFailure, type McpHostRequestContext, type McpSamplingService } from "./host-services.js";
 
+/** @experimental */
 export interface McpSamplingModel {
   readonly model: Model;
   readonly name: string;
 }
 
-/** Isolated one-shot model bridge. Produces remote tool proposals but NEVER executes tools. */
+/**
+ * Isolated one-shot model bridge. Produces remote tool proposals but NEVER executes tools.
+ * @experimental
+ */
 export function createMcpModelSampler(
   create: (maxTokens: number, context: McpHostRequestContext) => McpSamplingModel | Promise<McpSamplingModel>,
 ): McpSamplingService {

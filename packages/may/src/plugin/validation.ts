@@ -42,6 +42,7 @@ export function validateToken(token: ServiceToken): void {
   }
 }
 
+/** @experimental */
 export function defineService<T>(
   definition: Omit<ServiceToken<T>, "capabilities" | "valueType"> & {
     readonly capabilities?: readonly string[];
@@ -52,6 +53,7 @@ export function defineService<T>(
   return Object.freeze(token);
 }
 
+/** @experimental */
 export function definePlugin<C = unknown>(definition: PluginDefinition<C>): PluginDefinition<C> {
   return Object.freeze(definition);
 }

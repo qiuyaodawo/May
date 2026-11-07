@@ -1,7 +1,10 @@
 import { omitUndefined } from "@sortedyuan/may/core";
 import type { FinishedTraceSpan, ObservabilityErrorHandler, SpanExporter, SpanProcessor } from "./types.js";
 
-/** Deterministic processor intended for tests and local inspection. */
+/**
+ * Deterministic processor intended for tests and local inspection.
+ * @experimental
+ */
 export class InMemorySpanProcessor implements SpanProcessor {
   private readonly finished: FinishedTraceSpan[] = [];
   private dropped = 0;
@@ -29,7 +32,10 @@ export class InMemorySpanProcessor implements SpanProcessor {
   }
 }
 
-/** Serializes exports off the Agent execution path. */
+/**
+ * Serializes exports off the Agent execution path.
+ * @experimental
+ */
 export class SimpleSpanProcessor implements SpanProcessor {
   private readonly processor: BatchSpanProcessor;
 
@@ -65,6 +71,7 @@ export class SimpleSpanProcessor implements SpanProcessor {
   }
 }
 
+/** @experimental */
 export interface BatchSpanProcessorOptions {
   readonly maxQueueSize?: number;
   readonly maxExportBatchSize?: number;
@@ -74,6 +81,7 @@ export interface BatchSpanProcessorOptions {
   readonly metrics?: import("./types.js").MetricRecorder;
 }
 
+/** @experimental */
 export interface ProcessorDiagnostics {
   readonly queueSize: number;
   readonly exporting: boolean;
@@ -83,7 +91,10 @@ export interface ProcessorDiagnostics {
   readonly closed: boolean;
 }
 
-/** Bounded, non-blocking batch processor for remote or asynchronous exporters. */
+/**
+ * Bounded, non-blocking batch processor for remote or asynchronous exporters.
+ * @experimental
+ */
 export class BatchSpanProcessor implements SpanProcessor {
   private readonly maxQueueSize: number;
   private readonly maxExportBatchSize: number;

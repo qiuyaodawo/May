@@ -2,21 +2,26 @@ import { createServer, type IncomingMessage, type ServerResponse, type Server } 
 import type { AddressInfo, Socket } from "node:net";
 import { definePlugin, defineService, type PluginDefinition, type ServiceToken } from "@sortedyuan/may/plugin";
 
+/** @experimental */
 export interface WebApiRequestContext {
   readonly origin: string;
   readonly signal: AbortSignal;
 }
+/** @experimental */
 export type WebApiHandler = (
   request: IncomingMessage,
   response: ServerResponse,
   context: WebApiRequestContext,
 ) => void | Promise<void>;
+/** @experimental */
 export interface WebApiService {
   readonly server: Server;
   readonly url: string;
   close(): Promise<void>;
 }
+/** @experimental */
 export const webApiService = defineService<WebApiService>({ id: "may.web-api", version: "1.0.0", scope: "host" });
+/** @experimental */
 export function createWebApiPlugin(options: {
   readonly handler: ServiceToken<WebApiHandler>;
   readonly port?: number;

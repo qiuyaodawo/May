@@ -34,7 +34,8 @@ already includes direct children of `examples/`.
   "scripts": { "start": "node agent.mjs" },
   "dependencies": {
     "@sortedyuan/may": "workspace:*",
-    "@sortedyuan/providers": "workspace:*"
+    "@sortedyuan/providers": "workspace:*",
+    "zod": "^4.6.7"
   }
 }
 ```
@@ -49,7 +50,8 @@ Create `examples/quickstart-agent/agent.mjs`:
 
 ```js
 import { defineAgent } from "@sortedyuan/may";
-import { ToolRegistry } from "@sortedyuan/may/core";
+import { defineTool, ToolRegistry } from "@sortedyuan/may/core";
+import { z } from "zod";
 import { DeepSeekModel } from "@sortedyuan/providers/deepseek";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
 
@@ -59,36 +61,15 @@ if (!apiKey || !modelName) {
   throw new Error("Set DEEPSEEK_API_KEY and DEEPSEEK_MODEL");
 }
 
-/** @type {import("@sortedyuan/may/core").Tool<{a: number, b: number}, number>} */
-const add = {
+const add = defineTool({
   name: "add",
   description: "Add two finite numbers",
-  inputSchema: {
-    type: "object",
-    properties: { a: { type: "number" }, b: { type: "number" } },
-    required: ["a", "b"],
-    additionalProperties: false,
-  },
-  parse(input) {
-    if (
-      typeof input !== "object" ||
-      input === null ||
-      !("a" in input) ||
-      !("b" in input) ||
-      typeof input.a !== "number" ||
-      typeof input.b !== "number" ||
-      !Number.isFinite(input.a) ||
-      !Number.isFinite(input.b)
-    ) {
-      throw new TypeError("a and b must be finite numbers");
-    }
-    return { a: input.a, b: input.b };
-  },
+  schema: z.strictObject({ a: z.number(), b: z.number() }),
   async execute({ a, b }, context) {
     context.signal.throwIfAborted();
     return a + b;
   },
-};
+});
 
 const store = new InMemorySessionStore();
 const agent = defineAgent({

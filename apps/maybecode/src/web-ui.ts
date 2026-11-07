@@ -263,16 +263,22 @@ export async function runMaybeCodeWebUI(
   options.write(
     `MaybeCode Web UI: ${server.url}\nEnter MAYBECODE_CONTROL_TOKEN in the connection dialog. Closing a browser tab does not stop the agent. Ctrl+C stops the host.\n`,
   );
+  let closing: Promise<void> | undefined;
+  let closingFailure: unknown;
   const stop = () => {
-    void server.close();
+    closing ??= server.close().catch((error) => {
+      closingFailure = error;
+    });
   };
   process.once("SIGINT", stop);
   process.once("SIGTERM", stop);
   try {
     await server.closed;
-    await server.close();
   } finally {
     process.removeListener("SIGINT", stop);
     process.removeListener("SIGTERM", stop);
+    stop();
+    await closing;
+    if (closingFailure !== undefined) throw closingFailure;
   }
 }

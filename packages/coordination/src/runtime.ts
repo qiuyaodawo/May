@@ -42,6 +42,7 @@ import {
   validateSnapshot,
 } from "./validation.js";
 
+/** @experimental */
 export interface CoordinationRuntimeOptions {
   readonly tracer?: Tracer;
   readonly telemetry?: TelemetryCorrelation;
@@ -51,6 +52,7 @@ export interface CoordinationRuntimeOptions {
   readonly policy: CoordinationPolicy;
 }
 
+/** @experimental */
 export interface CreateCoordinationOptions extends CoordinationRuntimeOptions {
   readonly tasks: readonly TaskSpec[];
   readonly limits?: Partial<CoordinationLimits>;
@@ -66,7 +68,9 @@ interface ActiveTask {
   readonly done: Promise<void>;
 }
 
-/** Task graphs and bounded delegation on one host. Opening never executes agents. */
+/** Task graphs and bounded delegation on one host. Opening never executes agents.
+ * @experimental
+ */
 export class CoordinationRuntime {
   readonly events: AsyncIterable<CoordinationEvent>;
   private readonly serial = new AsyncStateSerializer();

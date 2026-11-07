@@ -1,4 +1,5 @@
 import type { Context, ContextSnapshot } from "./context.js";
+import { createModelRequest, consumeModel } from "./model-step.js";
 import { resolveRunBudget, RunBudgetMeter, RunBudgetExceededError, type RunBudget } from "./budget.js";
 import {
   ConcurrentRunError,
@@ -20,11 +21,10 @@ import {
   type MayEvent,
   type MayEventPayload,
   type RunResult,
-  type SerializedError,
 } from "./events.js";
 import type { Model, ModelRequest, ModelResponseFormat } from "./model.js";
 import { randomUUID } from "node:crypto";
-import type { ModelRequestObservation, ModelRequestSink } from "./request-recording.js";
+import type { ModelRequestSink } from "./request-recording.js";
 import { runtimeHooks, RUNTIME_HOOKS, type HookContext, type HookDefinition, type HookDispatcher } from "./hooks.js";
 import { DEFAULT_RUNTIME_DESCRIPTOR, type AgentRuntime } from "./runtime.js";
 import { jsonEqual } from "./json-equal.js";
@@ -40,7 +40,6 @@ import {
 } from "./tool.js";
 import { ToolRegistry } from "./tool-registry.js";
 import {
-  addTraceEvent,
   endTraceSpan,
   setTraceAttributes,
   startTraceSpan,
@@ -50,21 +49,33 @@ import {
   type TraceSpan,
   type Tracer,
 } from "./tracing.js";
-import { createModelAttemptObserver } from "./telemetry.js";
-import { aggregateUsage as mergeUsage, resolveUsageTotals, type UsageCost } from "./pricing.js";
+import { aggregateUsage as mergeUsage, type UsageCost } from "./pricing.js";
 import {
-  textContent,
-  toolCancellationMessage,
+  traceOperation,
+  endOperationSpan,
+  modelConfigurationTraceAttributes,
+  usageTraceAttributes,
+  costTraceAttributes,
+} from "./run-tracing.js";
+import {
+  createCancelledToolOutcome,
+  createSkippedToolOutcome,
+  emitToolOutcomes,
+  emitToolProgress,
+  type FailedToolExecution,
+  type ToolExecutionOutcome,
+} from "./tool-outcomes.js";
+import {
   userMessage,
   type AssistantMessage,
   type ContentPart,
   type Message,
   type ToolCall,
-  type ToolMessage,
   type Usage,
   type UserMessage,
 } from "./types.js";
 
+/** @experimental */
 export interface MayOptions {
   model: Model;
   responseFormat?: ModelResponseFormat;
@@ -91,6 +102,7 @@ export interface MayOptions {
   traceAttributes?: TraceAttributes;
 }
 
+/** @experimental */
 export interface RunOptions {
   readonly recordRequest?: ModelRequestSink;
   /** Host-only control, checked after a complete model/tool step. Never interrupts tools. */
@@ -108,6 +120,7 @@ export interface RunOptions {
   traceAttributes?: TraceAttributes;
 }
 
+/** @experimental */
 export interface ContinueOptions {
   readonly recordRequest?: ModelRequestSink;
   shouldYield?: () => boolean;
@@ -121,6 +134,7 @@ export interface ContinueOptions {
   traceAttributes?: TraceAttributes;
 }
 
+/** @experimental */
 export interface RunHandle {
   readonly id: string;
   readonly events: AsyncIterable<MayEvent>;
@@ -129,6 +143,7 @@ export interface RunHandle {
   cancel(reason?: string): void;
 }
 
+/** @experimental */
 export type RunCheckpointEvent = Extract<
   MayEventPayload,
   {
@@ -142,8 +157,10 @@ export type RunCheckpointEvent = Extract<
       | "input.generated";
   }
 > & { readonly runId: string };
+/** @experimental */
 export type RunCheckpoint = (event: RunCheckpointEvent) => Promise<void>;
 
+/** @experimental */
 export type StepInputSource = (boundary: {
   readonly runId: string;
   readonly step: number;
@@ -165,6 +182,7 @@ interface RunExecution {
   readonly recordRequest: ModelRequestSink | undefined;
 }
 
+/** @experimental */
 export class May implements AgentRuntime {
   get supportsRequestRecording(): boolean {
     return this.model.supportsRequestRecording === true;
@@ -897,23 +915,7 @@ export class May implements AgentRuntime {
   }
 
   private createModelRequest(snapshot: ContextSnapshot, tools: ToolRegistry): ModelRequest {
-    const messages: Message[] = [];
-
-    if (snapshot.instructions) {
-      messages.push({
-        role: "system",
-        content: textContent(snapshot.instructions),
-      });
-    }
-
-    messages.push(...snapshot.messages);
-
-    return omitUndefined({
-      messages,
-      tools: tools.definitions(),
-      responseFormat: this.responseFormat === undefined ? undefined : structuredClone(this.responseFormat),
-      metadata: snapshot.metadata,
-    });
+    return createModelRequest(snapshot, tools, this.responseFormat);
   }
 
   private async consumeModel(
@@ -926,163 +928,24 @@ export class May implements AgentRuntime {
     modelSpan: TraceSpan | undefined,
     recordRequest: ModelRequestSink | undefined,
   ): Promise<{ message: AssistantMessage; usage?: Usage; cost?: UsageCost }> {
-    let completed: AssistantMessage | undefined;
-    let usage: Usage | undefined;
-    let cost: UsageCost | undefined;
-    let responseCompleted = false;
-    const started = performance.now();
-    let content = false;
-    let text = false;
-    let attempts = 0;
-    let retryWaitMs = 0;
-    const observer = createModelAttemptObserver(
-      omitUndefined({
+    return consumeModel(
+      {
+        model: this.model,
         tracer: this.tracer,
-        parent: modelSpan?.context,
-        modelCallId,
-        attributes: { ...modelConfigurationTraceAttributes(this.model), "may.run.id": runId, "may.step": step },
-        onRetryWait(durationMs: number) {
-          retryWaitMs += durationMs;
-          setTraceAttributes(modelSpan, { "may.model.retry_wait_ms": retryWaitMs });
+        observe: (hook, value, context) => this.observe(hook, value, context),
+        requireReconciliation: () => {
+          this.unsafeToReuse = true;
         },
-        onContent(kind: "text" | "reasoning" | "tool" | "other") {
-          if (!content) {
-            content = true;
-            setTraceAttributes(modelSpan, { "may.model.first_content_ms": performance.now() - started });
-          }
-          if (kind === "text" && !text) {
-            text = true;
-            setTraceAttributes(modelSpan, { "may.model.first_text_ms": performance.now() - started });
-          }
-        },
-      }),
-    );
-    const attemptObserver = {
-      retryWait(durationMs: number) {
-        observer.retryWait?.(durationMs);
       },
-      start(attempt: number) {
-        attempts += 1;
-        return observer.start(attempt);
-      },
-    };
-    let singleAttempt: ReturnType<typeof attemptObserver.start> | undefined;
-    const streamOptions = omitUndefined({
+      request,
       signal,
       runId,
       step,
       modelCallId,
-      attemptObserver,
-      recordRequest:
-        recordRequest === undefined
-          ? undefined
-          : async (event: ModelRequestObservation) => {
-              try {
-                await recordRequest({ ...event, runId, step, modelCallId });
-              } catch (error) {
-                this.unsafeToReuse = true;
-                throw new RunCheckpointError(error);
-              }
-            },
-      traceContext: modelSpan?.context,
-    });
-    try {
-      await this.model.preflight?.(request, streamOptions);
-      singleAttempt = this.model.reportsAttempts === true ? undefined : attemptObserver.start(1);
-      for await (const event of this.model.stream(request, streamOptions)) {
-        if (event.type === "response.completed") {
-          if (responseCompleted) {
-            throw new ModelProtocolError("Model emitted more than one response.completed event");
-          }
-          responseCompleted = true;
-          usage = event.usage;
-          cost = event.cost;
-        }
-        throwIfAborted(signal);
-        await this.observe(runtimeHooks.modelEvent, event, { runId, step, signal });
-
-        if (event.type === "text.delta") {
-          if (event.delta.length > 0) singleAttempt?.content("text");
-          emit({ type: "model.text.delta", step, delta: event.delta });
-          continue;
-        }
-
-        if (event.type === "reasoning.delta") {
-          if (event.delta.length > 0) singleAttempt?.content("reasoning");
-          emit({ type: "model.reasoning.delta", step, delta: event.delta });
-          continue;
-        }
-
-        if (event.type === "retrying") {
-          addTraceEvent(
-            modelSpan,
-            "may.model.retry",
-            omitUndefined({
-              "may.model.retry.attempt": event.attempt,
-              "may.model.retry.max_attempts": event.maxAttempts,
-              "may.model.retry.delay_ms": event.delayMs,
-              "error.type": event.error.name,
-              "error.code": event.error.code,
-            }),
-          );
-          emit({
-            type: "model.retrying",
-            step,
-            attempt: event.attempt,
-            maxAttempts: event.maxAttempts,
-            delayMs: event.delayMs,
-            error: event.error,
-          });
-          continue;
-        }
-
-        completed = event.message;
-        if (completed.content.some((part) => part.type === "text" && part.text.length > 0))
-          singleAttempt?.content("text");
-        if ((completed.toolCalls?.length ?? 0) > 0) singleAttempt?.content("tool");
-        if (completed.content.some((part) => part.type !== "text")) singleAttempt?.content("other");
-      }
-
-      if (!completed) {
-        throw new ModelProtocolError("Model stream ended without a response.completed event");
-      }
-      singleAttempt?.end(omitUndefined({ status: "ok", completed: true, usage }));
-      return omitUndefined({ message: completed, usage, cost });
-    } catch (error) {
-      let failure = error;
-      if (error instanceof ModelResponseValidationError) {
-        usage = error.usage ?? usage;
-        cost = error.cost ?? cost;
-        responseCompleted = error.responseCompleted;
-        if (error.usage !== usage || error.cost !== cost) {
-          failure = new ModelResponseValidationError(error.message, omitUndefined({ usage, cost, cause: error }));
-        }
-      } else if (responseCompleted) {
-        failure = new ModelResponseValidationError(
-          "Model response processing failed after completion",
-          omitUndefined({ usage, cost, cause: error }),
-        );
-      }
-      singleAttempt?.end(
-        omitUndefined({
-          status: signal.aborted ? "cancelled" : "error",
-          error: traceError(failure),
-          completed: responseCompleted,
-          usage,
-        }),
-      );
-      throw failure;
-    } finally {
-      setTraceAttributes(modelSpan, {
-        ...modelConfigurationTraceAttributes(this.model),
-        "may.model.has_content": content,
-        "may.model.has_text": text,
-        "may.model.attempts": attempts,
-        "may.model.usage_available": usage !== undefined,
-        ...usageTraceAttributes(usage, "may.model"),
-        "may.model.completed": responseCompleted,
-      });
-    }
+      emit,
+      modelSpan,
+      recordRequest,
+    );
   }
 
   private async scheduleTools(
@@ -1199,7 +1062,9 @@ export class May implements AgentRuntime {
         throw new FatalToolExecutionError("Tool Hook cannot change call identity");
       if (prepared.denyReason !== undefined) throw new ToolHookDeniedError(prepared.denyReason);
       throwIfAborted(signal);
-      const input = freezeToolInput(tool.parse ? tool.parse(prepared.input) : prepared.input);
+      const parsedInput = tool.parse ? await tool.parse(prepared.input) : prepared.input;
+      throwIfAborted(signal);
+      const input = freezeToolInput(parsedInput);
       await checkpoint?.({ type: "tool.started", runId, step, call, input });
       throwIfAborted(signal);
       emit({ type: "tool.started", step, call, input });
@@ -1324,78 +1189,6 @@ export class May implements AgentRuntime {
   }
 }
 
-interface CompletedToolExecution {
-  readonly type: "completed";
-  readonly call: ToolCall;
-  readonly output: unknown;
-  readonly message: ToolMessage;
-  readonly fatal?: FatalToolExecutionError;
-}
-
-interface FailedToolExecution {
-  readonly type: "failed";
-  readonly call: ToolCall;
-  readonly error: SerializedError;
-  readonly message: ToolMessage;
-  fatal?: FatalToolExecutionError;
-}
-
-type ToolExecutionOutcome = CompletedToolExecution | FailedToolExecution;
-
-function createCancelledToolOutcome(call: ToolCall, error: RunCancelledError): FailedToolExecution {
-  return {
-    type: "failed",
-    call,
-    error: serializeError(error),
-    message: toolCancellationMessage(call, error.message),
-  };
-}
-
-function createSkippedToolOutcome(call: ToolCall, fatal: FatalToolExecutionError): FailedToolExecution {
-  const error: SerializedError = {
-    name: "ToolSkippedError",
-    message: `Tool \"${call.name}\" was not executed because a previous tool failed fatally: ${fatal.message}`,
-    code: "TOOL_SKIPPED",
-  };
-  return {
-    type: "failed",
-    call,
-    error,
-    message: {
-      role: "tool",
-      toolCallId: call.id,
-      name: call.name,
-      isError: true,
-      content: [{ type: "json", value: error }],
-    },
-  };
-}
-
-function emitToolOutcomes(
-  step: number,
-  outcomes: readonly ToolExecutionOutcome[],
-  emit: (event: MayEventPayload) => void,
-): void {
-  for (const outcome of outcomes) {
-    if (outcome.type === "completed") {
-      emit({
-        type: "tool.completed",
-        step,
-        call: outcome.call,
-        output: outcome.output,
-        content: outcome.message.content,
-      });
-    } else {
-      emit({
-        type: "tool.failed",
-        step,
-        call: outcome.call,
-        error: outcome.error,
-      });
-    }
-  }
-}
-
 function createRunId(): string {
   return `run_${randomUUID()}`;
 }
@@ -1429,116 +1222,6 @@ function createRunResult(
   };
   if (usage !== undefined) result.usage = usage;
   return result;
-}
-
-async function traceOperation<T>(
-  tracer: Tracer | undefined,
-  name: string,
-  parent: TraceContext | undefined,
-  attributes: TraceAttributes,
-  signal: AbortSignal,
-  operation: () => Promise<T>,
-): Promise<T> {
-  const span = startTraceSpan(tracer, name, omitUndefined({ parent, attributes }));
-  try {
-    const value = await operation();
-    endTraceSpan(span, { status: "ok" });
-    return value;
-  } catch (error) {
-    endOperationSpan(span, error, signal);
-    throw error;
-  }
-}
-
-function endOperationSpan(span: TraceSpan | undefined, error: unknown, signal: AbortSignal): void {
-  endTraceSpan(span, {
-    status: signal.aborted || error instanceof RunCancelledError ? "cancelled" : "error",
-    error: traceError(error),
-  });
-}
-
-function modelConfigurationTraceAttributes(model: Model): TraceAttributes {
-  const attributes: Record<string, string | number | boolean> = {};
-  const configuration = model.configuration ?? {};
-  const fields = {
-    provider: "provider",
-    adapter: "adapter",
-    model: "name",
-    profile: "profile",
-    reasoningEffort: "reasoning_effort",
-    capabilityVersion: "capability_version",
-  };
-  for (const [key, attribute] of Object.entries(fields)) {
-    const value = configuration[key];
-    if (value !== undefined) attributes[`may.model.${attribute}`] = value;
-  }
-  if (model.capabilityVersion !== undefined) attributes["may.model.capability_version"] = model.capabilityVersion;
-  return attributes;
-}
-
-function usageTraceAttributes(usage: Usage | undefined, prefix = "may.run"): TraceAttributes {
-  if (usage === undefined) return { [`${prefix}.usage_complete`]: false };
-  return omitUndefined({
-    [`${prefix}.cached_read_tokens`]: usage.cachedReadTokens,
-    [`${prefix}.cached_write_tokens`]: usage.cachedWriteTokens,
-    [`${prefix}.reasoning_tokens`]: usage.reasoningTokens,
-    [`${prefix}.usage_complete`]: resolveUsageTotals(usage).complete,
-    [`${prefix}.input_tokens`]: usage.inputTokens,
-    [`${prefix}.output_tokens`]: usage.outputTokens,
-    [`${prefix}.total_tokens`]: usage.totalTokens,
-  }) as TraceAttributes;
-}
-
-function costTraceAttributes(cost: UsageCost): TraceAttributes {
-  return omitUndefined({
-    "may.model.cost": cost.amount,
-    "may.model.currency": cost.currency,
-    "may.model.cost_kind": cost.kind,
-    "may.model.cost_complete": cost.complete,
-    "may.model.pricing_version": cost.pricingVersion,
-    "may.model.pricing_id": cost.pricingId,
-  });
-}
-
-function emitToolProgress(
-  step: number,
-  call: ToolCall,
-  update: ToolProgressUpdate,
-  emit: (event: MayEventPayload) => void,
-): void {
-  if (update.type === "output.delta") {
-    if (typeof update.delta !== "string") {
-      throw new TypeError("Tool output delta must be a string");
-    }
-    if (update.delta === "") return;
-    emit(
-      update.channel === undefined
-        ? { type: "tool.output.delta", step, call, delta: update.delta }
-        : {
-            type: "tool.output.delta",
-            step,
-            call,
-            delta: update.delta,
-            channel: update.channel,
-          },
-    );
-    return;
-  }
-
-  if (update.type !== "progress" || typeof update.message !== "string") {
-    throw new TypeError("Tool progress update is invalid");
-  }
-  emit(
-    update.data === undefined
-      ? { type: "tool.progress", step, call, message: update.message }
-      : {
-          type: "tool.progress",
-          step,
-          call,
-          message: update.message,
-          data: update.data,
-        },
-  );
 }
 
 async function settleWithin(pending: readonly Promise<unknown>[], timeoutMs: number): Promise<boolean> {

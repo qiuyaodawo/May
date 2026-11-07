@@ -2,6 +2,7 @@ import type { ContentPart, MediaSource, Message, ToolCall, ToolDefinition } from
 import { UnsupportedContentError, omitUndefined } from "@sortedyuan/may/core";
 import type { OpenAICompatibleMessage, OpenAICompatibleToolCall, OpenAICompatibleToolDefinition } from "./protocol.js";
 
+/** @experimental */
 export function toOpenAICompatibleMessages(
   messages: readonly Message[],
   options: { includeToolName?: boolean } = {},
@@ -45,6 +46,7 @@ export function toOpenAICompatibleMessages(
   });
 }
 
+/** @experimental */
 export function toOpenAICompatibleTools(tools: readonly ToolDefinition[]): OpenAICompatibleToolDefinition[] {
   return tools.map((tool) => ({
     type: "function",

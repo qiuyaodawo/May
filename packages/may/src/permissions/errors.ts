@@ -1,5 +1,6 @@
 import { FatalToolExecutionError, MayError } from "../core/index.js";
 
+/** @experimental */
 export class PermissionDeniedError extends MayError {
   readonly toolName: string;
 
@@ -9,6 +10,7 @@ export class PermissionDeniedError extends MayError {
   }
 }
 
+/** @experimental */
 export class PermissionExecutorClosedError extends FatalToolExecutionError {
   constructor(reason?: string) {
     super(reason ?? "Permission executor is closed", { code: "PERMISSION_EXECUTOR_CLOSED" });

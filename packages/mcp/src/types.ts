@@ -17,8 +17,10 @@ import type { McpHostServices, McpServerHostOptions } from "./host-services.js";
 import type { McpTaskJournal, McpTaskRecord } from "./task-journal.js";
 import type { McpTaskSnapshot, McpTaskWaitOptions, McpTaskUpdateOptions } from "./task-runtime.js";
 
+/** @experimental */
 export type McpTransport = "stdio" | "streamable-http";
 
+/** @experimental */
 export interface McpServerBaseOptions {
   /** Stable configuration id used to namespace every remote tool. */
   readonly id: string;
@@ -35,6 +37,7 @@ export interface McpServerBaseOptions {
   readonly tasks?: boolean;
 }
 
+/** @experimental */
 export interface McpStdioServerOptions extends McpServerBaseOptions {
   /** Omission preserves the original stdio API. */
   readonly transport?: "stdio";
@@ -49,6 +52,7 @@ export interface McpStdioServerOptions extends McpServerBaseOptions {
   readonly stderrMaxBytes?: number;
 }
 
+/** @experimental */
 export interface McpHttpServerOptions extends McpServerBaseOptions {
   readonly transport: "streamable-http";
   /** HTTPS endpoint; plaintext HTTP is allowed only for literal loopback hosts. */
@@ -58,8 +62,10 @@ export interface McpHttpServerOptions extends McpServerBaseOptions {
   readonly auth?: McpOAuthOptions;
 }
 
+/** @experimental */
 export type McpServerOptions = McpStdioServerOptions | McpHttpServerOptions;
 
+/** @experimental */
 export interface OpenMcpClientPoolOptions {
   /** Optional graphical Host only. Terminals omit this and never execute remote HTML. */
   readonly apps?: McpAppsHostOptions;
@@ -79,12 +85,14 @@ export interface OpenMcpClientPoolOptions {
   };
 }
 
+/** @experimental */
 export interface McpToolOutput {
   readonly _meta?: Readonly<Record<string, unknown>> | undefined;
   readonly content: readonly unknown[];
   readonly structuredContent?: unknown;
 }
 
+/** @experimental */
 export interface McpDiagnostic {
   readonly name: string;
   readonly message: string;
@@ -93,8 +101,10 @@ export interface McpDiagnostic {
   readonly stderr?: string;
 }
 
+/** @experimental */
 export type McpServerConnectionState = "connected" | "auth-required" | "failed" | "disconnected";
 
+/** @experimental */
 export interface McpServerStatus {
   readonly serverId: string;
   readonly transport: McpTransport;
@@ -118,6 +128,7 @@ interface McpClientEventBase {
   readonly required: boolean;
 }
 
+/** @experimental */
 export interface McpServerCatalog {
   readonly serverId: string;
   readonly revision: number;
@@ -128,6 +139,7 @@ export interface McpServerCatalog {
   readonly prompts: readonly Prompt[];
 }
 
+/** @experimental */
 export type McpClientEvent =
   | (McpClientEventBase & {
       readonly type: "mcp.server.connected";
@@ -146,16 +158,19 @@ export type McpClientEvent =
       readonly type: "mcp.server.disconnected";
     });
 
+/** @experimental */
 export interface McpOperationOptions {
   readonly owner?: McpInteractionOwner;
   readonly signal?: AbortSignal;
   readonly traceContext?: TraceContext;
 }
 
+/** @experimental */
 export interface McpReadOptions extends McpOperationOptions {
   readonly cache?: "use" | "refresh" | "bypass";
 }
 
+/** @experimental */
 export interface McpResourceRead {
   readonly serverId: string;
   readonly uri: string;
@@ -163,6 +178,7 @@ export interface McpResourceRead {
   readonly fromCache: boolean;
 }
 
+/** @experimental */
 export interface McpPromptExpansion {
   readonly serverId: string;
   readonly name: string;
@@ -170,9 +186,12 @@ export interface McpPromptExpansion {
   readonly result: GetPromptResult;
 }
 
+/** @experimental */
 export type McpCompletionParams = Pick<CompleteRequestParams, "ref" | "argument" | "context">;
+/** @experimental */
 export type McpCompletion = CompleteResult["completion"];
 
+/** @experimental */
 export interface McpResourceSubscription {
   readonly serverId: string;
   readonly uri: string;
@@ -182,6 +201,7 @@ export interface McpResourceSubscription {
   close(): Promise<void>;
 }
 
+/** @experimental */
 export interface McpClientPool {
   /** Pool-owned, ephemeral UI broker when explicitly enabled. Do not share between pools. */
   readonly interactions?: McpInteractionBroker | undefined;

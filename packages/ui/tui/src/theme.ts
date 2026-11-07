@@ -1,3 +1,4 @@
+/** @experimental */
 export type TerminalColor =
   | "black"
   | "red"
@@ -19,6 +20,7 @@ export type TerminalColor =
   | number
   | "";
 
+/** @experimental */
 export interface TextStyle {
   readonly foreground?: TerminalColor;
   readonly background?: TerminalColor;
@@ -30,6 +32,7 @@ export interface TextStyle {
   readonly strikethrough?: boolean;
 }
 
+/** @experimental */
 export interface MarkdownTheme {
   readonly heading: TextStyle;
   readonly link: TextStyle;
@@ -43,7 +46,10 @@ export interface MarkdownTheme {
   readonly listBullet: TextStyle;
 }
 
-/** Semantic tokens shared by May-owned terminal applications. */
+/**
+ * Semantic tokens shared by May-owned terminal applications.
+ * @experimental
+ */
 export interface TuiTheme {
   readonly name: string;
   readonly text: TextStyle;
@@ -70,6 +76,7 @@ export interface TuiTheme {
   readonly markdown: MarkdownTheme;
 }
 
+/** @experimental */
 export const DEFAULT_DARK_THEME: TuiTheme = {
   name: "may-dark",
   text: {},
@@ -107,7 +114,10 @@ export const DEFAULT_DARK_THEME: TuiTheme = {
   },
 };
 
-/** Apply framework-generated SGR styles without accepting raw escape codes. */
+/**
+ * Apply framework-generated SGR styles without accepting raw escape codes.
+ * @experimental
+ */
 export function styleText(value: string, style: TextStyle | undefined): string {
   if (value === "" || style === undefined) return value;
   const open: number[] = [];
@@ -124,6 +134,7 @@ export function styleText(value: string, style: TextStyle | undefined): string {
   return `\x1b[${open.join(";")}m${value}\x1b[${[...new Set(close.reverse())].join(";")}m`;
 }
 
+/** @experimental */
 export function mergeTextStyles(base: TextStyle, overrides: TextStyle): TextStyle {
   return { ...base, ...overrides };
 }

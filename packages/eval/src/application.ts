@@ -6,11 +6,13 @@ import { assertJson } from "./validation.js";
 import { EvalTelemetryCollector, evalIdentities, evalMetrics } from "./telemetry.js";
 import { EvalTrialBudget } from "./agent-budget.js";
 
+/** @experimental */
 export interface EvalApprovalHandler {
   readonly assisted?: boolean;
   decide(request: ApprovalRequest, signal: AbortSignal): ApprovalDecision | Promise<ApprovalDecision>;
 }
 
+/** @experimental */
 export interface ApplicationExecutionAdapterOptions {
   readonly id?: string;
   readonly version: string;
@@ -29,6 +31,7 @@ export interface ApplicationExecutionAdapterOptions {
   readonly maxContinuations?: number;
 }
 
+/** @experimental */
 export function createApplicationExecutionAdapter(options: ApplicationExecutionAdapterOptions): EvalExecutionAdapter {
   const maxContinuations = options.maxContinuations ?? 32;
   if (!Number.isSafeInteger(maxContinuations) || maxContinuations < 0)
@@ -226,11 +229,13 @@ function applicationOutput(result: RunResult): JsonValue {
   return { ...(text.length === 0 ? {} : { text }), ...(json.length === 0 ? {} : { json }) };
 }
 
+/** @experimental */
 export function errorCode(error: unknown): string {
   if (error instanceof Error && "code" in error && typeof error.code === "string") return error.code;
   return error instanceof Error ? error.name : "unknown";
 }
 
+/** @experimental */
 export async function waitWithSignal<T>(operation: Promise<T>, signal: AbortSignal): Promise<T> {
   signal.throwIfAborted();
   let abort: (() => void) | undefined;

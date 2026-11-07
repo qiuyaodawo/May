@@ -8,7 +8,9 @@ import { MayConfigFileError, MayConfigParseError, MayConfigWriteError } from "./
 import { parseMayConfig } from "./parse.js";
 import type { MayConfig } from "./types.js";
 
-/** Atomically updates only the top-level defaultModel field. */
+/** Atomically updates only the top-level defaultModel field.
+ * @experimental
+ */
 export async function updateDefaultMayModel(configPath: string, profile: string): Promise<MayConfig> {
   const path = resolve(configPath);
   let lock;

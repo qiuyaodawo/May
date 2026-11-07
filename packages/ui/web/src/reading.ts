@@ -1,5 +1,6 @@
 import type { UiBlock, UiClient, UiClientState, UiField, UiFieldPage, UiForkPoint } from "@sortedyuan/ui-client";
 import { approvalCard, button, element, statusLabel, transcriptBlock, type WebUiExtensions } from "./components.js";
+import { createUiTasks } from "./tasks.js";
 
 const preview = (text: string, limit: number) =>
   text.length > limit ? text.slice(0, limit) + "\n…（预览已截断，完整内容见详情）" : text;
@@ -21,6 +22,7 @@ export function createTranscriptReader(
   versions?: { fork(point: UiForkPoint): void; changes(runId: string): void },
 ) {
   const { scroll, messages, approvals } = elements;
+  const tasks = createUiTasks(showError);
   const toolbar = element("div", "reading-toolbar");
   toolbar.setAttribute("aria-label", "执行过程阅读");
   const summary = element("span", "reading-summary");
@@ -63,11 +65,11 @@ export function createTranscriptReader(
     submit,
     button("清除搜索", () => {
       search.value = "";
-      void loadHistory(false);
+      tasks.run(loadHistory(false));
     }),
   );
   const more = button("加载更早记录", () => {
-    void loadHistory(true);
+    tasks.run(loadHistory(true));
   });
   const info = element("span", "history-info");
   info.setAttribute("role", "status");
@@ -167,7 +169,7 @@ export function createTranscriptReader(
   }
   searchForm.onsubmit = (event) => {
     event.preventDefault();
-    void loadHistory(false);
+    tasks.run(loadHistory(false));
   };
   onlyErrors.onchange = () => {
     following = false;
@@ -377,7 +379,7 @@ export function createTranscriptReader(
           approvalCard(
             request,
             (decision) => {
-              void client.command("approval.resolve", { id: request.id, decision }).catch(showError);
+              tasks.run(client.command("approval.resolve", { id: request.id, decision }));
             },
             approvalsDisabled,
             extensions,
@@ -433,7 +435,7 @@ export function createTranscriptReader(
       total = next.snapshot?.historyPage?.total ?? next.snapshot?.blocks.length ?? 0;
       render();
     },
-    dispose() {
+    async dispose() {
       disposed = true;
       requestId++;
       scroll.removeEventListener("scroll", onScroll);
@@ -447,6 +449,7 @@ export function createTranscriptReader(
       groups.clear();
       previousSignatures.clear();
       previousInteractions = "";
+      await tasks.close();
     },
   };
 }
@@ -459,6 +462,9 @@ export function createInspector(
   dismiss?: () => void,
 ) {
   const root = element("div", "evidence-inspector");
+  const tasks = createUiTasks((error) => {
+    root.append(element("p", "dialog-error", error instanceof Error ? error.message : "读取失败。"));
+  });
   root.hidden = true;
   let state = client.state,
     scope = "",
@@ -508,7 +514,7 @@ export function createInspector(
         page = undefined;
         offsets = [];
         if (key === "overview") render();
-        else void load(0);
+        else tasks.run(load(0));
       });
       tab.setAttribute("aria-pressed", String(key === field));
       tab.disabled = key !== "overview" && !state.snapshot?.reads?.fields;
@@ -533,18 +539,18 @@ export function createInspector(
         button("从首段刷新", () => {
           offsets = [];
           page = undefined;
-          void load(0);
+          tasks.run(load(0));
         }),
       );
       const previous = button("上一段", () => {
         const offset = offsets.pop();
-        if (offset !== undefined) void load(offset);
+        if (offset !== undefined) tasks.run(load(offset));
       });
       previous.disabled = loading || !offsets.length;
       const next = button("下一段", () => {
         if (page?.nextOffset !== null && page?.nextOffset !== undefined) {
           offsets.push(page.offset);
-          void load(page.nextOffset);
+          tasks.run(load(page.nextOffset));
         }
       });
       next.disabled = loading || !page || page.nextOffset === null;
@@ -615,9 +621,10 @@ export function createInspector(
         if (field === "overview") render();
       }
     },
-    dispose() {
+    async dispose() {
       disposed = true;
       requestId++;
+      await tasks.close();
     },
   };
 }

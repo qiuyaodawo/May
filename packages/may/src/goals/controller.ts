@@ -24,7 +24,9 @@ import type {
 
 class GoalLimitError extends Error {}
 
-/** 外部组件独立管理目标；Agent 仅提供通用的执行接口。 */
+/** 外部组件独立管理目标；Agent 仅提供通用的执行接口。
+ * @experimental
+ */
 export class GoalController {
   private state: GoalState | undefined;
   private agent: GoalAgent | undefined;
@@ -590,6 +592,7 @@ export class GoalController {
   }
 }
 
+/** @experimental */
 export function createGoalTools(goal: GoalController): readonly Tool[] {
   return [
     {

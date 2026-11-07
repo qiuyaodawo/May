@@ -53,6 +53,7 @@ const activeStores = new WeakSet<SchedulerStore>();
 
 class SchedulerConflictError extends Error {}
 
+/** @experimental */
 export class Scheduler {
   private readonly store: SchedulerStore;
   private readonly dispatcher: TaskDispatcher;

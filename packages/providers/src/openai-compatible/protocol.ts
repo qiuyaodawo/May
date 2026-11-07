@@ -1,17 +1,21 @@
+/** @experimental */
 export interface OpenAICompatibleFunctionCall {
   name: string;
   arguments: string;
 }
 
+/** @experimental */
 export interface OpenAICompatibleToolCall {
   id: string;
   type: "function";
   function: OpenAICompatibleFunctionCall;
 }
 
+/** @experimental */
 export type OpenAICompatibleUserContent =
   string | Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string; detail?: string } }>;
 
+/** @experimental */
 export type OpenAICompatibleMessage =
   | { role: "system"; content: string }
   | { role: "user"; content: OpenAICompatibleUserContent }
@@ -28,6 +32,7 @@ export type OpenAICompatibleMessage =
       name?: string;
     };
 
+/** @experimental */
 export interface OpenAICompatibleToolDefinition {
   type: "function";
   function: {
@@ -37,6 +42,7 @@ export interface OpenAICompatibleToolDefinition {
   };
 }
 
+/** @experimental */
 export interface OpenAICompatibleToolCallDelta {
   index: number;
   id?: string;
@@ -47,13 +53,17 @@ export interface OpenAICompatibleToolCallDelta {
   };
 }
 
-/** 服务端在 HTTP 200 流中返回的顶层错误，字段内容按各 provider 实现而不同。 */
+/**
+ * 服务端在 HTTP 200 流中返回的顶层错误，字段内容按各 provider 实现而不同。
+ * @experimental
+ */
 export interface OpenAICompatibleStreamError {
   message?: string | null;
   type?: string | null;
   code?: string | number | null;
 }
 
+/** @experimental */
 export interface OpenAICompatibleChunk {
   /** 顶层错误事件；一旦出现，本次流立即失败。 */
   error?: OpenAICompatibleStreamError | string | number | boolean | null;

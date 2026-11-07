@@ -5,13 +5,17 @@ import { sanitizeTerminalText } from "./text.js";
 import { renderTextDocument, type TextDocumentLine } from "./text-selection.js";
 import { DEFAULT_DARK_THEME, styleText, type MarkdownTheme, type TextStyle } from "./theme.js";
 
+/** @experimental */
 export interface MarkdownOptions {
   readonly colors?: boolean;
   readonly theme?: MarkdownTheme;
   readonly sourceId?: string;
 }
 
-/** Safe terminal Markdown rendering backed by Marked's lexer, not its HTML output. */
+/**
+ * Safe terminal Markdown rendering backed by Marked's lexer, not its HTML output.
+ * @experimental
+ */
 export class Markdown implements Component {
   constructor(
     private readonly value: string | (() => string),
@@ -24,6 +28,7 @@ export class Markdown implements Component {
   }
 }
 
+/** @experimental */
 export function renderTerminalMarkdown(source: string, options: MarkdownOptions = {}): string {
   return markdownDocument(source, options)
     .map((line) => line.value)

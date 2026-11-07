@@ -5,6 +5,7 @@ import type { McpClientEvent, McpInteractionEvent } from "@sortedyuan/mcp";
 import type { MaybeCodeDelegationEvent } from "@sortedyuan/coordination/delegation/types";
 export type { MaybeCodeRun } from "@sortedyuan/coordination/delegation/types";
 
+/** @experimental */
 export type MaybeCodeSessionEvent =
   | { type: "workspace.git.changed"; checkpoint: import("@sortedyuan/may/application/git-workspace").GitCheckpoint }
   | import("@sortedyuan/may/goals").GoalEvent
@@ -17,6 +18,7 @@ export type MaybeCodeSessionEvent =
       toolCallId: string;
       preview: ToolChangePreview;
     };
+/** @experimental */
 export type MaybeCodeEvent =
   | import("@sortedyuan/may").AgentSessionForkedEvent
   | { type: "permission-mode.changed"; mode: import("./policy.js").MaybeCodePermissionMode }

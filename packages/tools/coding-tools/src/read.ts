@@ -5,9 +5,12 @@ import { readTextFile } from "./text-file.js";
 import { resolveExistingWorkspacePath, type WorkspacePath } from "./workspace-path.js";
 import { assertFileExistence, type WorkspaceFileGuard } from "./guard.js";
 
+/** @experimental */
 export const DEFAULT_READ_MAX_BYTES = 1024 * 1024;
+/** @experimental */
 export const DEFAULT_READ_MAX_LINES = 2000;
 
+/** @experimental */
 export interface ReadToolOptions {
   readonly cwd: string;
   readonly maxBytes?: number;
@@ -17,6 +20,7 @@ export interface ReadToolOptions {
   readonly guard?: WorkspaceFileGuard;
 }
 
+/** @experimental */
 export interface ReadToolInput {
   readonly path: string;
   /** One-based line number. */
@@ -24,6 +28,7 @@ export interface ReadToolInput {
   readonly limit?: number;
 }
 
+/** @experimental */
 export interface ReadToolOutput {
   readonly path: string;
   readonly content: string;
@@ -33,6 +38,7 @@ export interface ReadToolOutput {
   readonly truncated: boolean;
 }
 
+/** @experimental */
 export function createReadTool(options: ReadToolOptions): Tool<ReadToolInput, ReadToolOutput> {
   const maxBytes = requirePositiveIntegerOption(options.maxBytes, DEFAULT_READ_MAX_BYTES, "maxBytes");
   const maxLines = requirePositiveIntegerOption(options.maxLines, DEFAULT_READ_MAX_LINES, "maxLines");

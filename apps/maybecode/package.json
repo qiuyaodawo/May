@@ -17,6 +17,7 @@
     "maybecode": "./dist/bin.js"
   },
   "files": [
+    "README.zh-CN.md",
     "dist",
     "!dist/.tsbuildinfo"
   ],

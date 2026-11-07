@@ -5,6 +5,7 @@ import type { FocusTarget, InteractiveComponent, RenderResult, RenderSize, Point
 import { styleText, type TextStyle } from "./theme.js";
 import { sanitizeTerminalText } from "./text.js";
 
+/** @experimental */
 export interface SelectItem<T = string> {
   readonly value: T;
   readonly label: string;
@@ -12,6 +13,7 @@ export interface SelectItem<T = string> {
   readonly disabled?: boolean;
 }
 
+/** @experimental */
 export interface SelectListOptions<T> {
   readonly keybindings?: readonly KeyBindingDefinition[];
   readonly selectedIndex?: number;
@@ -24,6 +26,7 @@ export interface SelectListOptions<T> {
   readonly markerStyle?: TextStyle;
 }
 
+/** @experimental */
 export const SELECT_LIST_KEYBINDINGS: readonly KeyBindingDefinition[] = [
   { context: "select", keys: "up", action: "list.up" },
   { context: "select", keys: "down", action: "list.down" },
@@ -35,6 +38,7 @@ export const SELECT_LIST_KEYBINDINGS: readonly KeyBindingDefinition[] = [
   { context: "select", keys: "escape", action: "list.cancel" },
 ];
 
+/** @experimental */
 export class SelectList<T = string> implements InteractiveComponent, FocusTarget {
   private items: readonly SelectItem<T>[];
   private index: number;

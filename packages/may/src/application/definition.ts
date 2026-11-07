@@ -10,12 +10,15 @@ type SessionBoundAgentOption = "store" | "sessionId" | "resume" | "fork" | "meta
  *
  * Tool registries are accepted through their iterable contract. The iterable
  * is consumed and snapshotted when the definition is created.
+ * @experimental
  */
 export type AgentDefinitionOptions = Omit<AgentApplicationOptions, SessionBoundAgentOption | "tools"> & {
   readonly tools?: Iterable<Tool>;
 };
 
-/** Infrastructure and identity that belong to one opened Agent Session. */
+/** Infrastructure and identity that belong to one opened Agent Session.
+ * @experimental
+ */
 export interface AgentDefinitionOpenOptions {
   readonly store: SessionStore;
   readonly sessionId?: string;
@@ -35,6 +38,7 @@ type StoredAgentDefinitionOptions = Omit<AgentApplicationOptions, SessionBoundAg
  * while `open()` receives Session storage, identity and metadata. Stateful
  * collaborators such as a Model or ContextFactory remain caller-owned and are
  * intentionally shared when the same definition opens multiple applications.
+ * @public
  */
 export class AgentDefinition {
   private readonly applicationOptions: StoredAgentDefinitionOptions;
@@ -44,6 +48,7 @@ export class AgentDefinition {
     this.applicationOptions = snapshotDefinitionOptions(options);
   }
 
+  /** @public */
   open(options: AgentDefinitionOpenOptions): Promise<AgentApplication> {
     return AgentApplication.open({
       ...this.applicationOptions,
@@ -55,7 +60,9 @@ export class AgentDefinition {
   }
 }
 
-/** Define reusable Agent behavior separately from Session lifecycle inputs. */
+/** Define reusable Agent behavior separately from Session lifecycle inputs.
+ * @public
+ */
 export function defineAgent(options: AgentDefinitionOptions): AgentDefinition {
   return new AgentDefinition(options);
 }

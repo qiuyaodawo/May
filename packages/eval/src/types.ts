@@ -1,14 +1,18 @@
 import type { Message, RunBudget, Usage, UsageCost } from "@sortedyuan/may/core";
 
+/** @experimental */
 export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue };
+/** @experimental */
 export interface ComponentReference {
   readonly id: string;
   readonly version: string;
   readonly options?: Readonly<Record<string, JsonValue>>;
 }
+/** @experimental */
 export interface EvaluatorReference extends ComponentReference {
   readonly required: boolean;
 }
+/** @experimental */
 export interface EvalLimits {
   readonly prepareTimeoutMs: number;
   readonly executionTimeoutMs: number;
@@ -16,6 +20,7 @@ export interface EvalLimits {
   readonly cleanupTimeoutMs: number;
   readonly runBudget: RunBudget;
 }
+/** @experimental */
 export interface EnvironmentCapabilities {
   readonly independentResources: boolean;
   readonly filesystemIsolation: boolean;
@@ -24,6 +29,7 @@ export interface EnvironmentCapabilities {
   readonly credentialIsolation: boolean;
   readonly protectedEvaluationResources?: boolean;
 }
+/** @experimental */
 export interface EvalCase {
   readonly id: string;
   readonly version: string;
@@ -36,6 +42,7 @@ export interface EvalCase {
   readonly requiredCapabilities?: Partial<EnvironmentCapabilities>;
   readonly evaluateAfterLimit?: boolean;
 }
+/** @experimental */
 export interface EvalVariant {
   readonly id: string;
   readonly version: string;
@@ -44,6 +51,7 @@ export interface EvalVariant {
   readonly runBudget?: RunBudget;
   readonly assisted?: boolean;
 }
+/** @experimental */
 export interface EvidencePolicy {
   readonly maxItemBytes: number;
   readonly maxTrialBytes: number;
@@ -53,6 +61,7 @@ export interface EvidencePolicy {
   readonly redactorId?: string;
   readonly redactorVersion?: string;
 }
+/** @experimental */
 export interface EvalExperiment {
   readonly id: string;
   readonly cases: readonly EvalCase[];
@@ -62,6 +71,7 @@ export interface EvalExperiment {
   readonly seed: number;
   readonly evidencePolicy?: EvidencePolicy;
 }
+/** @experimental */
 export interface EvalTrial {
   readonly id: string;
   readonly experimentId: string;
@@ -71,12 +81,14 @@ export interface EvalTrial {
   readonly ordinal: number;
   readonly retryOf?: string;
 }
+/** @experimental */
 export interface EvalFingerprints {
   readonly case: string;
   readonly variant: string;
   readonly environment: string;
   readonly evaluators: string;
 }
+/** @experimental */
 export interface EvalPlan {
   readonly schemaVersion: 1;
   readonly experiment: EvalExperiment;
@@ -84,13 +96,16 @@ export interface EvalPlan {
   readonly trials: readonly EvalTrial[];
   readonly fingerprints: Readonly<Record<string, EvalFingerprints>>;
 }
+/** @experimental */
 export type EvalPhase = "prepare" | "execute" | "freeze" | "evaluate" | "cleanup";
+/** @experimental */
 export interface EvalError {
   readonly phase: EvalPhase;
   readonly code: string;
   readonly name: string;
   readonly message: string;
 }
+/** @experimental */
 export interface EvalPhaseRecord {
   readonly phase: EvalPhase;
   readonly startedAt: string;
@@ -99,8 +114,11 @@ export interface EvalPhaseRecord {
   readonly status: "running" | "completed" | "failed" | "limited" | "cancelled";
   readonly error?: EvalError;
 }
+/** @experimental */
 export type ExecutionStatus = "completed" | "failed" | "limited" | "cancelled" | "interrupted";
+/** @experimental */
 export type TaskVerdict = "passed" | "failed" | "inconclusive" | "not-evaluated";
+/** @experimental */
 export interface EvalIdentities {
   readonly taskIds?: readonly string[];
   readonly sessionIds?: readonly string[];
@@ -108,11 +126,13 @@ export interface EvalIdentities {
   readonly coordinationIds?: readonly string[];
   readonly traceIds?: readonly string[];
 }
+/** @experimental */
 export interface MeasuredValue {
   readonly value?: number;
   readonly complete: boolean;
   readonly missingReasons: readonly string[];
 }
+/** @experimental */
 export interface EvalMetrics {
   readonly durationMs: MeasuredValue;
   readonly approvalWaitMs: MeasuredValue;
@@ -127,6 +147,7 @@ export interface EvalMetrics {
   readonly cost: UsageCost;
   readonly usage?: Usage;
 }
+/** @experimental */
 export interface EvidenceReference {
   readonly id: string;
   readonly mediaType: string;
@@ -135,6 +156,7 @@ export interface EvidenceReference {
   readonly path?: string;
   readonly label?: string;
 }
+/** @experimental */
 export interface EvidenceSink {
   write(value: {
     readonly id: string;
@@ -143,6 +165,7 @@ export interface EvidenceSink {
     readonly label?: string;
   }): Promise<EvidenceReference>;
 }
+/** @experimental */
 export interface EvalExecutionEvent {
   readonly id: string;
   readonly type:
@@ -162,6 +185,7 @@ export interface EvalExecutionEvent {
   readonly cost?: UsageCost;
   readonly identities?: EvalIdentities;
 }
+/** @experimental */
 export interface EvalExecutionResult {
   readonly status: Exclude<ExecutionStatus, "interrupted">;
   readonly terminationConfirmed: boolean;
@@ -171,13 +195,16 @@ export interface EvalExecutionResult {
   readonly metrics?: Partial<EvalMetrics>;
   readonly evidence?: readonly EvidenceReference[];
 }
+/** @experimental */
 export interface ExecutionTarget {
   readonly workspacePath?: string;
   readonly data?: Readonly<Record<string, JsonValue>>;
 }
+/** @experimental */
 export interface EvaluationTarget extends ExecutionTarget {
   readonly baselinePath?: string;
 }
+/** @experimental */
 export interface EnvironmentPrepareContext {
   readonly trial: EvalTrial;
   readonly case: EvalCase;
@@ -185,16 +212,19 @@ export interface EnvironmentPrepareContext {
   readonly options: Readonly<Record<string, JsonValue>>;
   readonly signal: AbortSignal;
 }
+/** @experimental */
 export interface EvalComponent {
   readonly id: string;
   readonly version: string;
   validate?(options: Readonly<Record<string, JsonValue>>): void;
 }
+/** @experimental */
 export interface EvalEnvironmentAdapter extends EvalComponent {
   readonly capabilities: EnvironmentCapabilities;
   prepare(context: EnvironmentPrepareContext): Promise<PreparedEnvironment>;
   recover?(context: EnvironmentPrepareContext): Promise<void>;
 }
+/** @experimental */
 export interface PreparedEnvironment {
   readonly id: string;
   readonly capabilities: EnvironmentCapabilities;
@@ -202,6 +232,7 @@ export interface PreparedEnvironment {
   freeze(signal: AbortSignal): Promise<EvaluationTarget>;
   dispose(signal: AbortSignal): Promise<void>;
 }
+/** @experimental */
 export interface ExecutionCreateContext {
   readonly trial: EvalTrial;
   readonly case: EvalCase;
@@ -213,6 +244,7 @@ export interface ExecutionCreateContext {
   readonly emit: (event: EvalExecutionEvent) => Promise<void>;
   readonly signal: AbortSignal;
 }
+/** @experimental */
 export interface EvalExecutionAdapter extends EvalComponent {
   validateCase?(context: { readonly case: EvalCase; readonly variant: EvalVariant }): void;
   create(context: ExecutionCreateContext): Promise<EvalExecution>;
@@ -223,17 +255,20 @@ export interface EvalExecutionAdapter extends EvalComponent {
     readonly signal: AbortSignal;
   }): Promise<{ readonly confirmed: boolean }>;
 }
+/** @experimental */
 export interface EvalExecution {
   execute(signal: AbortSignal): Promise<EvalExecutionResult>;
   cancel(signal: AbortSignal): Promise<{ readonly confirmed: boolean }>;
   close(signal: AbortSignal): Promise<void>;
 }
+/** @experimental */
 export interface EvaluationCheck {
   readonly id: string;
   readonly verdict: "passed" | "failed" | "inconclusive";
   readonly message?: string;
   readonly evidence?: readonly EvidenceReference[];
 }
+/** @experimental */
 export interface EvaluationResult {
   readonly verdict: "passed" | "failed" | "inconclusive" | "awaiting-review";
   readonly checks: readonly EvaluationCheck[];
@@ -241,6 +276,7 @@ export interface EvaluationResult {
   readonly evidence: readonly EvidenceReference[];
   readonly metrics?: Partial<EvalMetrics>;
 }
+/** @experimental */
 export interface EvaluationContext {
   readonly trial: EvalTrial;
   readonly case: EvalCase;
@@ -251,9 +287,11 @@ export interface EvaluationContext {
   readonly evidenceSink: EvidenceSink;
   readonly emit: (event: EvalExecutionEvent) => Promise<void>;
 }
+/** @experimental */
 export interface EvalEvaluator extends EvalComponent {
   evaluate(context: EvaluationContext, signal: AbortSignal): Promise<EvaluationResult>;
 }
+/** @experimental */
 export interface EvaluationRevision {
   readonly evaluatorId: string;
   readonly evaluatorVersion: string;
@@ -262,6 +300,7 @@ export interface EvaluationRevision {
   readonly createdAt: string;
   readonly result: EvaluationResult;
 }
+/** @experimental */
 export interface TrialState {
   readonly trial: EvalTrial;
   readonly phases: readonly EvalPhaseRecord[];
@@ -280,6 +319,7 @@ export interface TrialState {
   readonly evidence: readonly EvidenceReference[];
   readonly awaitingReview: boolean;
 }
+/** @experimental */
 export interface EvalStore {
   acquire(experimentId: string): Promise<() => Promise<void>>;
   createPlan(plan: EvalPlan): Promise<void>;
@@ -296,6 +336,7 @@ export interface EvalStore {
   ): Promise<EvidenceReference>;
   appendTrial(experimentId: string, trial: EvalTrial, fingerprints: EvalFingerprints): Promise<void>;
 }
+/** @experimental */
 export interface EvalRunnerOptions {
   readonly registry: import("./registry.js").EvalRegistry;
   readonly store: EvalStore;

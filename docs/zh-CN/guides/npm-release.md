@@ -42,12 +42,20 @@ OpenTelemetry instrumentation 使用 `@sortedyuan/observability`，需要同步�
 
 ```sh
 pnpm release:status
+pnpm release:registry
 ```
 
 只有明确要求准备版本后，才执行 `pnpm changeset version`。随后执行
 `pnpm install --lockfile-only`，检查生成的版本、内部依赖范围、changelog
 和 lockfile，并重新验证。每次 Git commit 都需要明确确认。提交、推送和
 发布分别取得授权。
+
+`release:registry` 报告仓库版本、registry dist-tag、仓库版本是否已经发布，以及运行时、
+optional 和 peer 依赖是否具有满足范围的已发布版本。Workspace 依赖按仓库版本检查。
+默认 registry 为 `https://registry.npmjs.org`，tag 为 `latest`，清单为
+`scripts/release-packages.json`。使用 `--registry`、`--tag` 和 `--manifest` 指定其他值。
+默认模式只报告结果；`--expect-published` 在包或版本缺失、tag 不一致、依赖无法满足
+或查询失败时返回非零退出码。HTTP 404、认证失败（401/403）和网络失败分别报告。
 
 ## 验证候选版本
 
@@ -58,6 +66,7 @@ checkout 中重复检查。查看 `git status --short`，将 `git rev-parse HEAD
 ```sh
 pnpm install --frozen-lockfile
 pnpm release:check
+pnpm release:registry --registry <approved-registry> --tag <approved-tag>
 pnpm build
 pnpm test
 pnpm docs:check
@@ -100,10 +109,17 @@ pnpm --filter <approved-package> publish --access public --registry <approved-re
 保持 Git 检查启用。创建或推送发布标签、发布之后更改 dist-tag，以及
 创建 GitHub Release，分别需要覆盖对应操作的明确授权。
 
-命令失败后，重新尝试之前检查所选 registry 中每个经过批准的包及版本。
-记录已经存在的版本，只对缺少的版本重新执行发布，并准确报告部分完成状态。
+部分发布失败时，重新尝试之前执行以下检查。记录已经存在的版本，只对缺少的版本
+重新执行发布，并准确报告部分完成状态。非零退出码表示发布尚未完成，或存在其他
+需要审阅的不一致情况。
+
+```sh
+pnpm release:registry --registry <approved-registry> --tag <approved-tag> --expect-published
+```
 
 发布之后，创建没有本地 overrides 和 workspace 链接的全新外部项目。
 从所选 registry 安装经过批准的精确版本，验证代表性的公开导入与
 `maybecode --help`，并逐项核对 registry 版本、dist-tag 和批准清单。
 保存命令结果作为发布记录。
+
+发布之后再次执行同一项 `--expect-published` 检查，将输出和外部项目安装结果一起保存。

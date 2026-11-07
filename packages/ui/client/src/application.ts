@@ -21,6 +21,7 @@ import {
 import { UiProjection } from "./projection.js";
 import { readPage, historyPage, recordedField, fieldPage, searchHistory } from "./reading.js";
 
+/** @experimental */
 export interface ApplicationUiOptions {
   readonly workspace?: () => Promise<import("./protocol.js").UiWorkspaceGit | undefined>;
   readonly forkPoints?: (sessionId: string) => Promise<readonly import("./protocol.js").UiForkPoint[]>;
@@ -53,7 +54,10 @@ type UiApplication = Omit<AgentWorkspaceController<{ type: string }>, "compactCo
   compactContext(): Promise<unknown>;
 };
 
-/** Adapter for a single-active-session workspace, shared by all connected operators. */
+/**
+ * Adapter for a single-active-session workspace, shared by all connected operators.
+ * @experimental
+ */
 export class ApplicationUiHost implements UiHost {
   readonly hostId = randomUUID();
   private revision = 0;

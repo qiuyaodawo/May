@@ -1,10 +1,15 @@
 import { McpCapabilityError } from "./errors.js";
 import { assertMcpContentSize } from "./content.js";
 
-/** The 2026-07-28 extension, not the incompatible 2025 experimental Tasks API. */
+/**
+ * The 2026-07-28 extension, not the incompatible 2025 experimental Tasks API.
+ * @experimental
+ */
 export const MCP_TASKS_EXTENSION = "io.modelcontextprotocol/tasks";
+/** @experimental */
 export type McpTaskStatus = "working" | "input_required" | "completed" | "cancelled" | "failed";
 
+/** @experimental */
 export interface McpRemoteTask {
   readonly taskId: string;
   readonly status: McpTaskStatus;
@@ -15,6 +20,7 @@ export interface McpRemoteTask {
   readonly statusMessage?: string;
 }
 
+/** @experimental */
 export type McpTaskState = McpRemoteTask &
   (
     | { readonly status: "working" | "cancelled" }
@@ -27,9 +33,12 @@ export type McpTaskState = McpRemoteTask &
  * Validate extension-native frames before trusting an id/state. Does not turn a
  * task's result into tool content or fulfill its input requests. Those require
  * the originating tool schema, host services and permission/ownership checks.
+ * @experimental
  */
 export function parseMcpTask(value: unknown, kind: "created", serverId: string): McpRemoteTask;
+/** @experimental */
 export function parseMcpTask(value: unknown, kind: "state", serverId: string): McpTaskState;
+/** @experimental */
 export function parseMcpTask(
   value: unknown,
   kind: "created" | "state",

@@ -5,32 +5,40 @@ import writeFileAtomic from "write-file-atomic";
 import type { ContentPart, MediaSource } from "@sortedyuan/may/core";
 import { withFileAccess } from "@sortedyuan/may/storage";
 
+/** @experimental */
 export interface ImageAttachment {
   readonly id: string;
   readonly mediaType?: string;
   readonly url?: string;
   readonly fileId?: string;
 }
+/** @experimental */
 export type DisplayPart =
   { readonly type: "text"; readonly text: string } | { readonly type: "image"; readonly image: ImageAttachment };
+/** @experimental */
 export interface ImageData {
   readonly data: Uint8Array;
   readonly mediaType: string;
   readonly width: number;
   readonly height: number;
 }
+/** @experimental */
 export interface SavedImage extends ImageData {
   readonly id: string;
   readonly path: string;
 }
+/** @experimental */
 export type MediaReader = (source: MediaSource, signal?: AbortSignal) => Promise<ImageData>;
+/** @experimental */
 export interface MediaCapabilities {
   readonly images: boolean;
   readonly maxImageBytes: number;
   readonly mediaTypes: readonly string[];
 }
+/** @experimental */
 export const MAX_IMAGE_BYTES = 32 * 1024 * 1024;
 
+/** @experimental */
 export function imageAttachment(source: MediaSource): ImageAttachment {
   const id = createHash("sha256").update(JSON.stringify(source)).digest("hex");
   if (source.type === "url") {
@@ -42,6 +50,7 @@ export function imageAttachment(source: MediaSource): ImageAttachment {
   return source.type === "base64" ? { id, mediaType: source.mediaType } : { id, fileId: source.fileId };
 }
 
+/** @experimental */
 export function displayParts(content: readonly ContentPart[]): DisplayPart[] {
   return content.flatMap<DisplayPart>((part) => {
     if (part.type === "reasoning") return [];
@@ -51,6 +60,7 @@ export function displayParts(content: readonly ContentPart[]): DisplayPart[] {
   });
 }
 
+/** @experimental */
 export async function inspectImage(data: Uint8Array): Promise<ImageData> {
   if (!data.byteLength || data.byteLength > MAX_IMAGE_BYTES)
     throw new Error("Image size must be between 1 byte and 32 MiB");
@@ -71,6 +81,7 @@ export async function inspectImage(data: Uint8Array): Promise<ImageData> {
   return { data, mediaType, width: metadata.autoOrient.width, height: metadata.autoOrient.height };
 }
 
+/** @experimental */
 export const readEmbeddedImage: MediaReader = async (source) => {
   if (source.type !== "base64") throw new Error(`Image source ${source.type} requires a host-provided MediaReader`);
   if (source.data.length > Math.ceil(MAX_IMAGE_BYTES / 3) * 4) throw new Error("Image exceeds 32 MiB");
@@ -81,6 +92,7 @@ export const readEmbeddedImage: MediaReader = async (source) => {
   return image;
 };
 
+/** @experimental */
 export class FileMediaStore {
   constructor(
     readonly directory: string,
@@ -103,6 +115,7 @@ export class FileMediaStore {
   }
 }
 
+/** @experimental */
 export async function imagePng(image: ImageData): Promise<Buffer> {
   const { default: sharp } = await import("sharp");
   return sharp(image.data, { limitInputPixels: 40_000_000, failOn: "error" }).rotate().png().toBuffer();

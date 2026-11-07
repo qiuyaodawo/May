@@ -37,8 +37,7 @@ export function withGatewayConfiguration<T>(
     () => {},
   );
   writes.set(key, settled);
-  void settled.then(() => {
+  return job.finally(() => {
     if (writes.get(key) === settled) writes.delete(key);
   });
-  return job;
 }

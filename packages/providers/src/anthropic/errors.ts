@@ -1,3 +1,4 @@
+/** @experimental */
 export class AnthropicError extends Error {
   readonly code: string;
 
@@ -8,6 +9,7 @@ export class AnthropicError extends Error {
   }
 }
 
+/** @experimental */
 export class AnthropicApiError extends AnthropicError {
   readonly status: number;
   readonly providerType: string | undefined;
@@ -29,6 +31,7 @@ export class AnthropicApiError extends AnthropicError {
   }
 }
 
+/** @experimental */
 export class AnthropicStreamError extends AnthropicError {
   readonly providerType: string | undefined;
   readonly requestId: string | undefined;
@@ -40,12 +43,14 @@ export class AnthropicStreamError extends AnthropicError {
   }
 }
 
+/** @experimental */
 export class AnthropicProtocolError extends AnthropicError {
   constructor(message: string, options?: ErrorOptions) {
     super("ANTHROPIC_PROTOCOL_ERROR", message, options);
   }
 }
 
+/** @experimental */
 export class AnthropicFinishReasonError extends AnthropicError {
   readonly finishReason: string;
 

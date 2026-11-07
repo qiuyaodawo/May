@@ -1,3 +1,4 @@
+/** @experimental */
 export class MaybeCodeUsageError extends Error {
   constructor(message: string) {
     super(message);

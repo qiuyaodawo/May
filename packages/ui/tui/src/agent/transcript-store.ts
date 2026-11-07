@@ -11,9 +11,11 @@ import {
 } from "@sortedyuan/may/session";
 import { decodeToolChangePreviewPresentation, type ToolChangePreview } from "@sortedyuan/coding-tools/change-preview";
 
+/** @experimental */
 export type TranscriptItem =
   UserTranscriptItem | AssistantTranscriptItem | ToolTranscriptItem | ApprovalTranscriptItem | NoticeTranscriptItem;
 
+/** @experimental */
 export interface UserTranscriptItem {
   readonly id: string;
   readonly kind: "user";
@@ -21,6 +23,7 @@ export interface UserTranscriptItem {
   readonly timestamp: number;
 }
 
+/** @experimental */
 export interface AssistantTranscriptItem {
   readonly content?: readonly ContentPart[];
   readonly id: string;
@@ -33,6 +36,7 @@ export interface AssistantTranscriptItem {
   readonly timestamp: number;
 }
 
+/** @experimental */
 export interface ToolTranscriptItem {
   readonly content?: readonly ContentPart[];
   readonly id: string;
@@ -49,6 +53,7 @@ export interface ToolTranscriptItem {
   readonly timestamp: number;
 }
 
+/** @experimental */
 export interface ApprovalTranscriptItem {
   readonly id: string;
   readonly kind: "approval";
@@ -63,6 +68,7 @@ export interface ApprovalTranscriptItem {
   readonly timestamp: number;
 }
 
+/** @experimental */
 export interface NoticeTranscriptItem {
   readonly id: string;
   readonly kind: "notice";
@@ -71,6 +77,7 @@ export interface NoticeTranscriptItem {
   readonly timestamp: number;
 }
 
+/** @experimental */
 export type TranscriptListener = (store: TranscriptStore) => void;
 
 /**
@@ -79,6 +86,7 @@ export type TranscriptListener = (store: TranscriptStore) => void;
  * Product-specific events stay outside this package: applications can reset the
  * projection and append notices or coding change previews through the explicit
  * methods below.
+ * @experimental
  */
 export class TranscriptStore {
   private values: TranscriptItem[] = [];
@@ -298,6 +306,8 @@ export class TranscriptStore {
       case "step.started":
       case "step.completed":
       case "run.yielded":
+      case "input.generated":
+      case "run.budget.exceeded":
         break;
     }
     if (isSessionRunTerminalEvent(event)) this.settle(event.runId);
@@ -472,6 +482,23 @@ export class TranscriptStore {
         break;
       case "session.created":
       case "run.yielded":
+      case "continuation.submitted":
+      case "history.omitted":
+      case "input.generated":
+      case "model.attempt.completed":
+      case "model.attempt.failed":
+      case "model.attempt.started":
+      case "model.request.defined":
+      case "model.request.prepared":
+      case "rule.created":
+      case "rule.revoked":
+      case "rule.used":
+      case "run.budget.exceeded":
+      case "run.settled":
+      case "runtime.changed":
+      case "runtime.state.saved":
+      case "session.fork.ready":
+      case "state.updated":
         break;
     }
     if (isSessionRunTerminalEvent(event) && "runId" in event) this.settle(event.runId);

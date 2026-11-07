@@ -38,12 +38,34 @@ export function gatewayAuthentication() {
 export interface GatewayManager {
   readonly navigation: WebUiNavigation;
   readonly onNew: () => void;
-  dispose(): void;
+  dispose(): Promise<void>;
 }
 
 export function createGatewayManager(client: UiClient): GatewayManager {
   let disposed = false;
+  let closing: Promise<void> | undefined;
   const activeDialogs = new Set<HTMLDialogElement>();
+  const pendingActions = new Set<Promise<void>>();
+  const actionErrors: unknown[] = [];
+
+  function runAction(action: () => unknown, onError: (reason: unknown) => void = showError): void {
+    const task = Promise.resolve()
+      .then(action)
+      .then(
+        () => {},
+        (error) => {
+          if (disposed) actionErrors.push(error);
+          else onError(error);
+        },
+      )
+      .catch((error) => {
+        actionErrors.push(error);
+      })
+      .finally(() => {
+        pendingActions.delete(task);
+      });
+    pendingActions.add(task);
+  }
 
   function statusPill(status: string): HTMLElement {
     const span = document.createElement("span");
@@ -150,7 +172,7 @@ export function createGatewayManager(client: UiClient): GatewayManager {
     control.className = className;
     control.textContent = label;
     control.addEventListener("click", () => {
-      void Promise.resolve().then(action).catch(showError);
+      runAction(action);
     });
     return control;
   }
@@ -202,8 +224,11 @@ export function createGatewayManager(client: UiClient): GatewayManager {
     view.form.onsubmit = (event) => {
       event.preventDefault();
       control.disabled = true;
-      void action().then(
-        () => view.dialog.close(),
+      runAction(
+        async () => {
+          await action();
+          view.dialog.close();
+        },
         (reason) => {
           control.disabled = false;
           view.fail(reason);
@@ -258,7 +283,7 @@ export function createGatewayManager(client: UiClient): GatewayManager {
       tip.textContent = "当前尚未配置 Agent。";
       const add = button("添加 Agent", () => {
         view.dialog.close();
-        void agents();
+        return agents();
       });
       group.append(tip, add);
     }
@@ -503,7 +528,7 @@ export function createGatewayManager(client: UiClient): GatewayManager {
                 await client.command("delivery.retry", { id: delivery.id, confirm: "true" });
                 retry.dialog.close();
                 view.dialog.close();
-                void channels();
+                await channels();
               });
             }),
           );
@@ -1047,22 +1072,27 @@ export function createGatewayManager(client: UiClient): GatewayManager {
       render() {
         return {
           dispose() {
-            manager.dispose();
+            return manager.dispose();
           },
         };
       },
     },
     onNew: () => createSession(),
     dispose() {
-      if (disposed) return;
-      disposed = true;
-      for (const dialog of activeDialogs) {
-        dialog.close();
-        dialog.remove();
-      }
-      activeDialogs.clear();
+      return (closing ??= closeDialogs());
     },
   };
 
   return manager;
+
+  async function closeDialogs(): Promise<void> {
+    disposed = true;
+    for (const dialog of activeDialogs) {
+      dialog.close();
+      dialog.remove();
+    }
+    activeDialogs.clear();
+    while (pendingActions.size) await Promise.all(pendingActions);
+    if (actionErrors.length) throw new AggregateError(actionErrors, "Gateway management actions failed");
+  }
 }

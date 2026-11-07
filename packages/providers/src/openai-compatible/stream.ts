@@ -2,6 +2,7 @@ import type { AssistantMessage, ModelEvent, ToolCall, Usage } from "@sortedyuan/
 import type { OpenAICompatibleChunk, OpenAICompatibleToolCallDelta } from "./protocol.js";
 import { readSseData } from "./http.js";
 
+/** @experimental */
 export interface OpenAICompatibleStreamOptions {
   signal: AbortSignal;
   providerName: string;
@@ -16,6 +17,7 @@ interface PendingToolCall {
   arguments: string;
 }
 
+/** @experimental */
 export async function* streamOpenAICompatibleResponse(
   response: Response,
   options: OpenAICompatibleStreamOptions,

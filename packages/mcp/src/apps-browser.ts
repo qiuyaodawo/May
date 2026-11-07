@@ -1,4 +1,7 @@
-/** Browser-only entry point: no Node imports, credentials, executor or Session state. */
+/**
+ * Browser-only entry point: no Node imports, credentials, executor or Session state.
+ * @experimental
+ */
 export interface McpAppChannel {
   readonly resource: { readonly html: string };
   /** Authenticated backend channel bound to exactly one McpAppSession. */
@@ -8,7 +11,10 @@ export interface McpAppChannel {
   readonly lifetimeMs?: number;
 }
 
-/** Mount only on an explicit user action. The sandbox URL is host configuration, not server metadata. */
+/**
+ * Mount only on an explicit user action. The sandbox URL is host configuration, not server metadata.
+ * @experimental
+ */
 export function mountMcpApp(container: HTMLElement, sandboxUrl: string, channel: McpAppChannel) {
   const lifetime = channel.lifetimeMs ?? 600_000;
   if (!Number.isSafeInteger(lifetime) || lifetime <= 0 || lifetime > 3_600_000)

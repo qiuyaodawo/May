@@ -38,6 +38,10 @@ perform no Git or model operations. See [Web UI](../../../docs/en/guides/web-ui.
 The line-oriented `TerminalIO.updatePrompt(prompt)` method updates an active
 question without replacing its draft or cursor position. `createNodeTerminal`
 implements it for hosts that display changing status in their prompt.
+Call `await terminal.close()` to release terminal input and wait for active
+suggestion providers. Provider failures abort the active input and are reported
+by `close()`. Custom `TerminalIO.close()` implementations may return either
+`void` or `Promise<void>`.
 
 `TranscriptStore` displays delivered steering messages from live `input.received`
 events and saved `input.steering.queued` / `input.steering.delivered` records.

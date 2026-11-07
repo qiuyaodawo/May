@@ -17,51 +17,28 @@
 
 ## 完整工具示例
 
-在 TypeScript 应用中创建 `add-tool.ts`，并将 `@sortedyuan/may` 加入直接依赖。
+在 TypeScript 应用中创建 `add-tool.ts`，并将 `@sortedyuan/may` 和 Zod 4.6.7 或更新版本加入直接依赖。
 该文件实现加法，`execute()` 返回 `{ value: number }`。
 
 ```ts
-import type { Tool } from "@sortedyuan/may/core";
-
-interface AddInput {
-  readonly left: number;
-  readonly right: number;
-}
+import { defineTool } from "@sortedyuan/may/core";
+import { z } from "zod";
 
 interface AddOutput {
   readonly value: number;
 }
 
-export const addTool: Tool<AddInput, AddOutput> = {
+export const addTool = defineTool({
   name: "add",
   description: "Add two finite numbers.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      left: { type: "number" },
-      right: { type: "number" },
-    },
-    required: ["left", "right"],
-    additionalProperties: false,
-  },
-
-  parse(input): AddInput {
-    if (typeof input !== "object" || input === null) {
-      throw new TypeError("add input must be an object");
-    }
-    const value = input as Record<string, unknown>;
-    if (!Number.isFinite(value.left) || !Number.isFinite(value.right)) {
-      throw new TypeError("left and right must be finite numbers");
-    }
-    return { left: value.left as number, right: value.right as number };
-  },
+  schema: z.strictObject({ left: z.number(), right: z.number() }),
 
   async execute(input, context): Promise<AddOutput> {
     context.signal.throwIfAborted();
     context.report({ type: "progress", message: "Adding values" });
     return { value: input.left + input.right };
   },
-};
+});
 ```
 
 在应用组合模块中从 `./add-tool.js` 导入 `addTool`，与已初始化的 `productTools` 组合。
@@ -86,6 +63,10 @@ const application = await agent.open({ store });
 
 `inputSchema` 向模型描述输入。工具必须在 `parse()` 或 `execute()` 中执行运行时校验。
 权限策略接收解析后的值。
+`defineTool` 在定义时将 Standard JSON Schema 输入转换为 draft-07，执行时等待
+Standard Schema 校验。默认值和 transform 在权限检查及执行之前应用。
+`ToolInputValidationError.issues` 包含字段路径。直接调用 `tool.parse()` 时必须等待结果。
+执行过程在解析之后检查取消，并冻结解析后的输入。
 
 ## 使用 `ToolRegistry` 组合工具
 

@@ -74,6 +74,11 @@ interfaces, and product composition remains under `apps`.
 
 ### `@sortedyuan/may/core`
 
+`may.ts` owns run state, scheduling, cancellation, checkpoint ordering and closure.
+`model-step.ts` prepares requests and observes model streams through `ModelStepHost`;
+`tool-outcomes.ts` projects tool results and events; `run-tracing.ts` supplies
+run, model and usage tracing helpers.
+
 Core owns active execution:
 
 - model, tool, and context contracts
@@ -111,6 +116,12 @@ the automatic strategy chain, while the owning provider serializes and
 restores native continuation state through `modelState`.
 
 ### `@sortedyuan/may/session`
+
+`session.ts` composes internal modules while retaining ownership of mutable run
+state, submission ordering, cancellation, closure and persistence. `run-observer.ts`
+converts runtime events, `recovery.ts` identifies interruptions, `replay.ts`
+rebuilds history, `branching.ts` prepares inherited history, `runtime-state.ts`
+handles runtime state transfer, and `request-recorder.ts` prepares request records.
 
 The session package composes Core into a long-lived identity. It owns a session
 id, metadata, serialized submission, context continuity, session events, and a
@@ -193,6 +204,12 @@ by another.
 
 ### `@sortedyuan/mcp`
 
+`client.ts` preserves the public composition entrypoint. `connection.ts` owns each
+server connection, `client-pool.ts` owns pool state and refresh ordering,
+`connection-apps.ts` contains Apps integration, and `transport-support.ts`
+contains transport helpers. Their existing lifecycle owners retain cancellation
+and connection shutdown ordering.
+
 The MCP package is an optional adapter at the tool boundary. It depends on
 Core's `Tool` and tracing contracts, while Core remains independent of MCP and
 its SDK. A client pool owns stdio child processes and Streamable HTTP transports, takes a
@@ -218,6 +235,17 @@ Pool/process lifetime belongs to the product that opened the pool, not Core or
 an individual Session.
 
 ### `@sortedyuan/may/application`
+
+`application.ts` retains application state and run/close lifecycle ownership.
+`plugin-composition.ts` prepares plugin and service composition,
+`compaction-controller.ts` handles compaction execution and persistence mappings,
+and `session-navigation.ts` selects recovery, branching and plugin state.
+Opening uses `opening-plugins.ts` for plugin scopes and service resolution,
+`opening-tools.ts` for tools and permissions, `runtime-assembly.ts` for runtime
+creation, and `opening-session.ts` for Session opening and recovery.
+`application-events.ts` connects event relays; `opening-completion.ts` completes
+initial state persistence. `application-compaction.ts` prepares compaction
+operations while the application owns cancellation and operation ordering.
 
 The application package provides headless orchestration above Session and
 Core. `AgentDefinition` captures reusable behavior and policy without Session
@@ -301,6 +329,28 @@ the active Session for reading its state, and `controller.transition(action)` ru
 state change on that Session's queue.
 The bundled frontends consume this interface. Another UI can consume the same
 controller without inheriting MaybeCode's rendering or command policy.
+
+`workspace.ts` owns Workspace transitions and resource closure.
+`workspace-configuration.ts` prepares configuration and application creation,
+`model-transition.ts` checks model profiles and saved identity,
+`session-navigation.ts` projects branch points, and `workspace-state.ts` defines
+the internal shared state types.
+
+### `apps/maybeclaw`
+
+`gateway.ts` composes the channel Gateway and retains ownership of execution
+queues, cancellation, closure, recovery and notification ordering. Internal
+`gateway/access.ts` checks access and updates sessions; `gateway/messages.ts`
+writes message sequence, content, delivery queue and session timestamps in one
+transaction; `gateway/task-projection.ts` maintains saved task projections.
+`gateway/input.ts` processes input, `gateway/coordination.ts` coordinates Agents,
+and `gateway/tasks.ts` handles task recovery and dispatch.
+`gateway/approvals.ts` handles approvals, `gateway/management.ts` manages members
+and sessions, and `gateway/maintenance.ts` performs maintenance and adapter cleanup.
+`gateway/permissions.ts` manages permission rules; `gateway/adapters.ts` resolves
+adapters and prepares bindings.
+These modules use internal owner interfaces; mutable state remains owned by
+`AgentGateway`.
 
 ## Events and persistence
 

@@ -2,18 +2,22 @@ import { omitUndefined, type ContextSnapshot, type Message, type SystemMessage }
 
 import type { ContextCompactionOptions, ContextCompactionStrategy } from "./compaction.js";
 
+/** @experimental */
 export interface HistoryReferenceRequest {
   readonly snapshot: Readonly<ContextSnapshot>;
   readonly signal?: AbortSignal;
 }
 
+/** @experimental */
 export type HistoryReferenceProvider = (request: HistoryReferenceRequest) => string | Promise<string>;
 
+/** @experimental */
 export interface HistoryReferenceOptions {
   readonly reference: string | HistoryReferenceProvider;
   readonly keepRecentTurns?: number;
 }
 
+/** @experimental */
 export class HistoryReferenceStrategy implements ContextCompactionStrategy {
   readonly name = "history-reference";
 

@@ -1,4 +1,4 @@
-import { readRecordedModelRequests, requestReferences, requestValueId, type RecordedModelRequest } from "./requests.js";
+import { readRecordedModelRequests, type RecordedModelRequest } from "./requests.js";
 import type { ModelRequestSink } from "../core/request-recording.js";
 import {
   AsyncEventQueue,
@@ -8,7 +8,6 @@ import {
   type RuntimeDescriptor,
   DEFAULT_RUNTIME_DESCRIPTOR,
   validateRuntimeDescriptor,
-  runtimeDescriptorsEqual,
   jsonEqual,
   omitUndefined,
   type MayEvent,
@@ -17,15 +16,12 @@ import {
   type RunHandle,
   type RunOptions,
   type RunCheckpointEvent,
-  toolCancellationMessage,
-  type ToolCall,
   type UserMessage,
   userMessage,
 } from "../core/index.js";
 
 import type {
   RecordablePermissionEvent,
-  SessionApprovalRequest,
   SessionContextCompaction,
   SessionEvent,
   SessionEventPayload,
@@ -33,13 +29,21 @@ import type {
   SessionRecovery,
   SessionForkOrigin,
 } from "./events.js";
-import { sessionToolResultContent } from "./events.js";
 import { readSessionBranchPositions, type SessionBranchPosition } from "./branch.js";
 import { SessionSteeringQueue, type SessionSteerOptions, type SessionSteeringInput } from "./steering.js";
 import { inspectSessionRunOutcome, type SessionRunOutcome, type SessionRunSelector } from "./outcome.js";
 import { SessionHistoryReader, type SessionHistoryQuery, type SessionHistoryPage } from "./history.js";
 import { InMemorySessionStore, type SessionStore, validateSessionHistory } from "./store.js";
+import { checkpointKey, toPermissionSessionEvent, toSessionEvent } from "./run-observer.js";
+import { interruptedRuns, SessionRecoveryRequiredError } from "./recovery.js";
+import { modelStepKey, replaySession } from "./replay.js";
+import { appendForkHistory } from "./branching.js";
+import { adoptRuntimeState, snapshotRuntimeState } from "./runtime-state.js";
+import { prepareModelRequest } from "./request-recorder.js";
 
+export { SessionRecoveryRequiredError } from "./recovery.js";
+
+/** @public */
 export interface SessionOptions {
   providerBodyRecording?: boolean | undefined;
   requestRecording?: "off" | "required";
@@ -50,6 +54,7 @@ export interface SessionOptions {
   deferBranchPositions?: boolean;
 }
 
+/** @public */
 export interface ResumeSessionOptions {
   providerBodyRecording?: boolean | undefined;
   requestRecording?: "off" | "required";
@@ -59,6 +64,7 @@ export interface ResumeSessionOptions {
   createRuntime(messages: Message[], info: SessionRuntimeInfo): AgentRuntime | Promise<AgentRuntime>;
 }
 
+/** @experimental */
 export interface SessionForkOptions extends Omit<ResumeSessionOptions, "id"> {
   readonly sourceId: string;
   readonly positionSeq: number;
@@ -69,11 +75,13 @@ export interface SessionForkOptions extends Omit<ResumeSessionOptions, "id"> {
   readonly deferForkReady?: boolean;
 }
 
+/** @experimental */
 export interface SessionModelMeasurement {
   readonly inputTokens: number;
   readonly contextMessageCount: number;
 }
 
+/** @experimental */
 export interface SessionRuntimeInfo {
   readonly state?: Readonly<Record<string, unknown>>;
   readonly latestModelMeasurement?: SessionModelMeasurement;
@@ -87,27 +95,35 @@ interface SuspendedRuntime {
   readonly closing: Promise<void>;
 }
 
-/** Optional host delivery identity. Duplicates are rejected, not submitted again. */
+/** Optional host delivery identity. Duplicates are rejected, not submitted again.
+ * @experimental
+ */
 export interface SessionSubmitOptions extends Omit<RunOptions, "stepInputSource"> {
   readonly stepInputSource?: never;
   readonly inputId?: string;
 }
 
-/** Session 的补充输入统一通过 steer() 保存和交付。 */
+/** Session 的补充输入统一通过 steer() 保存和交付。
+ * @experimental
+ */
 export interface SessionContinueOptions extends Omit<ContinueOptions, "stepInputSource"> {
   readonly stepInputSource?: never;
   /** 宿主提供的持久执行身份，同一个 Session 内只能提交一次。 */
   readonly continuationId?: string;
 }
 
+/** @public */
 export class Session {
   private requestRecording: "off" | "required" = "off";
   private providerBodyRecording = false;
   private readonly requestRecords = new AsyncStateSerializer();
   private readonly requestDefinitions = new Set<string>();
   private readonly requestAttempts = new Map<string, number>();
+  /** @experimental */
   readonly id: string;
+  /** @experimental */
   readonly metadata: Readonly<Record<string, unknown>> | undefined;
+  /** @experimental */
   readonly forkOrigin: SessionForkOrigin | undefined;
 
   private runtime: AgentRuntime;
@@ -167,6 +183,7 @@ export class Session {
     }
   }
 
+  /** @public */
   static async create(options: SessionOptions): Promise<Session> {
     const id = options.id ?? createSessionId();
     const store = options.store ?? new InMemorySessionStore();
@@ -197,6 +214,7 @@ export class Session {
     return session;
   }
 
+  /** @public */
   static async resume(options: ResumeSessionOptions): Promise<Session> {
     const events = await new SessionHistoryReader(options.store).readAll(options.id);
     if (events.length === 0) {
@@ -294,6 +312,7 @@ export class Session {
     }
   }
 
+  /** @experimental */
   static async fork(options: SessionForkOptions): Promise<Session> {
     if (options.store.inspect === undefined) throw new Error("Session forking requires read-only store inspection");
     const source = await options.store.inspect(options.sourceId);
@@ -306,91 +325,10 @@ export class Session {
     const id = options.id ?? createSessionId();
     if (id === options.sourceId || (await options.store.read(id)).length > 0)
       throw new Error(`Session "${id}" already exists`);
-    const stateKeys = new Set(options.stateKeys ?? []);
-    const queued = new Map<string, UserMessage>();
     const history: SessionEvent[] = [];
     const append = (event: SessionEventPayload, timestamp: number) =>
       history.push({ ...structuredClone(event), sessionId: id, seq: history.length + 1, timestamp });
-    const created = source[0];
-    if (created?.type !== "session.created") throw new Error("Source Session has no creation event");
-    append(
-      {
-        type: "session.created",
-        ...(created.runtime === undefined ? {} : { runtime: created.runtime }),
-        ...((options.metadata ?? created.metadata) === undefined
-          ? {}
-          : { metadata: { ...(options.metadata ?? created.metadata) } }),
-        fork: { sessionId: options.sourceId, positionSeq: options.positionSeq, runId: selected.runId },
-      },
-      Date.now(),
-    );
-    for (const event of source.slice(1, options.positionSeq)) {
-      if (event.type.startsWith("approval.") || event.type.startsWith("rule.")) {
-        append({ type: "history.omitted", reason: "permission" }, event.timestamp);
-        continue;
-      }
-      if (event.type === "session.fork.ready") {
-        append({ type: "history.omitted", reason: "fork-initialization" }, event.timestamp);
-        continue;
-      }
-      if (event.type === "state.updated") {
-        if (stateKeys.has(event.key))
-          append(
-            {
-              type: "state.updated",
-              key: event.key,
-              value:
-                options.transformState === undefined
-                  ? event.value
-                  : options.transformState(event.key, structuredClone(event.value)),
-            },
-            event.timestamp,
-          );
-        else append({ type: "history.omitted", reason: "application-state" }, event.timestamp);
-        continue;
-      }
-      if (event.type === "input.steering.queued") {
-        queued.set(event.input.inputId, event.input.message);
-        append({ type: "history.omitted", reason: "unconsumed-input" }, event.timestamp);
-        continue;
-      }
-      if (event.type === "input.steering.finished") {
-        append({ type: "history.omitted", reason: "unconsumed-input" }, event.timestamp);
-        continue;
-      }
-      if (event.type === "input.steering.delivered") {
-        const messages = event.inputIds.map((inputId) => {
-          const message = queued.get(inputId);
-          if (message === undefined) throw new Error(`Delivered input has no saved content: ${inputId}`);
-          return message;
-        });
-        append(
-          {
-            type: "input.generated",
-            runId: event.runId,
-            step: event.step,
-            messages,
-            reason: "Inherited delivered input",
-          },
-          event.timestamp,
-        );
-        continue;
-      }
-      if (event.type === "input.submitted") {
-        append({ type: "input.submitted", message: event.message }, event.timestamp);
-        continue;
-      }
-      if (event.type === "continuation.submitted") {
-        append({ type: "history.omitted", reason: "execution-identity" }, event.timestamp);
-        continue;
-      }
-      if (event.type === "run.started" && event.continuationId !== undefined) {
-        const { continuationId: _identity, ...started } = event;
-        append(started, event.timestamp);
-        continue;
-      }
-      append(event, event.timestamp);
-    }
+    const created = appendForkHistory(source, options, selected.runId, append);
     const replay = replaySession(history);
     const runtime = await options.createRuntime(replay.messages, replay.info);
     try {
@@ -439,10 +377,12 @@ export class Session {
     }
   }
 
+  /** @experimental */
   async branchPositions(): Promise<readonly SessionBranchPosition[]> {
     return readSessionBranchPositions(await this.history());
   }
 
+  /** @experimental */
   async saveForkReady(): Promise<void> {
     if (this.forkOrigin === undefined) throw new Error("Only a forked Session can save initialization readiness");
     if (this.runtimeClosed) throw new Error("Session runtime is closed");
@@ -452,6 +392,7 @@ export class Session {
     await this.record({ type: "session.fork.ready" });
   }
 
+  /** @experimental */
   async saveBranchPosition(
     runId: string,
     options: import("./branch.js").SessionBranchCompletionOptions = {},
@@ -477,11 +418,13 @@ export class Session {
     await this.record({ type: "run.settled", runId, ...(hostCompleted ? { hostCompleted: true as const } : {}) });
   }
 
+  /** @experimental */
   submit(options: SessionSubmitOptions): Promise<RunHandle> {
     assertSessionInputOptions(options);
     return this.enqueueRun(() => this.start(options));
   }
 
+  /** @experimental */
   async steer(options: SessionSteerOptions): Promise<SessionSteeringInput> {
     this.assertRecovered();
     if (options.inputId !== undefined && this.submittedInputIds.has(options.inputId))
@@ -489,14 +432,17 @@ export class Session {
     return this.steering.enqueue(options, this.activeRun?.id);
   }
 
+  /** @experimental */
   listSteeringInputs(): readonly SessionSteeringInput[] {
     return this.steering.list();
   }
 
+  /** @experimental */
   cancelSteeringInputs(reason = "Cancelled by user"): Promise<void> {
     return this.steering.cancel(reason);
   }
 
+  /** @experimental */
   startSteeringInput(
     inputId: string,
     options: Omit<SessionSubmitOptions, "input" | "inputId"> = {},
@@ -507,6 +453,7 @@ export class Session {
   }
 
   /** Continue the current context without recording a new user input. */
+  /** @experimental */
   continue(options: SessionContinueOptions = {}): Promise<RunHandle> {
     assertSessionInputOptions(options);
     return this.enqueueRun(() => this.startContinuation(options));
@@ -540,15 +487,18 @@ export class Session {
     return started;
   }
 
+  /** @public */
   async history(): Promise<readonly SessionEvent[]> {
     await this.records.idle();
     return this.historyReader.readAll(this.id);
   }
 
+  /** @experimental */
   async inspectRun(selector: SessionRunSelector): Promise<SessionRunOutcome> {
     return inspectSessionRunOutcome(await this.history(), selector);
   }
 
+  /** @experimental */
   async getRuntimeInfo(): Promise<{ readonly messages: Message[]; readonly info: SessionRuntimeInfo }> {
     this.assertIdleRuntime();
     this.runtimeMutation = true;
@@ -559,6 +509,7 @@ export class Session {
     }
   }
 
+  /** @experimental */
   async suspendRuntime(): Promise<void> {
     if (this.runtimeClosed) throw new Error("Session runtime is closed");
     if (this.suspendedRuntime !== undefined) return this.suspendedRuntime.closing;
@@ -584,6 +535,7 @@ export class Session {
     }
   }
 
+  /** @experimental */
   async replaceRuntime(runtime: AgentRuntime): Promise<void> {
     const previous = this.runtime;
     let accepted = false;
@@ -635,6 +587,7 @@ export class Session {
     }
   }
 
+  /** @public */
   async closeRuntime(): Promise<void> {
     if (this.runtimeClosing !== undefined) return this.runtimeClosing;
     if (
@@ -650,6 +603,7 @@ export class Session {
     return this.runtimeClosing;
   }
 
+  /** @experimental */
   async saveRuntimeState(): Promise<void> {
     this.assertIdleRuntime();
     if (this.runtimeClosed) throw new Error("Session runtime is closed");
@@ -684,11 +638,13 @@ export class Session {
     });
   }
 
+  /** @public */
   async queryHistory(query: SessionHistoryQuery = {}): Promise<SessionHistoryPage> {
     await this.records.idle();
     return this.historyReader.query(this.id, query);
   }
 
+  /** @experimental */
   recordPermissionEvent(event: RecordablePermissionEvent): Promise<void> {
     if (event.type === "rule.created" || event.type === "rule.revoked" || event.type === "rule.used") {
       return this.record(toPermissionSessionEvent(event), event.timestamp);
@@ -714,6 +670,7 @@ export class Session {
     return operation;
   }
 
+  /** @experimental */
   async recordContextCompaction(
     compaction: SessionContextCompaction,
     afterRunStep?: { readonly runId: string; readonly step: number },
@@ -732,6 +689,7 @@ export class Session {
     });
   }
 
+  /** @experimental */
   async recordToolPresentation(presentation: SessionToolPresentation): Promise<void> {
     validateToolPresentation(presentation);
     const snapshot = JSON.parse(JSON.stringify(presentation)) as SessionToolPresentation;
@@ -1023,11 +981,13 @@ export class Session {
     this.seq = seq;
   }
 
+  /** @public */
   listRecoveries(): readonly SessionRecovery[] {
     return [...this.recoveries.values()].map((value) => structuredClone(value));
   }
 
   /** Persist bounded, application-owned state independently of compactable messages. */
+  /** @experimental */
   async recordState(key: string, value: unknown): Promise<void> {
     if (!/^[a-z][a-z0-9._-]{0,127}$/u.test(key)) throw new Error("Invalid session state key");
     const snapshot: unknown = JSON.parse(JSON.stringify(value));
@@ -1036,6 +996,7 @@ export class Session {
   }
 
   /** The host must verify external effects and describe the finding before continuing. */
+  /** @public */
   resolveRecovery(id: string, finding: string): Promise<void> {
     const operation = this.tail.then(async () => {
       if (this.persistenceFailed) throw new Error("Session persistence failed; reopen the session before recovery");
@@ -1081,6 +1042,7 @@ export class Session {
     await extra?.(event);
   }
 
+  /** @experimental */
   async listModelRequests(
     options: { afterSeq?: number; limit?: number } = {},
   ): Promise<readonly RecordedModelRequest[]> {
@@ -1094,65 +1056,22 @@ export class Session {
       .slice(0, limit);
   }
 
+  /** @experimental */
   async getModelRequest(modelCallId: string): Promise<readonly RecordedModelRequest[]> {
     return readRecordedModelRequests(await this.history()).filter((request) => request.modelCallId === modelCallId);
   }
 
+  /** @experimental */
   readonly recordModelRequest: ModelRequestSink = (observation) => {
     const operation = this.requestRecords.run(async () => {
       const identity = { runId: observation.runId, step: observation.step, modelCallId: observation.modelCallId };
       if (observation.type === "prepared") {
-        if (
-          new TextEncoder().encode(
-            JSON.stringify({
-              ...observation.record,
-              body: this.providerBodyRecording ? observation.record.body : undefined,
-            }),
-          ).byteLength >
-          64 * 1024 * 1024
-        )
-          throw new RangeError("Model request record exceeds 64 MiB");
-        const definitions = new Set(this.requestDefinitions);
-        const added: Array<{ id: string; value: unknown }> = [];
-        const define = (value: unknown): string => {
-          const id = requestValueId(value);
-          if (!definitions.has(id)) {
-            definitions.add(id);
-            added.push({ id, value });
-          }
-          return id;
-        };
-        const record = observation.record;
-        if (
-          this.providerBodyRecording &&
-          (typeof record.body !== "object" || record.body === null || Array.isArray(record.body))
-        )
-          throw new TypeError("Recorded request body must be an object");
-        const request = requestReferences({ ...record.request }, define);
-        const body = this.providerBodyRecording
-          ? requestReferences(record.body as Record<string, unknown>, define)
-          : undefined;
-        const batch: SessionEventPayload[] = added.map((definition) => ({
-          type: "model.request.defined",
-          ...definition,
-        }));
-        const attempt = (this.requestAttempts.get(observation.modelCallId) ?? 0) + 1;
-        batch.push({
-          type: "model.request.prepared",
-          version: 1,
-          ...identity,
-          attempt,
-          adapter: record.adapter,
-          purpose: record.purpose,
-          request,
-          body,
-          ...omitUndefined({
-            endpoint: record.endpoint,
-            protocol: record.protocol,
-            omittedPaths: record.omittedPaths,
-            externalResourcePaths: record.externalResourcePaths,
-          }),
-        });
+        const { batch, added, attempt } = prepareModelRequest(
+          observation,
+          this.providerBodyRecording,
+          this.requestDefinitions,
+          this.requestAttempts,
+        );
         await this.records.run(async () => {
           const events = batch.map(
             (payload, index) =>
@@ -1203,70 +1122,6 @@ function requestRecordingMode(value: unknown): "off" | "required" {
   return value;
 }
 
-export class SessionRecoveryRequiredError extends Error {
-  readonly code = "SESSION_RECOVERY_REQUIRED";
-  constructor(readonly recoveries: readonly SessionRecovery[]) {
-    super("Interrupted tools have unknown outcomes. Inspect /recovery and record verified findings before continuing.");
-    this.name = "SessionRecoveryRequiredError";
-  }
-}
-
-function checkpointKey(event: { type: string; runId: string; step?: number; call?: ToolCall }): string {
-  return JSON.stringify([event.type, event.runId, event.step, event.call?.id]);
-}
-
-function interruptedRuns(events: readonly SessionEvent[]): SessionEventPayload[] {
-  const runs = new Map<string, { version?: 1; pending: Map<string, SessionRecovery>; started: Set<string> }>();
-  const approvals = new Set<string>();
-  for (const event of events) {
-    if (event.type === "approval.requested") approvals.add(event.request.id);
-    if (event.type === "approval.resolved" || event.type === "approval.cancelled") approvals.delete(event.requestId);
-    if (event.type === "run.started") {
-      runs.set(event.runId, {
-        ...omitUndefined({ version: event.checkpointVersion }),
-        pending: new Map(),
-        started: new Set(),
-      });
-    } else if (event.type === "assistant.completed") {
-      const run = runs.get(event.runId);
-      for (const call of event.message.toolCalls ?? []) {
-        const id = `${event.runId}:${event.step}:${call.id}`;
-        run?.pending.set(id, { id, runId: event.runId, step: event.step, call, status: "unknown" });
-      }
-    } else if (event.type === "tool.started") {
-      runs.get(event.runId)?.started.add(`${event.runId}:${event.step}:${event.call.id}`);
-    } else if (event.type === "tool.completed" || event.type === "tool.failed") {
-      runs.get(event.runId)?.pending.delete(`${event.runId}:${event.step}:${event.call.id}`);
-    } else if (
-      event.type === "run.completed" ||
-      event.type === "run.yielded" ||
-      event.type === "run.cancelled" ||
-      event.type === "run.interrupted"
-    ) {
-      runs.delete(event.runId);
-    } else if (event.type === "run.failed") {
-      // A failure can leave unclosed calls (e.g. a failed persistence barrier).
-      if (runs.get(event.runId)?.pending.size === 0) runs.delete(event.runId);
-    }
-  }
-  const repairs: SessionEventPayload[] = [...runs].map(([runId, run]) => ({
-    type: "run.interrupted",
-    runId,
-    recoveries: [...run.pending.values()].map((item) => ({
-      ...item,
-      status: run.version === 1 && !run.started.has(item.id) ? "not-started" : "unknown",
-    })),
-  }));
-  return [
-    ...repairs,
-    ...[...approvals].map((requestId) => ({
-      type: "approval.cancelled" as const,
-      requestId,
-      reason: "Process interrupted; approval was not restored",
-    })),
-  ];
-}
-
 interface Deferred<T> {
   readonly promise: Promise<T>;
   readonly resolve: (value: T | PromiseLike<T>) => void;
@@ -1281,10 +1136,6 @@ function createDeferred<T>(): Deferred<T> {
     reject = rejectPromise;
   });
   return { promise, resolve, reject };
-}
-
-function modelStepKey(runId: string, step: number): string {
-  return `${runId}:${step}`;
 }
 
 function validateToolPresentation(presentation: SessionToolPresentation): void {
@@ -1305,329 +1156,14 @@ function requirePositiveSafeInteger(value: number, name: string): void {
   }
 }
 
-function replaySession(events: readonly SessionEvent[]): {
-  messages: Message[];
-  info: SessionRuntimeInfo;
-} {
-  const messages: Message[] = [];
-  const steeringInputs = new Map<string, UserMessage>();
-  const pendingTools = new Map<string, Map<string, ToolCall>>();
-  const state: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-  let latestModelMeasurement: SessionModelMeasurement | undefined;
-  let runtime: RuntimeDescriptor | undefined;
-  let runtimeState: unknown;
-
-  for (const event of events) {
-    switch (event.type) {
-      case "session.created":
-        runtime = event.runtime ?? DEFAULT_RUNTIME_DESCRIPTOR;
-        break;
-      case "runtime.changed":
-        validateRuntimeDescriptor(event.runtime);
-        runtime = event.runtime;
-        runtimeState = structuredClone(event.state);
-        break;
-      case "runtime.state.saved":
-        if (runtime === undefined) throw new Error("Runtime state requires Session creation metadata");
-        validateRuntimeDescriptor(event.runtime);
-        if (
-          runtime.id !== event.runtime.id ||
-          runtime.version !== event.runtime.version ||
-          runtime.stateVersion !== event.runtime.stateVersion
-        )
-          throw new Error("Saved runtime state has an incompatible descriptor");
-        runtimeState = structuredClone(event.state);
-        break;
-      case "input.generated":
-        messages.push(...event.messages);
-        break;
-      case "state.updated":
-        state[event.key] = event.value;
-        break;
-      case "run.interrupted":
-        for (const recovery of event.recoveries) {
-          const error =
-            recovery.status === "not-started"
-              ? {
-                  code: "TOOL_NOT_EXECUTED",
-                  message: "The process stopped before this tool's execution checkpoint. The tool was not executed.",
-                }
-              : {
-                  code: "TOOL_OUTCOME_UNKNOWN",
-                  message:
-                    "The process stopped without a durable outcome. External effects may have occurred. Do not repeat this operation without verified recovery findings.",
-                };
-          messages.push({
-            role: "tool",
-            name: recovery.call.name,
-            toolCallId: recovery.call.id,
-            isError: true,
-            content: [{ type: "json", value: error }],
-          });
-        }
-        break;
-      case "recovery.resolved":
-        messages.push(event.message);
-        break;
-      case "input.submitted":
-        messages.push(event.message);
-        break;
-      case "input.steering.queued":
-        steeringInputs.set(event.input.inputId, event.input.message);
-        break;
-      case "input.steering.delivered":
-        for (const inputId of event.inputIds) {
-          const input = steeringInputs.get(inputId);
-          if (input === undefined) throw new Error(`Missing steering input: ${inputId}`);
-          messages.push(input);
-        }
-        break;
-      case "assistant.completed":
-        messages.push(event.message);
-        if (event.message.toolCalls !== undefined && event.message.toolCalls.length > 0) {
-          pendingTools.set(
-            modelStepKey(event.runId, event.step),
-            new Map(event.message.toolCalls.map((call) => [call.id, call])),
-          );
-        }
-        if (event.usage?.inputTokens !== undefined && event.contextMessageCount !== undefined) {
-          latestModelMeasurement = {
-            inputTokens: event.usage.inputTokens,
-            contextMessageCount: event.contextMessageCount,
-          };
-        }
-        break;
-      case "context.compacted":
-        messages.splice(0, messages.length, ...event.messages);
-        pendingTools.clear();
-        latestModelMeasurement = undefined;
-        break;
-      case "tool.completed":
-        messages.push({
-          role: "tool",
-          toolCallId: event.call.id,
-          name: event.call.name,
-          content: sessionToolResultContent(event),
-        });
-        resolvePendingTool(pendingTools, event.runId, event.step, event.call.id);
-        break;
-      case "tool.failed":
-        messages.push({
-          role: "tool",
-          toolCallId: event.call.id,
-          name: event.call.name,
-          content: [{ type: "json", value: event.error }],
-          isError: true,
-        });
-        resolvePendingTool(pendingTools, event.runId, event.step, event.call.id);
-        break;
-      case "run.cancelled":
-        for (const [key, calls] of pendingTools) {
-          if (!key.startsWith(`${event.runId}:`)) continue;
-          messages.push(...[...calls.values()].map((call) => toolCancellationMessage(call, event.reason)));
-          pendingTools.delete(key);
-        }
-        break;
-    }
-  }
-
-  // Outcomes are durable in completion order, but model messages follow call order.
-  for (let index = 0; index < messages.length; index++) {
-    const message = messages[index]!;
-    if (message.role !== "assistant" || !message.toolCalls?.length) continue;
-    const order = new Map(message.toolCalls.map((call, position) => [call.id, position]));
-    let end = index + 1;
-    while (messages[end]?.role === "tool") end++;
-    const results = messages.slice(index + 1, end);
-    results.sort(
-      (a, b) =>
-        (a.role === "tool" ? (order.get(a.toolCallId) ?? Infinity) : Infinity) -
-        (b.role === "tool" ? (order.get(b.toolCallId) ?? Infinity) : Infinity),
-    );
-    messages.splice(index + 1, results.length, ...results);
-  }
-  return {
-    messages,
-    info: omitUndefined({
-      latestModelMeasurement,
-      runtime,
-      runtimeState,
-      state: Object.keys(state).length === 0 ? undefined : state,
-    }),
-  };
-}
-
-function resolvePendingTool(
-  pending: Map<string, Map<string, ToolCall>>,
-  runId: string,
-  step: number,
-  toolCallId: string,
-): void {
-  const key = modelStepKey(runId, step);
-  const calls = pending.get(key);
-  if (calls === undefined) return;
-  calls.delete(toolCallId);
-  if (calls.size === 0) pending.delete(key);
-}
-
-function toPermissionSessionEvent(event: RecordablePermissionEvent): SessionEventPayload {
-  if (event.type === "rule.created") return { type: event.type, rule: structuredClone(event.rule) };
-  if (event.type === "rule.revoked") return { type: event.type, ruleId: event.ruleId, scopeId: event.scopeId };
-  if (event.type === "rule.used")
-    return {
-      type: event.type,
-      ruleId: event.ruleId,
-      scopeId: event.scopeId,
-      decision: event.decision,
-      runId: event.runId,
-      toolCallId: event.toolCallId,
-    };
-  if (event.type === "approval.requested") {
-    const request: SessionApprovalRequest = {
-      id: event.request.id,
-      createdAt: event.request.createdAt,
-      tool: event.request.tool,
-      input: event.request.input,
-      runId: event.request.context.runId,
-      step: event.request.context.step,
-      toolCallId: event.request.context.toolCallId,
-      idempotencyKey: event.request.context.idempotencyKey,
-      ...omitUndefined({ grantKey: event.request.grantKey }),
-    };
-    if (event.request.persistent !== undefined) request.persistent = structuredClone(event.request.persistent);
-    return { type: "approval.requested", request };
-  }
-  if (event.type === "approval.resolved") {
-    return {
-      type: "approval.resolved",
-      requestId: event.requestId,
-      decision: event.decision,
-    };
-  }
-  return omitUndefined({ type: "approval.cancelled", requestId: event.requestId, reason: event.reason });
-}
-
-function toSessionEvent(event: MayEvent): SessionEventPayload | undefined {
-  switch (event.type) {
-    case "input.generated":
-      return {
-        type: event.type,
-        runId: event.runId,
-        step: event.step,
-        messages: [...event.messages],
-        reason: event.reason,
-      };
-    case "run.budget.exceeded":
-      return {
-        type: event.type,
-        runId: event.runId,
-        dimension: event.dimension,
-        limit: event.limit,
-        consumed: event.consumed,
-        budget: event.budget,
-      };
-    case "tool.started":
-      return omitUndefined({
-        type: "tool.started",
-        runId: event.runId,
-        step: event.step,
-        call: event.call,
-        input: event.input,
-      });
-    case "run.started":
-      return event.continuation === true
-        ? { type: "run.started", runId: event.runId, continuation: true }
-        : { type: "run.started", runId: event.runId };
-    case "model.completed":
-      return omitUndefined({
-        type: "assistant.completed",
-        runId: event.runId,
-        step: event.step,
-        message: event.message,
-        usage: event.usage,
-        contextMessageCount: event.contextMessageCount,
-      });
-    case "tool.completed":
-      return {
-        type: "tool.completed",
-        runId: event.runId,
-        step: event.step,
-        call: event.call,
-        output: event.output,
-        content: event.content,
-      };
-    case "tool.failed":
-      return {
-        type: "tool.failed",
-        runId: event.runId,
-        step: event.step,
-        call: event.call,
-        error: event.error,
-      };
-    case "run.completed":
-      return {
-        type: "run.completed",
-        runId: event.runId,
-        result: event.result,
-      };
-    case "run.yielded":
-      return { type: "run.yielded", runId: event.runId, result: event.result };
-    case "run.failed":
-      return {
-        type: "run.failed",
-        runId: event.runId,
-        error: event.error,
-      };
-    case "run.cancelled":
-      return omitUndefined({ type: "run.cancelled", runId: event.runId, reason: event.reason });
-    default:
-      return undefined;
-  }
-}
-
 function assertSessionInputOptions(options: { readonly stepInputSource?: unknown }): void {
   if (options.stepInputSource !== undefined)
     throw new TypeError("Session manages step input through steer(); custom stepInputSource is unsupported");
 }
 
+/** @experimental */
 export function createSessionId(): string {
   return `session_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-}
-
-async function snapshotRuntimeState(runtime: AgentRuntime): Promise<unknown> {
-  const descriptor = runtime.descriptor;
-  if (descriptor === undefined || descriptor.stateVersion === undefined)
-    throw new Error("Stateful runtime requires a versioned descriptor");
-  validateRuntimeDescriptor(descriptor);
-  const state = await runtime.saveState!();
-  if (state === undefined) throw new Error("Stateful runtime must save an explicit state value");
-  return structuredClone(state);
-}
-
-/** Migrate, restore and re-snapshot saved runtime state for a newly created runtime instance. */
-async function adoptRuntimeState(
-  runtime: AgentRuntime,
-  saved: RuntimeDescriptor,
-  savedState: unknown,
-): Promise<{ state: unknown; migrated: boolean }> {
-  const current = runtime.descriptor ?? DEFAULT_RUNTIME_DESCRIPTOR;
-  validateRuntimeDescriptor(current);
-  const migrated = !runtimeDescriptorsEqual(saved, current);
-  let state = savedState;
-  if (migrated) {
-    if (runtime.migrateState === undefined) {
-      throw new Error(
-        `Session runtime ${saved.id}@${saved.version} is incompatible with ${current.id}@${current.version}`,
-      );
-    }
-    state = await runtime.migrateState(saved, state);
-  }
-  if (state !== undefined) {
-    if (runtime.restoreState === undefined) throw new Error("Runtime cannot restore saved Session state");
-    await runtime.restoreState(state);
-  }
-  if (runtime.saveState !== undefined) state = await snapshotRuntimeState(runtime);
-  return { state, migrated };
 }
 
 async function closeRejectedRuntime(runtime: AgentRuntime, error: unknown): Promise<never> {

@@ -286,6 +286,20 @@ subagents are disabled. Saved evidence remains under the ignored
 
 ## Security boundary
 
+MaybeCode permits `glob` and `grep` in the same read category as `read`. `fetch`
+uses the `network` category and requires approval in default mode. Network grants
+use the URL origin, so different paths on that origin share the grant. When
+`apps.maybecode.persistentRules` is enabled, network grants can be saved alongside
+file grants. YOLO automatically approves requests under the existing policy rules;
+explicit denials retain precedence. `allowedOrigins` and address checks continue
+to apply after approval.
+
+`apps.maybecode.execution` selects host or container execution for shell and
+search processes, delegated tools, and team checks. Container mode limits execution
+to the mounted workspace, disables network access, and enforces resource limits.
+The host `fetch` tool and MCP servers retain their own permission and network
+boundaries. See [execution configuration](../reference/configuration.md).
+
 Permissions answer **whether** a tool may execute. They do not constrain
 **what the process can affect** after it executes:
 

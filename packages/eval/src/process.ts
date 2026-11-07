@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { isAbsolute } from "node:path";
 import treeKill from "tree-kill";
 
+/** @experimental */
 export interface EvalCommand {
   readonly executable: string;
   readonly args: readonly string[];
@@ -9,6 +10,7 @@ export interface EvalCommand {
   readonly env?: Readonly<Record<string, string>>;
   readonly maxOutputBytes?: number;
 }
+/** @experimental */
 export interface CommandOutcome {
   readonly exitCode: number | null;
   readonly signal: string | null;
@@ -18,11 +20,13 @@ export interface CommandOutcome {
   readonly processId: number;
   readonly processTerminationConfirmed: boolean;
 }
+/** @experimental */
 export interface EvalProcess {
   readonly result: Promise<CommandOutcome>;
   cancel(): Promise<boolean>;
 }
 
+/** @experimental */
 export function startEvalProcess(command: EvalCommand, signal: AbortSignal): EvalProcess {
   signal.throwIfAborted();
   if (
@@ -83,7 +87,7 @@ export function startEvalProcess(command: EvalCommand, signal: AbortSignal): Eva
     return cancelPromise;
   };
   const abort = () => {
-    void cancel();
+    cancelPromise = cancel();
   };
   signal.addEventListener("abort", abort, { once: true });
   if (signal.aborted) abort();
@@ -110,6 +114,8 @@ export function startEvalProcess(command: EvalCommand, signal: AbortSignal): Eva
         processTerminationConfirmed: true,
       });
     });
+  }).finally(async () => {
+    await cancelPromise;
   });
   return {
     result,

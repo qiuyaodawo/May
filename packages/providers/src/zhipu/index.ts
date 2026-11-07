@@ -1,9 +1,13 @@
 import { omitUndefined } from "@sortedyuan/may/core";
 import { OpenAICompatibleChatModel } from "../openai-compatible/chat-model.js";
 
-/** Provider/model metadata determines concrete supported values. */
+/**
+ * Provider/model metadata determines concrete supported values.
+ * @experimental
+ */
 export type ZhipuReasoningEffort = string;
 
+/** @experimental */
 export interface ZhipuModelOptions {
   apiKey: string;
   model: string;
@@ -15,6 +19,7 @@ export interface ZhipuModelOptions {
   fetch?: typeof globalThis.fetch;
 }
 
+/** @experimental */
 export class ZhipuModel extends OpenAICompatibleChatModel {
   constructor(options: ZhipuModelOptions) {
     const { thinking = "enabled", clearThinking = false, maxTokens, ...shared } = options;

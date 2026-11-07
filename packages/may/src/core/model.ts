@@ -3,12 +3,14 @@ import type { ContextSnapshot } from "./context.js";
 import type { SerializedError } from "./events.js";
 import type { TraceContext } from "./tracing.js";
 
+/** @experimental */
 export interface ToolDefinition {
   readonly name: string;
   readonly description: string;
   readonly inputSchema: JsonSchema;
 }
 
+/** @experimental */
 export interface ModelRequest {
   readonly messages: readonly Message[];
   readonly tools: readonly ToolDefinition[];
@@ -16,15 +18,18 @@ export interface ModelRequest {
   readonly responseFormat?: ModelResponseFormat;
 }
 
+/** @experimental */
 export type ModelResponseFormat =
   | { readonly type: "json" }
   | { readonly type: "jsonSchema"; readonly name: string; readonly schema: JsonSchema; readonly strict?: boolean };
 
+/** @experimental */
 export interface ModelLimits {
   readonly contextWindowTokens?: number;
   readonly maxOutputTokens?: number;
 }
 
+/** @experimental */
 export interface ModelContextCompactionResult {
   readonly messages: readonly Message[];
   /** Provider-supplied effective size of the compacted model input. */
@@ -33,6 +38,7 @@ export interface ModelContextCompactionResult {
   readonly usage?: Usage;
 }
 
+/** @experimental */
 export interface ModelContextCompactor {
   readonly name: string;
   compact(
@@ -46,6 +52,7 @@ export interface ModelContextCompactor {
   ): Promise<ModelContextCompactionResult>;
 }
 
+/** @experimental */
 export type ModelEvent =
   | { type: "text.delta"; delta: string }
   | { type: "reasoning.delta"; delta: string }
@@ -66,6 +73,7 @@ export type ModelEvent =
       cost?: import("./pricing.js").UsageCost;
     };
 
+/** @experimental */
 export interface ModelStreamOptions {
   readonly purpose?: "generation" | "compaction";
   readonly recordRequest?: import("./request-recording.js").ModelRequestRecorder;
@@ -81,6 +89,7 @@ export interface ModelStreamOptions {
   readonly attemptObserver?: import("./telemetry.js").ModelAttemptObserver;
 }
 
+/** @public */
 export interface Model {
   readonly supportsRequestRecording?: boolean;
   readonly reportsAttempts?: boolean | undefined;

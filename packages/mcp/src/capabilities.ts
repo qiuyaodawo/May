@@ -44,6 +44,9 @@ export class McpCapabilities {
   private watchCount = 0;
   private readonly remoteWatches = new Map<string, McpSubscription>();
   private readonly watchChanges = new AsyncStateSerializer();
+  private readonly background = new Set<Promise<void>>();
+  private backgroundFailure: Error | undefined;
+  private closing: Promise<void> | undefined;
   private closed = false;
   private catalog: McpServerCatalog | undefined;
   private completionWindow = 0;
@@ -228,7 +231,7 @@ export class McpCapabilities {
         let ended = false;
         let closePromise: Promise<void> | undefined;
         const abort = () => {
-          void watch.close().catch(() => {});
+          this.own(watch.close());
         };
         const watch: Watch = {
           push: () => {
@@ -256,25 +259,50 @@ export class McpCapabilities {
         options.signal?.addEventListener("abort", abort, { once: true });
         if (remote !== undefined && existing === undefined) {
           this.remoteWatches.set(uri, remote);
-          void remote.closed.then(() => {
-            if (this.remoteWatches.get(uri) !== remote) return;
-            this.remoteWatches.delete(uri);
-            for (const watcher of [...(this.watches.get(uri) ?? [])]) watcher.finish("remote");
-          });
+          this.own(
+            remote.closed.then(() => {
+              if (this.remoteWatches.get(uri) !== remote) return;
+              this.remoteWatches.delete(uri);
+              for (const watcher of [...(this.watches.get(uri) ?? [])]) watcher.finish("remote");
+            }),
+          );
         }
-        if (options.signal?.aborted || this.closed) void watch.close().catch(() => {});
+        if (options.signal?.aborted || this.closed) this.own(watch.close());
         return { serverId: this.server.id, uri, events: queue, closed, close: watch.close };
       }),
     );
   }
 
-  async close(): Promise<void> {
+  close(): Promise<void> {
+    return (this.closing ??= this.closeOwned());
+  }
+
+  private async closeOwned(): Promise<void> {
     this.closed = true;
     this.invalidate();
-    // Connection shutdown owns the transport; handles finish locally without extra auth/network waits.
+    // Connection shutdown finishes local handles and awaits subscription cleanup.
     for (const watchers of this.watches.values()) for (const watch of [...watchers]) watch.finish("connection-closed");
+    const subscriptions = [...this.remoteWatches.values()];
     this.remoteWatches.clear();
+    const closed = await Promise.allSettled(subscriptions.map(async (subscription) => subscription.close()));
     await this.watchChanges.idle();
+    await Promise.all(this.background);
+    const failed = closed.find((result) => result.status === "rejected");
+    if (failed?.status === "rejected") throw failed.reason;
+    if (this.backgroundFailure !== undefined) throw this.backgroundFailure;
+  }
+
+  private own(operation: Promise<unknown>): void {
+    const task = operation.then(
+      () => {
+        this.background.delete(task);
+      },
+      (error: unknown) => {
+        this.backgroundFailure ??= error instanceof Error ? error : new Error(String(error));
+        this.background.delete(task);
+      },
+    );
+    this.background.add(task);
   }
 
   private async endWatch(uri: string, watch: Watch): Promise<void> {
@@ -297,6 +325,7 @@ export class McpCapabilities {
   }
 
   private require(capability: "resources" | "prompts" | "completions"): void {
+    if (this.backgroundFailure !== undefined) throw this.backgroundFailure;
     if (this.closed) this.invalid("connection is closed");
     if (this.catalog?.capabilities[capability] === undefined)
       this.invalid(`capability ${capability} is not supported`, "MCP_CAPABILITY_UNSUPPORTED");

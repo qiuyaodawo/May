@@ -1,4 +1,6 @@
-/** FIFO serializer. A rejected operation rejects its caller and later operations still run. */
+/** FIFO serializer. A rejected operation rejects its caller and later operations still run.
+ * @experimental
+ */
 export class AsyncStateSerializer {
   private tail: Promise<void> = Promise.resolve();
   private accepting = true;

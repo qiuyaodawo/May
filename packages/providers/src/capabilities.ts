@@ -11,12 +11,16 @@ import type { ProviderModelSelection } from "./types.js";
 
 export { MODEL_CAPABILITY_KEYS };
 export type { ModelCapabilityKey, ModelCapabilityDeclaration };
+/** @experimental */
 export type ModelCapabilitySource = "user" | "provider" | "builtin" | "adapter" | "unknown";
+/** @experimental */
 export type ModelCapabilityLayer = "model" | "adapter" | "connection";
+/** @experimental */
 export type CapabilityValue<T = ModelCapabilityDeclaration> =
   | { readonly status: "known"; readonly source: Exclude<ModelCapabilitySource, "unknown">; readonly value: T }
   | { readonly status: "unsupported"; readonly source: Exclude<ModelCapabilitySource, "unknown"> }
   | { readonly status: "unknown"; readonly source: "unknown" };
+/** @experimental */
 export type ReasoningEffortCapabilities =
   | {
       readonly status: "known";
@@ -26,12 +30,15 @@ export type ReasoningEffortCapabilities =
     }
   | { readonly status: "unsupported"; readonly source: Exclude<ModelCapabilitySource, "unknown"> }
   | { readonly status: "unknown"; readonly source: "unknown" };
+/** @experimental */
 export type ModelCapabilityFields = Readonly<Partial<Record<ModelCapabilityKey, CapabilityValue>>>;
+/** @experimental */
 export interface ModelCapabilityDiagnostic {
   readonly discovery: string;
   readonly code: "DISCOVERY_FAILED";
   readonly observedAt: number;
 }
+/** @experimental */
 export interface ModelCapabilities {
   readonly reasoningEffort: ReasoningEffortCapabilities;
   readonly fields?: ModelCapabilityFields;
@@ -41,6 +48,7 @@ export interface ModelCapabilities {
   readonly expiresAt?: number;
   readonly diagnostics?: readonly ModelCapabilityDiagnostic[];
 }
+/** @experimental */
 export interface ModelCapabilityDiscovery {
   readonly name?: string;
   discoverReasoningEffort?(selection: ProviderModelSelection): Promise<ReasoningEffortCapabilities | undefined>;
@@ -49,6 +57,7 @@ export interface ModelCapabilityDiscovery {
     fields?: readonly ModelCapabilityKey[],
   ): Promise<ModelCapabilityFields | undefined>;
 }
+/** @experimental */
 export interface ModelCapabilityResolverOptions {
   readonly fetch?: typeof globalThis.fetch;
   readonly discoveries?: readonly ModelCapabilityDiscovery[];
@@ -57,10 +66,12 @@ export interface ModelCapabilityResolverOptions {
   readonly maxVerificationRecords?: number;
   readonly adapterCapabilities?: Readonly<Record<string, ModelCapabilityFields>>;
 }
+/** @experimental */
 export interface ResolveModelCapabilitiesOptions {
   readonly fields?: readonly ModelCapabilityKey[];
   readonly refresh?: boolean;
 }
+/** @experimental */
 export interface ModelCapabilityVerificationRecord {
   readonly model: string;
   readonly adapter: string;
@@ -78,6 +89,7 @@ interface DiscoveryResult {
   readonly expiresAt: number;
   readonly diagnostics: readonly ModelCapabilityDiagnostic[];
 }
+/** @experimental */
 export class ModelCapabilityResolver {
   private readonly discoveries: readonly ModelCapabilityDiscovery[];
   private readonly ttl: number;
@@ -323,9 +335,11 @@ export class ModelCapabilityResolver {
     return omitUndefined({ fields, reasoningEffort, observedAt, expiresAt: observedAt + this.ttl, diagnostics });
   }
 }
+/** @experimental */
 export function createModelCapabilityResolver(options: ModelCapabilityResolverOptions = {}): ModelCapabilityResolver {
   return new ModelCapabilityResolver(options);
 }
+/** @experimental */
 export function connectionIdentity(selection: ProviderModelSelection): string {
   return digest({ provider: selection.provider, adapter: selection.adapter, config: selection.providerConfig });
 }
@@ -403,6 +417,7 @@ function intersectCapability(
   if (Array.isArray(value) && value.length === 0) return { status: "unsupported", source: concrete.at(-1)!.source };
   return { status: "known", source, value };
 }
+/** @experimental */
 export function builtinAdapterCapabilities(adapter: string): ModelCapabilityFields {
   if (adapter === "google-gemini")
     return Object.fromEntries(

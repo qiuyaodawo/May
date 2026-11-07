@@ -25,6 +25,13 @@ Web 服务资源在使用时加载。
 
 ## 选择相关检查
 
+- 构建之后，`pnpm api:check` 使用 `scripts/api-stability.json`、声明标注和 `api/`
+  报告校验公共导出。有意修改 API 后运行 `pnpm api:update`，审阅生成的差异。
+  详见 [API 稳定性](../reference/stability.md)。
+
+- `pnpm lint --max-warnings 0`：对每个 workspace package 和应用中 `src/` 下的
+  TypeScript 源文件执行带类型信息的 ESLint 检查。
+  ESLint 使用 TypeScript 5.9；`tsc -b` 使用 TypeScript 7。CI 在 Ubuntu 和 Node.js 24 上执行 lint。
 - `pnpm format`：使用 Prettier（`printWidth: 120`）格式化仓库；`pnpm format:check` 只报告
   未格式化的文件，不修改文件。CI 在 Linux 和 Node.js 24 上运行这项检查。
 - `pnpm docs:check`：检查双语文件配对、语言链接、本地目标文件和代码围栏配对。

@@ -15,6 +15,7 @@ import { HistoryReferenceMemory, type SavedNotes } from "./history-memory.js";
 import { createModelContextSummarizer } from "./summarizer.js";
 import type { AutoCompactionMode } from "./index.js";
 
+/** @experimental */
 export interface HistoryMemoryService {
   readonly memory: HistoryReferenceMemory;
   readonly manual: ContextCompactionStrategy;
@@ -23,12 +24,14 @@ export interface HistoryMemoryService {
   readonly native: ContextCompactionStrategy | undefined;
 }
 
+/** @experimental */
 export const historyMemoryService = defineService<HistoryMemoryService>({
   id: "may.history-memory",
   version: "1.0.0",
   scope: "application",
 });
 
+/** @experimental */
 export interface HistoryMemoryPluginOptions {
   readonly mode?: AutoCompactionMode;
   readonly budget?: ContextBudget | ((model: Model) => ContextBudget | undefined);
@@ -37,6 +40,7 @@ export interface HistoryMemoryPluginOptions {
   readonly autoCompactionStrategies?: readonly ContextCompactionStrategy[];
 }
 
+/** @experimental */
 export function createHistoryMemoryPlugin(options: HistoryMemoryPluginOptions = {}) {
   const mode = options.mode ?? "prune-summary";
   return definePlugin({
@@ -159,6 +163,7 @@ export function createHistoryMemoryPlugin(options: HistoryMemoryPluginOptions = 
   });
 }
 
+/** @experimental */
 export class PruneAndSummaryTailStrategy implements ContextCompactionStrategy {
   readonly name = "prune+summary-tail";
   private readonly prune = new PruneOldToolResultsStrategy();

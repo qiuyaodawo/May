@@ -8,10 +8,12 @@ import type { SkillDescriptor, SkillDocument } from "@sortedyuan/may/skills";
 import type { MaybeCodePermissionMode } from "./policy.js";
 import type { UiForkPoint, UiWorkspaceGit, UiCheckpoint, UiWorktree, UiWorkspaceDiff } from "@sortedyuan/ui-client";
 
+/** @experimental */
 export interface MaybeCodeSkillInfo extends SkillDescriptor {
   readonly active: boolean;
 }
 
+/** @experimental */
 export interface MaybeCodeModelInfo {
   readonly profile?: string;
   readonly provider: string;
@@ -19,6 +21,7 @@ export interface MaybeCodeModelInfo {
   readonly model: string;
 }
 
+/** @experimental */
 export interface MaybeCodeModelProfile {
   readonly name: string;
   readonly provider: string;
@@ -29,6 +32,7 @@ export interface MaybeCodeModelProfile {
   readonly reasoningEffort?: string;
 }
 
+/** @experimental */
 export interface MaybeCodeReasoningEffortState {
   readonly status: "known" | "unsupported" | "unknown";
   readonly source: "user" | "provider" | "builtin" | "adapter" | "unknown";
@@ -38,11 +42,14 @@ export interface MaybeCodeReasoningEffortState {
   readonly overridden: boolean;
 }
 
+/** @experimental */
 export type MaybeCodeAutoCompactionMode = "prune-summary" | "history-reference" | "provider-native";
 
+/** @experimental */
 export type MaybeCodeCompactionStrategyName =
   "prune-old-tool-results" | "summary-tail" | "history-reference" | "provider-native";
 
+/** @experimental */
 export type MaybeCodeCompactionSelection = MaybeCodeCompactionStrategyName | ContextCompactionStrategy;
 
 /**
@@ -67,6 +74,7 @@ type MaybeCodeProductEvent = Extract<
   | { type: "mcp.server.disconnected" }
 >;
 
+/** @experimental */
 export interface MaybeCodeController extends Omit<
   AgentWorkspaceController<MaybeCodeSessionEvent, MaybeCodeProductEvent, MaybeCodeCompactionSelection, MaybeCodeRun>,
   "forkSession"

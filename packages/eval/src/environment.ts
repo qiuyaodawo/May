@@ -3,11 +3,13 @@ import { copyFile, lstat, mkdir, readdir, readFile, realpath, rm } from "node:fs
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { EnvironmentPrepareContext, EvalEnvironmentAdapter, JsonValue, EvaluationTarget } from "./types.js";
 
+/** @experimental */
 export interface FileManifestEntry {
   readonly path: string;
   readonly bytes: number;
   readonly sha256: string;
 }
+/** @experimental */
 export interface LocalDirectoryEnvironmentOptions {
   readonly id?: string;
   readonly version?: string;
@@ -18,6 +20,7 @@ export interface LocalDirectoryEnvironmentOptions {
   readonly excludeNames?: readonly string[];
 }
 
+/** @experimental */
 export function createLocalDirectoryEnvironment(options: LocalDirectoryEnvironmentOptions): EvalEnvironmentAdapter {
   const maxFiles = positive(options.maxFiles ?? 10_000);
   const maxBytes = positive(options.maxBytes ?? 67_108_864);
@@ -104,6 +107,7 @@ export function createLocalDirectoryEnvironment(options: LocalDirectoryEnvironme
   };
 }
 
+/** @experimental */
 export async function readFileManifest(
   directory: string,
   signal: AbortSignal,
@@ -199,6 +203,7 @@ async function potentialPath(path: string): Promise<string> {
     return join(await potentialPath(parent), relative(parent, path));
   }
 }
+/** @experimental */
 export function within(root: string, path: string) {
   const name = relative(root, path);
   return name === "" || (!isAbsolute(name) && name !== ".." && !name.startsWith(`..${sep}`));

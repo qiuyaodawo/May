@@ -4,6 +4,7 @@ import { omitUndefined } from "@sortedyuan/may/core";
 import type { EvalExecutionAdapter, ExecutionCreateContext } from "./types.js";
 import { startEvalProcess, type CommandOutcome, type EvalCommand, type EvalProcess } from "./process.js";
 
+/** @experimental */
 export interface CommandExecutionAdapterOptions {
   readonly id: string;
   readonly version: string;
@@ -17,6 +18,7 @@ export interface CommandExecutionAdapterOptions {
   }) => boolean | Promise<boolean>;
 }
 
+/** @experimental */
 export function createCommandExecutionAdapter(options: CommandExecutionAdapterOptions): EvalExecutionAdapter {
   return {
     id: options.id,
@@ -76,6 +78,7 @@ export function createCommandExecutionAdapter(options: CommandExecutionAdapterOp
   };
 }
 
+/** @experimental */
 export interface NodeEvalCommand {
   readonly script: string;
   readonly args?: readonly string[];
@@ -84,6 +87,7 @@ export interface NodeEvalCommand {
   readonly maxOutputBytes?: number;
 }
 
+/** @experimental */
 export function createNodeCommandExecutionAdapter(options: {
   readonly id: string;
   readonly version: string;
@@ -99,6 +103,7 @@ export function createNodeCommandExecutionAdapter(options: {
   });
 }
 
+/** @experimental */
 export function nodeEvalCommand(command: NodeEvalCommand): EvalCommand {
   if (typeof command.script !== "string" || !isAbsolute(command.script) || command.script.includes("\0"))
     throw new TypeError("Node evaluation script must be an absolute path");

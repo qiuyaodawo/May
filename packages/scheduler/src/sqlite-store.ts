@@ -16,6 +16,7 @@ const SCHEMA_SQL = `CREATE TABLE scheduler_records (
   PRIMARY KEY (collection, id)
 ) STRICT`;
 
+/** @experimental */
 export class SqliteSchedulerStore implements SchedulerStore {
   readonly #database: DatabaseSync;
   readonly #ownership: DatabaseSync;

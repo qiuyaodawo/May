@@ -16,6 +16,7 @@ import { MayError, omitUndefined } from "@sortedyuan/may/core";
 import type { McpCredentialStore } from "./credentials.js";
 import type { McpHttpServerOptions } from "./types.js";
 
+/** @experimental */
 export interface McpOAuthOptions {
   readonly type: "oauth";
   /** User-selected credential profile; independent from May Session permissions. */
@@ -32,6 +33,7 @@ export interface McpOAuthOptions {
   readonly callbackPort?: number;
 }
 
+/** @experimental */
 export class McpAuthenticationError extends MayError {
   constructor(
     readonly serverId: string,
@@ -61,6 +63,7 @@ interface Credentials {
   grants: Record<string, Grant>;
 }
 
+/** @experimental */
 export interface McpLoginOptions {
   /** Host displays or opens this URL; it must never enter model/session/tracing data. */
   readonly onAuthorizationUrl: (url: URL) => void | Promise<void>;
@@ -68,7 +71,10 @@ export interface McpLoginOptions {
   readonly timeoutMs?: number;
 }
 
-/** Owns credentials and OAuth flows, not UI, model access, or tool authorization. */
+/**
+ * Owns credentials and OAuth flows, not UI, model access, or tool authorization.
+ * @experimental
+ */
 export class McpOAuthManager {
   constructor(readonly store: McpCredentialStore) {}
 
@@ -163,7 +169,9 @@ export class McpOAuthManager {
               }),
             );
             if (result === "REDIRECT") {
-              const parameters = await callback.result;
+              const received = await callback.result;
+              if (received.status === "rejected") throw received.reason;
+              const parameters = received.value;
               const discovery = await provider.discoveryState!();
               validateAuthorizationResponseIssuer({
                 iss: parameters.get("iss") ?? undefined,
@@ -452,6 +460,7 @@ function oauthSettings(server: McpHttpServerOptions): McpOAuthOptions {
   return server.auth;
 }
 
+/** @experimental */
 export function validateMcpOAuthOptions(value: McpOAuthOptions): void {
   if (value === null || typeof value !== "object" || value.type !== "oauth") throw new Error("auth.type must be oauth");
   const allowed = [
@@ -518,11 +527,11 @@ async function listenForCallback(state: string, port: number, signal: AbortSigna
   signal.throwIfAborted();
   let complete!: (params: URLSearchParams) => void;
   let fail!: (reason: unknown) => void;
-  const result = new Promise<URLSearchParams>((resolve, reject) => {
-    complete = resolve;
-    fail = reject;
+  const result = new Promise<PromiseSettledResult<URLSearchParams>>((resolve) => {
+    complete = (value) => resolve({ status: "fulfilled", value });
+    fail = (reason) => resolve({ status: "rejected", reason });
   });
-  void result.catch(() => {});
+  let closing: Promise<void> | undefined;
   let url = "";
   let consumed = false;
   const server = createServer((request, response) => {
@@ -574,7 +583,7 @@ async function listenForCallback(state: string, port: number, signal: AbortSigna
   url = `http://127.0.0.1:${address.port}/oauth/callback`;
   const abort = () => {
     fail(signal.reason);
-    void closeServer(server);
+    closing ??= closeServer(server);
   };
   signal.addEventListener("abort", abort, { once: true });
   if (signal.aborted) abort();
@@ -583,7 +592,7 @@ async function listenForCallback(state: string, port: number, signal: AbortSigna
     result,
     close: async () => {
       signal.removeEventListener("abort", abort);
-      await closeServer(server);
+      await (closing ??= closeServer(server));
     },
   };
 }

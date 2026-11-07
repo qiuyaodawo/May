@@ -41,18 +41,23 @@ interface WorkNotes {
   nextSteps: string;
   historyRefs?: number[];
 }
+/** @experimental */
 export interface SavedNotes {
   version: 1;
   notes: WorkNotes;
   coveredWorkSeq: number;
 }
+/** @experimental */
 export interface HistoryMemoryContextOptions {
   readonly includeInstructions?: boolean;
 }
+/** @experimental */
 export interface HistoryMemoryApplication
   extends Pick<ApplicationHistory, "history" | "listRecoveries">, ApplicationState {}
 
-/** 每个 application 拥有独立实例，持久状态归属于 Session。 */
+/** 每个 application 拥有独立实例，持久状态归属于 Session。
+ * @experimental
+ */
 export class HistoryReferenceMemory {
   private application: HistoryMemoryApplication | undefined;
   private controller: ContextController | undefined;

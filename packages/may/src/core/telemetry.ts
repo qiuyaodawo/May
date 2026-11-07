@@ -12,6 +12,7 @@ import {
   type Tracer,
 } from "./tracing.js";
 
+/** @experimental */
 export interface ModelAttemptEnd {
   readonly status: TraceSpanStatus;
   readonly error?: TraceError;
@@ -19,17 +20,20 @@ export interface ModelAttemptEnd {
   readonly completed?: boolean;
 }
 
+/** @experimental */
 export interface ModelAttemptHandle {
   readonly traceContext?: TraceContext;
   content(kind: "text" | "reasoning" | "tool" | "other"): void;
   end(options: ModelAttemptEnd): void;
 }
 
+/** @experimental */
 export interface ModelAttemptObserver {
   start(attempt: number): ModelAttemptHandle;
   retryWait?(durationMs: number): void;
 }
 
+/** @experimental */
 export function createModelAttemptObserver(options: {
   readonly tracer?: Tracer;
   readonly parent?: TraceContext;

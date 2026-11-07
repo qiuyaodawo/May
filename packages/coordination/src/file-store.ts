@@ -12,7 +12,9 @@ import { AsyncStateSerializer } from "@sortedyuan/may/core";
 import type { CoordinationJournal, CoordinationSnapshot, CoordinationStore } from "./types.js";
 import { copy, name, positive, validateSnapshot } from "./validation.js";
 
-/** Local single-writer JSONL journal. */
+/** Local single-writer JSONL journal.
+ * @experimental
+ */
 export class FileCoordinationStore implements CoordinationStore {
   readonly directory: string;
   constructor(

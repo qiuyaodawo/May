@@ -1,14 +1,19 @@
 import { omitUndefined } from "@sortedyuan/may/core";
 import { OpenAICompatibleChatModel } from "../openai-compatible/chat-model.js";
 
-/** Provider/model metadata determines concrete supported values. */
+/**
+ * Provider/model metadata determines concrete supported values.
+ * @experimental
+ */
 export type KimiReasoningEffort = string;
 
+/** @experimental */
 export interface KimiThinkingConfig {
   type: "enabled" | "disabled";
   keep?: "all" | null;
 }
 
+/** @experimental */
 export interface KimiModelOptions {
   apiKey: string;
   model: string;
@@ -19,6 +24,7 @@ export interface KimiModelOptions {
   fetch?: typeof globalThis.fetch;
 }
 
+/** @experimental */
 export class KimiModel extends OpenAICompatibleChatModel {
   constructor(options: KimiModelOptions) {
     const { thinking, maxTokens, ...shared } = options;

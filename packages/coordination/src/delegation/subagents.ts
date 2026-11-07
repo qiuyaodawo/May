@@ -1,11 +1,23 @@
 import { omitUndefined, resolveRunBudget, type RunBudget } from "@sortedyuan/may/core";
 import { MaybeCodeConfigError } from "./errors.js";
 
-/** 子 Agent 角色在共享工作区里可以使用的编码工具。 */
-export type SubagentToolName = "read" | "shell" | "edit" | "write";
+/** 子 Agent 角色在共享工作区里可以使用的编码工具。
+ * @experimental
+ */
+export type SubagentToolName = "read" | "shell" | "edit" | "write" | "glob" | "grep" | "fetch";
 
-export const SUBAGENT_TOOL_NAMES: readonly SubagentToolName[] = ["read", "shell", "edit", "write"];
+/** @experimental */
+export const SUBAGENT_TOOL_NAMES: readonly SubagentToolName[] = [
+  "read",
+  "shell",
+  "edit",
+  "write",
+  "glob",
+  "grep",
+  "fetch",
+];
 
+/** @experimental */
 export interface MaybeCodeSubagentRole {
   readonly name: string;
   readonly model?: string;
@@ -17,6 +29,7 @@ export interface MaybeCodeSubagentRole {
   readonly runBudget?: RunBudget;
 }
 
+/** @experimental */
 export interface MaybeCodeSubagentLimits {
   /** 同时运行的子任务数量，主请求所在轮次也占用名额。 */
   readonly maxConcurrent: number;
@@ -31,6 +44,7 @@ export interface MaybeCodeSubagentLimits {
   readonly maxOutputBytes: number;
 }
 
+/** @experimental */
 export interface MaybeCodeSubagentConfiguration {
   readonly roles: readonly MaybeCodeSubagentRole[];
   readonly defaultRole: string;
@@ -44,7 +58,9 @@ export interface MaybeCodeSubagentConfiguration {
   readonly reservationTokens: number;
 }
 
-/** 配置文件中经过 JSON Schema 校验的 `subagents` 对象。 */
+/** 配置文件中经过 JSON Schema 校验的 `subagents` 对象。
+ * @experimental
+ */
 export interface MaybeCodeSubagentSettings {
   readonly enabled?: boolean;
   readonly roles?: Readonly<Record<string, Omit<Partial<MaybeCodeSubagentRole>, "name">>>;
@@ -66,7 +82,9 @@ const DEFAULT_LIMITS: MaybeCodeSubagentLimits = {
   maxOutputBytes: 65_536,
 };
 
-/** 子 Run 缺省的步数上限；自定义子 Agent 预算省略 maxSteps 时使用。 */
+/** 子 Run 缺省的步数上限；自定义子 Agent 预算省略 maxSteps 时使用。
+ * @experimental
+ */
 export const SUBAGENT_DEFAULT_MAX_STEPS = 24;
 
 const DEFAULT_RUN_BUDGET: RunBudget = {
@@ -76,9 +94,12 @@ const DEFAULT_RUN_BUDGET: RunBudget = {
   maxDurationMs: 300_000,
 };
 
+/** @experimental */
 export const DEFAULT_SUBAGENT_ROLE = "worker";
 
-/** worker 角色始终注册，因此不配置也能进行委派。 */
+/** worker 角色始终注册，因此不配置也能进行委派。
+ * @experimental
+ */
 export function defaultSubagentConfiguration(): MaybeCodeSubagentConfiguration {
   return Object.freeze({
     roles: Object.freeze([
@@ -96,7 +117,9 @@ export function defaultSubagentConfiguration(): MaybeCodeSubagentConfiguration {
   });
 }
 
-/** 由已校验的 `apps.maybecode.subagents` 得到委派配置；false 完全关闭委派。 */
+/** 由已校验的 `apps.maybecode.subagents` 得到委派配置；false 完全关闭委派。
+ * @experimental
+ */
 export function resolveSubagentConfiguration(
   settings: false | MaybeCodeSubagentSettings | undefined,
 ): false | MaybeCodeSubagentConfiguration {

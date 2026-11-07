@@ -40,6 +40,7 @@ const gradingSchema: JsonSchema = {
   },
 };
 
+/** @experimental */
 export interface ModelEvaluatorOptions {
   readonly id?: string;
   readonly version: string;
@@ -60,6 +61,7 @@ interface ModelGrade {
   readonly rationale: string;
 }
 
+/** @experimental */
 export function createModelEvaluator(options: ModelEvaluatorOptions): EvalEvaluator {
   if (
     ![options.version, options.modelId, options.promptVersion, options.rules].every(

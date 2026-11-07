@@ -2,7 +2,8 @@ import { createHash } from "node:crypto";
 import { lstat, open, readFile, readdir, realpath, stat } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { defineAgent } from "@sortedyuan/may";
-import { createReadTool } from "@sortedyuan/coding-tools";
+import { createReadTool, createGlobTool, createGrepTool } from "@sortedyuan/coding-tools";
+import { TeamExecutionEnvironments } from "./team-execution.js";
 import { loadMayConfig } from "@sortedyuan/may/config";
 import {
   CoordinationRuntime,
@@ -117,6 +118,7 @@ async function runLegacyMaybeCodeTeamCommand(
   const config = await (dependencies.loadConfig ?? loadMayConfig)({ path: manifest.configPath });
   const selected = selectMaybeCodeModel(config, { model: manifest.model });
   const recording = resolveMaybeCodeRecording(config);
+  const executionEnvironments = new TeamExecutionEnvironments(readMaybeCodeSettings(config).execution);
   if (fingerprint(selected) !== manifest.modelFingerprint)
     throw new Error("Team model configuration changed; restore the original profile before resuming");
   // Explicit limits replace no caller defaults: resolveRunBudget keeps configured limits non-loosening.
@@ -148,9 +150,31 @@ async function runLegacyMaybeCodeTeamCommand(
   let relay: Promise<void> | undefined;
   let cancellationTimer: ReturnType<typeof setInterval> | undefined;
   let cancelling: Promise<void> | undefined;
+  const backgroundTasks = new Set<Promise<void>>();
+  const backgroundErrors: unknown[] = [];
+  let failBackground!: (error: unknown) => void;
+  const backgroundFailed = new Promise<unknown>((resolve) => {
+    failBackground = resolve;
+  });
+  const trackBackground = (operation: Promise<void>): void => {
+    const task = operation.then(
+      () => {
+        backgroundTasks.delete(task);
+      },
+      (error) => {
+        backgroundTasks.delete(task);
+        backgroundErrors.push(error);
+        failBackground(error);
+        cancel();
+      },
+    );
+    backgroundTasks.add(task);
+  };
   const cancel = () => {
-    if (runtime) cancelling ??= runtime.cancel(`cancel-${id}`);
-    void cancelling?.catch(() => undefined);
+    if (runtime && !cancelling) {
+      cancelling = runtime.cancel(`cancel-${id}`);
+      trackBackground(cancelling);
+    }
   };
   try {
     artifacts = await FileArtifactStore.open(join(directory, "artifacts"), id, {
@@ -170,8 +194,9 @@ async function runLegacyMaybeCodeTeamCommand(
     });
     const store = new FileSessionStore(join(directory, "sessions"));
     const createRole = (role: "supervisor" | "worker"): CoordinationAgent => {
-      const adapter = (execution: TaskExecution, workspace: string) =>
-        createApplicationAgent({
+      const adapter = async (execution: TaskExecution, workspace: string) => {
+        const environment = await executionEnvironments.get(workspace);
+        return createApplicationAgent({
           version: VERSION,
           store,
           delegation: role === "supervisor",
@@ -183,6 +208,8 @@ async function runLegacyMaybeCodeTeamCommand(
               instructions: roleInstructions(role),
               tools: [
                 createReadTool({ cwd: workspace, maxBytes: 262_144, maxLines: 160 }),
+                createGlobTool({ cwd: workspace, execution: environment }),
+                createGrepTool({ cwd: workspace, execution: environment }),
                 createListTool(workspace),
                 ...artifacts!.forTask(execution.task.id).tools(),
                 ...tools,
@@ -192,6 +219,8 @@ async function runLegacyMaybeCodeTeamCommand(
               permissionPolicy: (check) =>
                 [
                   "read",
+                  "glob",
+                  "grep",
                   "list_files",
                   "publish_artifact",
                   "read_artifact",
@@ -203,6 +232,7 @@ async function runLegacyMaybeCodeTeamCommand(
                   : "deny",
             }),
         });
+      };
       const publish = async (execution: TaskExecution, output: { readonly text: string }) => {
         await artifacts!
           .forTask(execution.task.id)
@@ -216,12 +246,12 @@ async function runLegacyMaybeCodeTeamCommand(
         version: VERSION,
         async execute(execution, context) {
           const isolated = await workspaces!.prepare(execution.task.id);
-          const result = await adapter(execution, isolated.directory).execute(execution, context);
+          const result = await (await adapter(execution, isolated.directory)).execute(execution, context);
           if (!("yielded" in result)) await publish(execution, result);
           return result;
         },
         async recover(execution) {
-          const result = await adapter(execution, manifest.workspace).recover(execution);
+          const result = await (await adapter(execution, manifest.workspace)).recover(execution);
           if (result.status === "completed") await publish(execution, result.output);
           return result;
         },
@@ -263,7 +293,7 @@ async function runLegacyMaybeCodeTeamCommand(
         } else if (event.type === "runtime.failed") write("Team runtime failed; inspect its local recovery records.\n");
       }
     })();
-    void relay.catch(cancel);
+    trackBackground(relay);
     const checkCancellation = async () => {
       const path = join(directory, "cancel.request.json");
       try {
@@ -280,10 +310,15 @@ async function runLegacyMaybeCodeTeamCommand(
     await checkCancellation();
     if (dependencies.signal?.aborted) cancel();
     cancellationTimer = setInterval(() => {
-      void checkCancellation().catch(cancel);
+      trackBackground(checkCancellation());
     }, 300);
     await cancelling;
-    const result = await runtime.wait();
+    const result = await Promise.race([
+      runtime.wait(),
+      backgroundFailed.then((error) => {
+        throw error;
+      }),
+    ]);
     await cancelling;
     await writeStatus(directory, result);
     const summary = result.tasks.find((task) => task.id === "summary");
@@ -302,10 +337,17 @@ async function runLegacyMaybeCodeTeamCommand(
     if (cancellationTimer) clearInterval(cancellationTimer);
     dependencies.signal?.removeEventListener("abort", cancel);
     try {
-      await runtime?.close();
-      await relay;
+      const results = await Promise.allSettled([...(runtime ? [runtime.close()] : []), ...(relay ? [relay] : [])]);
+      while (backgroundTasks.size) await Promise.all(backgroundTasks);
+      const failures = [
+        ...new Set([
+          ...backgroundErrors,
+          ...results.flatMap((result) => (result.status === "rejected" ? [result.reason] : [])),
+        ]),
+      ];
+      if (failures.length) throw new AggregateError(failures, "Team background operations failed");
     } finally {
-      await Promise.all([workspaces?.close(), artifacts?.close(), ledger.close()]);
+      await Promise.all([workspaces?.close(), artifacts?.close(), ledger.close(), executionEnvironments.close()]);
     }
   }
 }

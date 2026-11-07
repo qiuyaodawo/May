@@ -2,8 +2,10 @@ import type { AgentApplicationEvent } from "@sortedyuan/may";
 import type { ContentPart, Tool, UserMessage } from "@sortedyuan/may/core";
 import type { ApprovalDecision, PersistentApprovalOptions } from "@sortedyuan/may/permissions";
 
+/** @experimental */
 export type AgentTaskStatus =
   "queued" | "running" | "waiting" | "cancelling" | "completed" | "failed" | "cancelled" | "recovery-required";
+/** @experimental */
 export interface AgentCapabilities {
   cancel: boolean;
   steer: boolean;
@@ -13,6 +15,7 @@ export interface AgentCapabilities {
   collaboration: boolean;
   media: readonly string[];
 }
+/** @experimental */
 export interface AgentAdapterContext {
   readonly telemetry?: import("@sortedyuan/may/core").TelemetryCorrelation;
   conversationId: string;
@@ -24,6 +27,7 @@ export interface AgentAdapterContext {
   report: (event: AgentApplicationEvent) => void;
   readonly permissionScope?: string;
 }
+/** @experimental */
 export interface AgentAdapter {
   readonly capabilities: AgentCapabilities;
   modelCapabilities?(refresh?: boolean): Promise<unknown>;
@@ -59,18 +63,24 @@ export interface AgentAdapter {
   command?(conversationId: string, name: string, args: readonly string[]): Promise<string>;
   close(): Promise<void>;
 }
+/** @experimental */
 export interface AgentAdapterConfig {
   readonly id: string;
   readonly module: string;
   readonly export?: string;
   readonly options?: Record<string, unknown>;
 }
+/** @experimental */
 export interface AgentAdapterRegistry {
   get(id: string): Promise<AgentAdapter>;
   release(id: string): Promise<void>;
   list(): readonly string[];
 }
+/** @experimental */
 export type GatewayAgentAdapter = AgentAdapter;
+/** @experimental */
 export type GatewayAdapterContext = AgentAdapterContext;
+/** @experimental */
 export type GatewayCapabilities = AgentCapabilities;
+/** @experimental */
 export type GatewayTaskStatus = AgentTaskStatus;

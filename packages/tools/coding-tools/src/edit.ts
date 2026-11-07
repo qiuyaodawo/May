@@ -6,8 +6,10 @@ import { assertTextWithinLimit, readTextFile } from "./text-file.js";
 import { resolveExistingWorkspacePath } from "./workspace-path.js";
 import { assertFileExistence, type WorkspaceFileGuard } from "./guard.js";
 
+/** @experimental */
 export const DEFAULT_EDIT_MAX_BYTES = 1024 * 1024;
 
+/** @experimental */
 export interface EditToolOptions {
   readonly cwd: string;
   readonly maxBytes?: number;
@@ -16,17 +18,20 @@ export interface EditToolOptions {
   readonly guard?: WorkspaceFileGuard;
 }
 
+/** @experimental */
 export interface EditToolInput {
   readonly path: string;
   readonly oldText: string;
   readonly newText: string;
 }
 
+/** @experimental */
 export interface EditToolOutput {
   readonly path: string;
   readonly replacements: 1;
 }
 
+/** @experimental */
 export function createEditTool(options: EditToolOptions): Tool<EditToolInput, EditToolOutput> {
   const maxBytes = requirePositiveIntegerOption(options.maxBytes, DEFAULT_EDIT_MAX_BYTES, "maxBytes");
 

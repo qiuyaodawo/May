@@ -55,6 +55,7 @@ class PhaseLimitError extends Error {
     this.name = "PhaseLimitError";
   }
 }
+/** @experimental */
 export class EvalRunner {
   private readonly registry: EvalRegistry;
   private readonly store: EvalStore;
@@ -871,6 +872,7 @@ export class EvalRunner {
   }
 }
 
+/** @experimental */
 export function resolveTaskVerdict(
   item: EvalCase,
   revisions: readonly EvaluationRevision[],

@@ -15,6 +15,7 @@ export function maybeCodeRuntimeInstructions(environment: MaybeCodeRuntimeEnviro
   return codingRuntimeInstructions(
     omitUndefined({
       workspace,
+      execution: options.execution,
       shell,
       agentRole: "main agent",
       sessionOrigin: environment.historicalBranch

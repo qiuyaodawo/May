@@ -6,6 +6,7 @@ import type { PointerEvent, RenderSize } from "./component.js";
 import type { TerminalWriter } from "./renderer.js";
 import { TerminalImageSupport } from "./image-support.js";
 
+/** @experimental */
 export interface TerminalInput extends NodeJS.ReadableStream {
   readonly isTTY?: boolean;
   readonly isRaw?: boolean;
@@ -14,12 +15,14 @@ export interface TerminalInput extends NodeJS.ReadableStream {
   unref?(): this;
 }
 
+/** @experimental */
 export interface TerminalOutput extends NodeJS.WritableStream {
   readonly isTTY?: boolean;
   readonly columns?: number;
   readonly rows?: number;
 }
 
+/** @experimental */
 export interface NodeTerminalDriverOptions {
   readonly input?: TerminalInput;
   readonly output?: TerminalOutput;
@@ -34,6 +37,7 @@ const BRACKETED_PASTE_START = Buffer.from("\x1b[200~");
 const BRACKETED_PASTE_END = Buffer.from("\x1b[201~");
 const ESCAPE_PREFIX_TIMEOUT_MS = 25;
 
+/** @experimental */
 export class NodeTerminalDriver implements TerminalWriter {
   readonly imageSupport: TerminalImageSupport;
   private readonly input: TerminalInput;

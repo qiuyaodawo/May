@@ -30,7 +30,7 @@ test("completes suggestions and redraws an active prompt around output", async (
   assert.ok(suggestionInputs.includes("/re"));
   assert.match(output(), /\/retry  Retry/u);
   assert.match(output(), /status update\n> \/retry/u);
-  terminal.close();
+  await terminal.close();
 });
 
 test("keeps temporary answers out of history and normalizes standalone keys", async () => {
@@ -57,7 +57,48 @@ test("keeps temporary answers out of history and normalizes standalone keys", as
     meta: false,
     text: "d",
   });
-  terminal.close();
+  await terminal.close();
+});
+
+test("close waits for an active suggestion provider", async () => {
+  const { terminal, input } = createTestTerminal();
+  const provider = Promise.withResolvers();
+  const started = Promise.withResolvers();
+  const answer = terminal.question("> ", {
+    suggestions() {
+      started.resolve();
+      return provider.promise;
+    },
+  });
+  const interrupted = assert.rejects(answer, { name: "AbortError" });
+  await tick();
+  input.write("a");
+  await started.promise;
+  let finished = false;
+  const closing = terminal.close().then(() => {
+    finished = true;
+  });
+  await interrupted;
+  await tick();
+  assert.equal(finished, false);
+  provider.resolve([]);
+  await closing;
+  assert.equal(finished, true);
+});
+
+test("suggestion failures interrupt input and propagate through close", async () => {
+  const { terminal, input } = createTestTerminal();
+  const failure = new Error("Completion provider failed");
+  const answer = terminal.question("> ", {
+    async suggestions() {
+      throw failure;
+    },
+  });
+  const interrupted = assert.rejects(answer, { name: "AbortError" });
+  await tick();
+  input.write("a");
+  await interrupted;
+  await assert.rejects(terminal.close(), (error) => error instanceof AggregateError && error.errors.includes(failure));
 });
 
 function createTestTerminal() {

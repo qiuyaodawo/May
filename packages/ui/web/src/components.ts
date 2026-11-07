@@ -89,8 +89,10 @@ export const statusLabel = (status: string): string =>
 
 /** Trusted host-application extensions, never JavaScript supplied by an agent event.
  * Extensions add content; the shell owns status labels, raw evidence and decision controls.
+ * @experimental
  */
 export type WebUiRenderer<T> = (value: T, context?: WebUiContext) => HTMLElement | null;
+/** @experimental */
 export interface WebUiExtensions {
   readonly presentations?: Readonly<Record<string, Readonly<Record<number, WebUiRenderer<UiBlock>>>>>;
   readonly tools?: Readonly<Record<string, WebUiRenderer<UiBlock>>>;
@@ -98,6 +100,7 @@ export interface WebUiExtensions {
   readonly diagnostics?: Readonly<Record<string, WebUiRenderer<UiDiagnostic>>>;
   readonly panels?: Readonly<Record<string, WebUiRenderer<UiPanel>>>;
 }
+/** @experimental */
 export interface WebUiContext {
   readonly state: UiClientState;
   readonly command: UiClient["command"];
@@ -215,6 +218,7 @@ const statusHint = (status?: string) =>
         ? "宿主记录此调用未执行。"
         : "";
 
+/** @experimental */
 export function transcriptBlock(block: UiBlock, extensions: WebUiExtensions = {}, context?: WebUiContext): HTMLElement {
   const article = element("article", `message message-${block.kind}`);
   article.dataset.id = block.id;
@@ -320,6 +324,7 @@ export function transcriptBlock(block: UiBlock, extensions: WebUiExtensions = {}
   return article;
 }
 
+/** @experimental */
 export function approvalCard(
   interaction: UiInteraction,
   decide: (value: string) => void,
@@ -346,6 +351,7 @@ export function approvalCard(
   section.append(actions);
   return section;
 }
+/** @experimental */
 export function detailPanel(panel: UiPanel): HTMLElement {
   const section = element("section", "detail-section");
   section.append(element("h3", "", panel.title));

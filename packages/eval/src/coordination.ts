@@ -5,6 +5,7 @@ import { type EvalApprovalHandler, errorCode, waitWithSignal } from "./applicati
 import { EvalTelemetryCollector, evalIdentities, evalMetrics } from "./telemetry.js";
 import { EvalTrialBudget } from "./agent-budget.js";
 
+/** @experimental */
 export interface CoordinationExecutionAdapterOptions {
   readonly id?: string;
   readonly version: string;
@@ -19,6 +20,7 @@ export interface CoordinationExecutionAdapterOptions {
 
 export { EvalTrialBudget } from "./agent-budget.js";
 
+/** @experimental */
 export function createCoordinationExecutionAdapter(options: CoordinationExecutionAdapterOptions): EvalExecutionAdapter {
   if (!options.version.trim()) throw new TypeError("Coordination adapter version is required");
   return {

@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { UiError } from "./protocol.js";
 
+/** @experimental */
 export class BrowserLogin {
   private readonly tickets = new Map<string, number>();
 

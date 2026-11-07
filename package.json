@@ -6,6 +6,7 @@
     "node": ">=22.16.0"
   },
   "scripts": {
+    "lint": "eslint .",
     "build": "tsc -b && node scripts/build-maybecode.mjs && node scripts/write-config-schema.mjs maybecode && node scripts/write-config-schema.mjs maybeclaw",
     "clean": "tsc -b --clean",
     "format": "prettier --write .",
@@ -15,6 +16,9 @@
     "changeset": "changeset",
     "release:status": "node scripts/check-release.mjs && changeset status",
     "release:check": "node scripts/check-release.mjs",
+    "release:registry": "node scripts/check-registry-release.mjs",
+    "api:check": "node scripts/check-api.mjs",
+    "api:update": "node scripts/check-api.mjs --update",
     "test:package:release": "node scripts/test-release-packages.mjs",
     "test": "pnpm -r --no-bail --if-present run test && pnpm run test:locks",
     "test:locks": "node --test scripts/test-file-locks.mjs",
@@ -42,17 +46,22 @@
   },
   "devDependencies": {
     "@changesets/cli": "3.0.3",
+    "@microsoft/api-extractor": "^7.60.1",
     "@sortedyuan/coding-tools": "workspace:*",
     "@sortedyuan/may": "workspace:*",
     "@sortedyuan/observability": "workspace:*",
     "@sortedyuan/providers": "workspace:*",
+    "@types/node": "22.20.1",
     "esbuild": "^0.28.2",
+    "eslint": "^10.14.0",
     "mdast-util-from-markdown": "^2.1.0",
     "mdast-util-gfm": "^3.1.0",
     "micromark-extension-gfm": "^3.0.0",
     "prettier": "3.9.10",
     "semver": "7.8.5",
     "tar": "7.5.22",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "typescript-api": "npm:typescript@5.9.3",
+    "zod": "^4.6.7"
   }
 }

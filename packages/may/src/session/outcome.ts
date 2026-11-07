@@ -2,27 +2,33 @@ import type { RunResult, SerializedError } from "../core/index.js";
 import type { SessionEvent } from "./events.js";
 import { validateSessionHistory } from "./store.js";
 
+/** @experimental */
 export type SessionRunSelector =
   | { readonly runId: string }
   | { readonly inputId: string }
   | { readonly inputSeq: number }
   | { readonly continuationId: string };
 
+/** @experimental */
 export type SessionRunOutcome =
   | { readonly status: "not-started" }
   | { readonly status: "completed"; readonly result: RunResult }
   | { readonly status: "yielded"; readonly result: RunResult }
   | { readonly status: "failed" | "cancelled" | "recovery-required"; readonly detail: string };
 
+/** @experimental */
 export function isSessionRunTerminalEvent(event: { readonly type: string }): boolean {
   return ["run.completed", "run.yielded", "run.failed", "run.cancelled", "run.interrupted"].includes(event.type);
 }
 
+/** @experimental */
 export function sessionToolFailureHasUnknownEffects(error: Pick<SerializedError, "name" | "code">): boolean {
   return /CANCEL|ABORT|UNKNOWN/iu.test(`${error.code ?? ""} ${error.name}`);
 }
 
-/** 根据持久身份查询一个 Run；查询本身只读取事件。 */
+/** 根据持久身份查询一个 Run；查询本身只读取事件。
+ * @experimental
+ */
 export function inspectSessionRunOutcome(
   history: readonly SessionEvent[],
   selector: SessionRunSelector,

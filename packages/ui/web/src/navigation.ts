@@ -1,6 +1,8 @@
 import type { UiClientState } from "@sortedyuan/ui-client";
 import { button, element, icon, type WebUiContext } from "./components.js";
+import { createUiTasks } from "./tasks.js";
 
+/** @experimental */
 export interface WebUiNavigationItem {
   readonly id: string;
   readonly label: string;
@@ -27,29 +29,37 @@ export interface WebUiNavigationItem {
   action(context: WebUiContext): void | Promise<void>;
 }
 
+/** @experimental */
 export interface WebUiNavigationGroup {
   readonly id?: string;
   readonly title?: string;
   readonly items: readonly WebUiNavigationItem[];
 }
 
+/** @experimental */
 export interface WebUiNavigationLifecycle {
   update?(state: UiClientState): void;
-  dispose?(): void;
+  dispose?(): void | Promise<void>;
 }
 
+/** @experimental */
 export interface WebUiNavigation {
   readonly groups?: readonly WebUiNavigationGroup[];
-  render?(container: HTMLElement, context: WebUiContext): WebUiNavigationLifecycle | (() => void) | void;
+  render?(
+    container: HTMLElement,
+    context: WebUiContext,
+  ): WebUiNavigationLifecycle | (() => void | Promise<void>) | void;
 }
 
+/** @experimental */
 export function createNavigation(
   navigation: WebUiNavigation | readonly WebUiNavigationGroup[],
   getContext: () => WebUiContext,
   onAfterAction?: () => void,
   onError?: (error: unknown) => void,
-): { root: HTMLElement; update(state: UiClientState): void; dispose(): void } {
+): { root: HTMLElement; update(state: UiClientState): void; dispose(): Promise<void> } {
   const root = element("nav", "sidebar-navigation");
+  const tasks = createUiTasks(onError);
   root.setAttribute("aria-label", "服务与功能管理");
 
   const groups: readonly WebUiNavigationGroup[] = Array.isArray(navigation)
@@ -73,10 +83,7 @@ export function createNavigation(
           try {
             const result = item.action(getContext());
             if (result && typeof (result as Promise<void>).then === "function") {
-              void (result as Promise<void>).catch((error) => {
-                if (onError) onError(error);
-                else throw error;
-              });
+              tasks.run(result as Promise<void>);
             }
           } catch (error) {
             if (onError) onError(error);
@@ -115,6 +122,7 @@ export function createNavigation(
   }
 
   let disposed = false;
+  let closing: Promise<void> | undefined;
   return {
     root,
     update(state: UiClientState): void {
@@ -136,17 +144,18 @@ export function createNavigation(
         else throw error;
       }
     },
-    dispose(): void {
-      if (disposed) return;
-      disposed = true;
-      try {
-        customLifecycle?.dispose?.();
-      } catch (error) {
-        if (onError) onError(error);
-        else throw error;
-      }
-      customLifecycle = undefined;
-      root.remove();
+    dispose(): Promise<void> {
+      return (closing ??= (async () => {
+        disposed = true;
+        const lifecycle = customLifecycle;
+        customLifecycle = undefined;
+        root.remove();
+        const results = await Promise.allSettled([Promise.resolve().then(() => lifecycle?.dispose?.()), tasks.close()]);
+        const errors = results
+          .filter((result) => result.status === "rejected")
+          .map((result) => result.reason as unknown);
+        if (errors.length) throw new AggregateError(errors, "Web UI navigation shutdown failed");
+      })());
     },
   };
 }

@@ -1,10 +1,12 @@
 import type { ModelCapabilitiesOverride, ProviderConfig } from "@sortedyuan/may/config";
 import type { Model, ModelLimits } from "@sortedyuan/may/core";
 
+/** @experimental */
 export interface ModelProfileSelector {
   readonly model?: string;
 }
 
+/** @experimental */
 export interface ProviderModelSelection {
   readonly profile: string;
   readonly provider: string;
@@ -16,6 +18,7 @@ export interface ProviderModelSelection {
   readonly limits?: ModelLimits;
 }
 
+/** @experimental */
 export interface ProviderAdapterFactory {
   create(selection: ProviderModelSelection): Model;
 }

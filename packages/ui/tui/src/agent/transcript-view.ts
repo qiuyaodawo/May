@@ -26,6 +26,7 @@ import type {
 } from "./transcript-store.js";
 import { createCodingToolRendererRegistry, type ToolRendererRegistry } from "./tool-renderers.js";
 
+/** @experimental */
 export interface TranscriptViewOptions {
   readonly keybindings?: readonly KeyBindingDefinition[];
   readonly images?: TerminalImages;
@@ -44,6 +45,7 @@ export interface TranscriptViewOptions {
   readonly toolDetailsHint?: string;
 }
 
+/** @experimental */
 export const TRANSCRIPT_KEYBINDINGS: readonly KeyBindingDefinition[] = [
   { context: "transcript", keys: "j", action: "tool.next" },
   { context: "transcript", keys: "k", action: "tool.previous" },
@@ -51,6 +53,7 @@ export const TRANSCRIPT_KEYBINDINGS: readonly KeyBindingDefinition[] = [
   { context: "transcript", keys: "space", action: "tool.toggle" },
 ];
 
+/** @experimental */
 export class TranscriptView implements InteractiveComponent, FocusTarget {
   private readonly keymap: Keymap;
   private textRows: readonly (TextRow | undefined)[] = [];
@@ -514,6 +517,7 @@ interface TranscriptItemViewOptions {
   readonly toolDetailsHint: string;
 }
 
+/** @experimental */
 export class TranscriptItemView implements Component {
   constructor(
     private readonly item: TranscriptItem,

@@ -24,6 +24,8 @@ export function createCodingPermissionPolicy(
       options.readOnly &&
       ![
         "read",
+        "glob",
+        "grep",
         "skill_read",
         "session_history",
         "session_history_search",
@@ -36,6 +38,17 @@ export function createCodingPermissionPolicy(
     )
       return "deny";
     let decision = await policy(check);
+    if (options.persistent && check.tool.name === "fetch" && options.policy === undefined) {
+      const url = stringField(check.input, "url");
+      if (url !== undefined) {
+        const origin = new URL(url).origin;
+        decision = {
+          decision: "ask",
+          grantKey: `network:${origin}`,
+          persistent: { scopeId: options.persistent.scopeId, description: `network · ${origin}` },
+        };
+      }
+    }
     if (options.persistent && ["read", "edit", "write"].includes(check.tool.name)) {
       const path = stringField(check.input, "path");
       if (path !== undefined) {
@@ -84,6 +97,8 @@ function defaultCodingPermission(check: PermissionCheck): PermissionDecision {
   if (
     [
       "read",
+      "glob",
+      "grep",
       "skill_read",
       "session_history",
       "session_history_search",
@@ -121,6 +136,11 @@ function defaultCodingPermission(check: PermissionCheck): PermissionDecision {
       decision: "ask",
       grantKey: `mcp:${check.tool.name}`,
     };
+  }
+
+  if (check.tool.name === "fetch") {
+    const url = stringField(check.input, "url");
+    return url === undefined ? "ask" : { decision: "ask", grantKey: `network:${new URL(url).origin}` };
   }
 
   return "ask";

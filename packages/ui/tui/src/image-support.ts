@@ -1,8 +1,10 @@
 import AnsiParser from "node-ansiparser";
 import { createSupportsTerminalGraphics } from "supports-terminal-graphics";
 
+/** @experimental */
 export type ImageProtocol = "kitty" | "iterm2" | "sixel" | "none";
 
+/** @experimental */
 export function terminalImageProtocol(output: { readonly isTTY?: boolean } = process.stdout): ImageProtocol {
   const setting = process.env.MAY_IMAGE_PROTOCOL;
   if (setting !== undefined && !["auto", "kitty", "iterm2", "sixel", "none"].includes(setting))
@@ -19,12 +21,16 @@ export function terminalImageProtocol(output: { readonly isTTY?: boolean } = pro
         : "none";
 }
 
+/** @experimental */
 export interface TerminalCellSize {
   readonly width: number;
   readonly height: number;
 }
 
-/** 接收 tty-events 分离的终端响应，保持键盘输入独立。 */
+/**
+ * 接收 tty-events 分离的终端响应，保持键盘输入独立。
+ * @experimental
+ */
 export class TerminalImageSupport {
   readonly protocol: ImageProtocol;
   private measured: TerminalCellSize | undefined;

@@ -18,7 +18,9 @@ export function taskIdentity(execution: TaskExecution) {
   };
 }
 
-/** 每一轮一个确定的输入身份；身份不会被重用或重放。 */
+/** 每一轮一个确定的输入身份；身份不会被重用或重放。
+ * @experimental
+ */
 export function taskTurnInputId(execution: TaskExecution): string {
   return `${execution.task.dispatchId}:${execution.task.turn ?? 0}`;
 }
@@ -143,7 +145,9 @@ function taskRecovery(outcome: SessionRunOutcome): TaskRecovery {
   return outcome;
 }
 
-/** 第一轮使用任务文本；之后的轮次从持久化的子任务结果作为数据继续。 */
+/** 第一轮使用任务文本；之后的轮次从持久化的子任务结果作为数据继续。
+ * @experimental
+ */
 export function coordinationInput(execution: TaskExecution): UserMessage {
   const firstTurn = (execution.task.turn ?? 0) === (execution.task.sessionStartTurn ?? 0);
   const retry = firstTurn ? execution.task.attempts?.at(-1) : undefined;

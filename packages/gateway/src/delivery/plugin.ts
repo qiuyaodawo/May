@@ -8,10 +8,12 @@ import {
 import type { ChannelAdapter, ChannelIngress, ChannelRegistry, DeliveryService } from "./types.js";
 import { validateChannelInput } from "./store.js";
 
+/** @experimental */
 export const deliveryServices = Object.freeze({
   registry: defineService<ChannelRegistry>({ id: "may.channels.registry", version: "1.0.0", scope: "host" }),
   delivery: defineService<DeliveryService>({ id: "may.delivery", version: "1.0.0", scope: "host" }),
 });
+/** @experimental */
 export function createDeliveryPlugin(options: {
   readonly ingress: ServiceToken<ChannelIngress>;
   readonly id?: string;
@@ -106,7 +108,7 @@ export function createDeliveryPlugin(options: {
       context.defer(async () => {
         const results = await Promise.allSettled(
           [...adapters.values()]
-            .map((value) => value.dispose())
+            .map(async (value) => value.dispose())
             .concat(
               [...pending.values()].map(async (value) => {
                 await value;

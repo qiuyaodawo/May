@@ -1,4 +1,7 @@
-/** Deliberately small Markdown renderer. No HTML, embedded media, or executable previews. */
+/**
+ * Deliberately small Markdown renderer. No HTML, embedded media, or executable previews.
+ * @experimental
+ */
 export function markdown(source: string): HTMLElement {
   const root = document.createElement("div");
   root.className = "markdown";

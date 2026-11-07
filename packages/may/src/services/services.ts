@@ -11,14 +11,17 @@ import type {
   ToolSourceRegistry,
 } from "./registries.js";
 
+/** @experimental */
 export interface ContextOptions {
   readonly budget?: ContextBudget;
   readonly compactionStrategy?: ContextCompactionStrategy;
   readonly autoCompactionStrategies?: readonly ContextCompactionStrategy[];
   readonly providerNativeAutoCompaction?: boolean;
 }
+/** @experimental */
 export type ContextOptionsSource = ContextOptions | ((model: Model) => ContextOptions);
 
+/** @experimental */
 export interface ModelInfo {
   readonly provider: string;
   readonly model: string;
@@ -27,6 +30,7 @@ export interface ModelInfo {
 }
 
 const token = <T>(id: string) => defineService<T>({ id, version: "1.0.0", scope: "application" });
+/** @experimental */
 export const services = Object.freeze({
   model: token<Model>("may.model"),
   modelInfo: token<ModelInfo>("may.model-info"),

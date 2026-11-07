@@ -4,6 +4,7 @@ import type { ModelEvent, ModelRequest } from "./model.js";
 import type { ToolProgressUpdate } from "./tool.js";
 import type { ContentPart, Message, ToolCall, UserMessage } from "./types.js";
 
+/** @experimental */
 export interface HookContext {
   readonly signal: AbortSignal;
   readonly runId?: string;
@@ -11,6 +12,7 @@ export interface HookContext {
   readonly sessionId?: string;
 }
 
+/** @experimental */
 export interface HookDefinition<T> {
   readonly name: string;
   readonly kind: "transform" | "observe";
@@ -19,11 +21,13 @@ export interface HookDefinition<T> {
   readonly allowAborted?: boolean;
 }
 
+/** @experimental */
 export interface HookDispatcher {
   transform<T>(hook: HookDefinition<T>, value: T, context: HookContext): Promise<T>;
   observe<T>(hook: HookDefinition<T>, value: T, context: HookContext): Promise<void>;
 }
 
+/** @experimental */
 export function defineHook<T>(definition: HookDefinition<T>): HookDefinition<T> {
   if (typeof definition.name !== "string" || definition.name.trim() === "")
     throw new TypeError("Hook name cannot be empty");
@@ -38,44 +42,53 @@ export function defineHook<T>(definition: HookDefinition<T>): HookDefinition<T> 
   return Object.freeze({ ...definition });
 }
 
+/** @experimental */
 export interface RunStartHook {
   readonly continuation: boolean;
 }
 
+/** @experimental */
 export interface RunSettleHook {
   readonly result: RunResult;
   readonly continueMessages: readonly UserMessage[];
   readonly reason?: string;
 }
 
+/** @experimental */
 export interface ToolInputHook {
   readonly call: ToolCall;
   readonly input: unknown;
   readonly denyReason?: string;
 }
 
+/** @experimental */
 export interface ToolResultHook {
   readonly call: ToolCall;
   readonly content: readonly ContentPart[];
 }
 
+/** @experimental */
 export interface ToolOutcomeHook extends ToolResultHook {
   readonly output: unknown;
 }
 
+/** @experimental */
 export interface ToolProgressHook {
   readonly call: ToolCall;
   readonly update: ToolProgressUpdate;
 }
 
+/** @experimental */
 export interface HookFailure {
   readonly error: SerializedError;
 }
 
+/** @experimental */
 export interface ToolFailureHook extends HookFailure {
   readonly call: ToolCall;
 }
 
+/** @experimental */
 export const runtimeHooks = Object.freeze({
   runBefore: defineHook<RunStartHook>({ name: "run.before", kind: "observe", validate: validateRunStart }),
   runStarted: defineHook<RunStartHook>({ name: "run.started", kind: "observe", validate: validateRunStart }),
@@ -137,8 +150,10 @@ export const runtimeHooks = Object.freeze({
   }),
 });
 
+/** @experimental */
 export const RUNTIME_HOOKS: readonly HookDefinition<unknown>[] = Object.freeze(Object.values(runtimeHooks));
 
+/** @experimental */
 export function validateContextSnapshot(value: unknown): ContextSnapshot {
   const data = record(value, "Context snapshot");
   validateMessages(data.messages);
@@ -147,6 +162,7 @@ export function validateContextSnapshot(value: unknown): ContextSnapshot {
   return value as ContextSnapshot;
 }
 
+/** @experimental */
 export function validateModelRequest(value: unknown): ModelRequest {
   const data = record(value, "Model request");
   validateMessages(data.messages);
@@ -164,6 +180,7 @@ export function validateModelRequest(value: unknown): ModelRequest {
   return value as ModelRequest;
 }
 
+/** @experimental */
 export function validateMessages(value: unknown): asserts value is readonly Message[] {
   if (!Array.isArray(value)) throw new TypeError("Messages must be an array");
   const pending = new Map<string, ToolCall>();
@@ -184,6 +201,7 @@ export function validateMessages(value: unknown): asserts value is readonly Mess
   if (pending.size > 0) throw new TypeError("Model view contains tool calls without results");
 }
 
+/** @experimental */
 export function validateMessage(value: unknown): Message {
   const data = record(value, "Message");
   if (!["system", "user", "assistant", "tool"].includes(data.role as string))
@@ -211,6 +229,7 @@ export function validateMessage(value: unknown): Message {
   return value as Message;
 }
 
+/** @experimental */
 export function validateContent(value: unknown): asserts value is readonly ContentPart[] {
   if (!Array.isArray(value)) throw new TypeError("Message content must be an array");
   for (const entry of value) {

@@ -9,17 +9,21 @@ import {
 export { validateStructuredModelResponse } from "@sortedyuan/may/core";
 import type { CapabilityValue, ModelCapabilities, ModelCapabilityKey } from "./capabilities.js";
 
+/** @experimental */
 export type UnknownCapabilityPolicy = "allow" | "require-known";
+/** @experimental */
 export interface ModelRequestValidationIssue {
   readonly field: string;
   readonly capability: ModelCapabilityKey | "reasoningEffort";
   readonly code: "unsupported" | "unknown" | "limit" | "parameter" | "schema";
   readonly message: string;
 }
+/** @experimental */
 export interface ModelRequestValidationResult {
   readonly status: "valid" | "unknown" | "invalid";
   readonly issues: readonly ModelRequestValidationIssue[];
 }
+/** @experimental */
 export interface ModelRequestValidationOptions {
   readonly unknownPolicy?: UnknownCapabilityPolicy;
   readonly parameters?: Readonly<Record<string, unknown>>;
@@ -29,6 +33,7 @@ export interface ModelRequestValidationOptions {
     field: string,
   ) => { readonly bytes?: number; readonly mediaType?: string } | undefined;
 }
+/** @experimental */
 export class ModelRequestValidationError extends TypeError {
   readonly code = "MODEL_REQUEST_VALIDATION_FAILED";
   constructor(readonly result: ModelRequestValidationResult) {
@@ -37,6 +42,7 @@ export class ModelRequestValidationError extends TypeError {
   }
 }
 
+/** @experimental */
 export function validateModelRequest(
   request: ModelRequest,
   capabilities: ModelCapabilities,
@@ -243,6 +249,7 @@ export function validateModelRequest(
   return { status: invalid ? "invalid" : unique.length > 0 ? "unknown" : "valid", issues: unique };
 }
 
+/** @experimental */
 export function assertModelRequestValid(
   request: ModelRequest,
   capabilities: ModelCapabilities,

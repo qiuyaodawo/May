@@ -5,7 +5,10 @@ import writeFileAtomic from "write-file-atomic";
 import { MayError, omitUndefined } from "@sortedyuan/may/core";
 import { hasErrorCode, withFileAccess } from "@sortedyuan/may/storage";
 
-/** Secrets are opaque to the host. Implementations must not log their values. */
+/**
+ * Secrets are opaque to the host. Implementations must not log their values.
+ * @experimental
+ */
 export interface McpCredentialStore {
   get<T>(key: string): Promise<T | undefined>;
   set(key: string, value: unknown): Promise<void>;
@@ -14,6 +17,7 @@ export interface McpCredentialStore {
   exclusive<T>(key: string, work: () => Promise<T>, signal?: AbortSignal): Promise<T>;
 }
 
+/** @experimental */
 export class McpCredentialStoreError extends MayError {
   constructor(
     message = "MCP credential vault is unavailable; unlock the OS keyring or provide a secure credential store",
@@ -23,7 +27,10 @@ export class McpCredentialStoreError extends MayError {
   }
 }
 
-/** For headless integrations/tests that deliberately want process-lifetime credentials. */
+/**
+ * For headless integrations/tests that deliberately want process-lifetime credentials.
+ * @experimental
+ */
 export class InMemoryMcpCredentialStore implements McpCredentialStore {
   private readonly values = new Map<string, unknown>();
   private readonly locks = new Map<string, Promise<unknown>>();
@@ -53,12 +60,16 @@ export class InMemoryMcpCredentialStore implements McpCredentialStore {
   }
 }
 
+/** @experimental */
 export interface McpVaultKeyring {
   getPassword(): Promise<string | null | undefined>;
   setPassword(value: string): Promise<void>;
 }
 
-/** AES-256-GCM records; only their 32-byte master key lives in the OS keyring. */
+/**
+ * AES-256-GCM records; only their 32-byte master key lives in the OS keyring.
+ * @experimental
+ */
 export class KeyringMcpCredentialStore implements McpCredentialStore {
   readonly directory: string;
   private key: Promise<Buffer> | undefined;

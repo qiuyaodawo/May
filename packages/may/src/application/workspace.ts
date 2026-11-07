@@ -23,6 +23,7 @@ import type { AgentController, AgentWorkspaceController } from "./controller.js"
 import type { AgentApplicationEvent, AgentRun, AgentWorkspaceEvent } from "./events.js";
 import { AsyncStateSerializer, omitUndefined } from "../core/index.js";
 
+/** @experimental */
 export interface AgentApplicationSelection {
   readonly sessionId?: string;
   readonly resume: boolean;
@@ -31,15 +32,18 @@ export interface AgentApplicationSelection {
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
+/** @experimental */
 export interface AgentWorkspaceForkOptions {
   readonly workspace?: string;
   readonly metadata?: Readonly<Record<string, unknown>>;
 }
 
+/** @experimental */
 export type SessionSummaryFactory = (
   history: readonly SessionEvent[],
 ) => Pick<SessionSummary, "title" | "preview" | "turnCount">;
 
+/** @experimental */
 export interface AgentWorkspaceOptions<
   ApplicationEvent = AgentApplicationEvent,
   CompactionSelection = ContextCompactionStrategy,
@@ -61,6 +65,7 @@ export interface AgentWorkspaceOptions<
   readonly isDroppableEvent?: (event: AgentWorkspaceEvent<ApplicationEvent, unknown>) => boolean;
 }
 
+/** @experimental */
 export interface AgentApplicationTransitionOptions<Application, ExtensionEvent> {
   /** Defaults to true; model/config transitions should preserve the session. */
   readonly preserveSession?: boolean;
@@ -68,6 +73,7 @@ export interface AgentApplicationTransitionOptions<Application, ExtensionEvent> 
   readonly createEvent?: (application: Application) => ExtensionEvent;
 }
 
+/** @experimental */
 export interface AgentStateTransitionOptions {
   /** Defaults to true. Set false for state that cannot affect an active run. */
   readonly requireIdle?: boolean;
@@ -80,6 +86,7 @@ export interface AgentStateTransitionOptions {
  * Model/profile state remains product-owned. `transitionApplication` provides
  * the same serialized, idle-only replacement primitive used by session changes
  * so a product can rebuild an application after changing model configuration.
+ * @experimental
  */
 export class AgentWorkspace<
   ApplicationEvent = AgentApplicationEvent,
@@ -622,7 +629,9 @@ export class AgentWorkspace<
   }
 }
 
-/** Default catalog projection shared by conversational Agent products. */
+/** Default catalog projection shared by conversational Agent products.
+ * @experimental
+ */
 export function summarizeSessionHistory(
   history: readonly SessionEvent[],
 ): Pick<SessionSummary, "title" | "preview" | "turnCount"> {

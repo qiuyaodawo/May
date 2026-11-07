@@ -6,6 +6,7 @@ interface MayConfigDocument extends Omit<MayConfig, "path" | "models"> {
   readonly models?: MayConfig["models"];
 }
 
+/** @experimental */
 export function parseMayConfig(value: unknown, path = "<inline>"): MayConfig {
   validateMayConfigDocument(value, path);
   const { providers, models = {}, apps = {}, defaultModel } = value as MayConfigDocument;

@@ -20,6 +20,7 @@ import {
   type GeminiUsageMetadata,
 } from "./protocol.js";
 
+/** @experimental */
 export interface GeminiModelOptions {
   apiKey: string;
   model: string;
@@ -31,6 +32,7 @@ export interface GeminiModelOptions {
   fetch?: typeof globalThis.fetch;
 }
 
+/** @experimental */
 export class GeminiModel implements Model {
   readonly supportsRequestRecording = true;
   private readonly baseURL: string;

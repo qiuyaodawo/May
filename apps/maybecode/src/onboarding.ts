@@ -503,7 +503,7 @@ export async function runMaybeCodeOnboarding(path: string, command: MaybeCodeSta
     process.stdin.pause();
     await setImmediate();
     removeInterrupt();
-    terminal.close();
+    await terminal.close();
     process.stdout.write("\x1b[?1049l");
     if (completion !== undefined) process.stdout.write(`${completion}\n`);
     process.removeListener("SIGINT", interrupt);

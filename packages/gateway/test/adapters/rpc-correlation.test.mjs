@@ -3,12 +3,15 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { once } from "node:events";
 import { readFile, writeFile } from "node:fs/promises";
+import { createServer } from "node:net";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { createTestDirectory } from "@sortedyuan/test-support";
 import { createMessageConnection, StreamMessageReader, StreamMessageWriter } from "vscode-jsonrpc/node";
 import { createGatewayRpcAdapter } from "../../dist/adapters/index.js";
+import { defineTool } from "@sortedyuan/may/core";
+import { z } from "zod";
 
 const example = fileURLToPath(new URL("../../examples/rpc-file-agent.mjs", import.meta.url));
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -149,3 +152,90 @@ test("actual RPC file service supports clients without telemetry negotiation", a
   );
   assert.equal(Object.hasOwn(record, "telemetry"), false);
 });
+
+test(
+  "RPC coalesces duplicate tool calls while asynchronous schema validation is pending",
+  { timeout: 10_000 },
+  async (t) => {
+    const parsing = Promise.withResolvers();
+    const release = Promise.withResolvers();
+    const callbacksProcessed = Promise.withResolvers();
+    let parseCount = 0;
+    let executionCount = 0;
+    let peer;
+    let socket;
+    const progress = [];
+    const server = createServer((accepted) => {
+      socket = accepted;
+      peer = createMessageConnection(new StreamMessageReader(accepted), new StreamMessageWriter(accepted));
+      peer.onRequest("gateway/initialize", () => ({
+        protocolVersion: 1,
+        capabilities: {
+          cancel: false,
+          steer: false,
+          resume: false,
+          delete: false,
+          approvals: false,
+          collaboration: true,
+          media: [],
+        },
+      }));
+      peer.onRequest("conversation/execute", async ({ conversationId, inputId }) => {
+        const request = { conversationId, inputId, callId: "sum", step: 0, name: "add", input: { left: 2, right: 3 } };
+        const first = peer.sendRequest("gateway/tool", request);
+        const second = peer.sendRequest("gateway/tool", request);
+        const results = Promise.all([first, second]);
+        await peer.sendRequest("gateway/shouldYield", { conversationId, inputId });
+        callbacksProcessed.resolve();
+        return { text: JSON.stringify(await results) };
+      });
+      peer.onNotification("gateway/toolProgress", (update) => progress.push(update));
+      peer.listen();
+    });
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    t.after(async () => {
+      release.resolve();
+      peer?.dispose();
+      socket?.destroy();
+      await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+    });
+    const adapter = await createGatewayRpcAdapter("arithmetic", {
+      transport: "socket",
+      host: "127.0.0.1",
+      port: server.address().port,
+    });
+    t.after(() => adapter.close());
+    const defined = defineTool({
+      name: "add",
+      description: "Add two integers",
+      schema: z.object({ left: z.number().int(), right: z.number().int() }).transform(async (value) => {
+        parsing.resolve();
+        await release.promise;
+        return value;
+      }),
+      async execute(value, context) {
+        executionCount++;
+        assert.equal(Object.isFrozen(value), true);
+        context.report({ type: "progress", message: "Adding integers" });
+        return value.left + value.right;
+      },
+    });
+    const tool = {
+      ...defined,
+      parse(value) {
+        parseCount++;
+        return defined.parse(value);
+      },
+    };
+    const execution = adapter.execute({ ...context("sum-conversation", "sum-input"), tools: [tool] });
+    await Promise.all([parsing.promise, callbacksProcessed.promise]);
+    assert.equal(parseCount, 1);
+    assert.equal(executionCount, 0);
+    release.resolve();
+    assert.deepEqual(JSON.parse((await execution).text), [5, 5]);
+    assert.equal(parseCount, 1);
+    assert.equal(executionCount, 1);
+    assert.equal(progress.length, 1);
+  },
+);

@@ -5,9 +5,13 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { AddressInfo } from "node:net";
 import { UiError, type UiCommand, type UiHost, type UiReceipt, type UiField } from "./protocol.js";
 
+/** @experimental */
 export type UiAssets = ReadonlyMap<string, { readonly type: string; readonly body: string }>;
 
-/** Mount behind the host's authentication/origin checks. GET assets contain no secrets. */
+/**
+ * Mount behind the host's authentication/origin checks. GET assets contain no secrets.
+ * @experimental
+ */
 export function createUiRouter(host: UiHost, exit?: () => void) {
   const receipts = new Map<string, { key: string; result: Promise<UiReceipt> }>();
   const streams = new Set<ServerResponse>();
@@ -138,6 +142,7 @@ export function createUiRouter(host: UiHost, exit?: () => void) {
   };
 }
 
+/** @experimental */
 export async function startUiServer(options: {
   host: UiHost;
   assets: UiAssets;
@@ -152,7 +157,7 @@ export async function startUiServer(options: {
   if (!Number.isSafeInteger(port) || port < 0 || port > 65535) throw new Error("Invalid port");
   const router = createUiRouter(options.host, () => {
     if (options.exit) options.exit();
-    else void close();
+    else close().catch(rejectClosed);
   });
   const login = options.browserLogin ? new BrowserLogin(options.token) : undefined;
   let origin = "";
@@ -214,7 +219,14 @@ export async function startUiServer(options: {
   });
   origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   let closing: Promise<void> | undefined;
-  const closed = new Promise<void>((resolve) => server.once("close", resolve));
+  let rejectClosed: (error: unknown) => void;
+  const closed = new Promise<void>((resolve, reject) => {
+    rejectClosed = reject;
+    server.once("close", () => {
+      if (closing) closing.then(resolve, reject);
+      else resolve();
+    });
+  });
   const close = () =>
     (closing ??= (async () => {
       login?.clear();
@@ -223,9 +235,9 @@ export async function startUiServer(options: {
         server.close((error) => (error ? reject(error) : resolve())),
       );
       server.closeAllConnections();
-      await options.close?.();
-      await Promise.allSettled([...requests]);
-      await stopped;
+      const results = await Promise.allSettled([Promise.resolve().then(() => options.close?.()), ...requests, stopped]);
+      const errors = results.filter((result) => result.status === "rejected").map((result) => result.reason as unknown);
+      if (errors.length) throw new AggregateError(errors, "UI server shutdown failed");
     })());
   return {
     url: origin,
@@ -238,6 +250,7 @@ export async function startUiServer(options: {
   };
 }
 
+/** @experimental */
 export function secureHeaders(res: ServerResponse): void {
   res.setHeader("cache-control", "no-store");
   res.setHeader("x-content-type-options", "nosniff");
@@ -247,10 +260,12 @@ export function secureHeaders(res: ServerResponse): void {
     "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' blob: https: http:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   );
 }
+/** @experimental */
 export function validateToken(token: string): void {
   if (!/^[\x21-\x7e]{32,256}$/.test(token))
     throw new Error("Control token must be 32..256 printable non-space ASCII characters");
 }
+/** @experimental */
 export function trustedRequest(req: IncomingMessage, origin: string): boolean {
   return (
     Boolean(origin) &&
@@ -258,6 +273,7 @@ export function trustedRequest(req: IncomingMessage, origin: string): boolean {
     (req.headers.origin === undefined || req.headers.origin === origin)
   );
 }
+/** @experimental */
 export function authorized(req: IncomingMessage, token: string): boolean {
   const supplied = req.headers.authorization ?? "",
     expected = `Bearer ${token}`;
@@ -266,6 +282,7 @@ export function authorized(req: IncomingMessage, token: string): boolean {
     timingSafeEqual(Buffer.from(supplied), Buffer.from(expected))
   );
 }
+/** @experimental */
 export function sendJson(res: ServerResponse, status: number, data: unknown): void {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(data));

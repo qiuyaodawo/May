@@ -29,6 +29,7 @@ interface Operation {
   readonly cancel?: Disposer;
 }
 
+/** @experimental */
 export class PluginHost implements HookDispatcher {
   readonly kind: PluginScope;
   readonly id: string;

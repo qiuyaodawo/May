@@ -6,7 +6,9 @@ import { AnthropicApiError } from "./errors.js";
 import type { AnthropicMessagesRequest, AnthropicReasoningEffort, AnthropicThinkingConfig } from "./protocol.js";
 import { streamAnthropicResponse } from "./stream.js";
 
+/** @experimental */
 export interface AnthropicModelOptions {
+  promptCaching?: false | AnthropicPromptCachingOptions;
   apiKey: string;
   model: string;
   baseURL?: string;
@@ -17,11 +19,19 @@ export interface AnthropicModelOptions {
   fetch?: typeof globalThis.fetch;
 }
 
+/** @experimental */
+export interface AnthropicPromptCachingOptions {
+  readonly ttl?: "5m" | "1h";
+  readonly cacheInstructions?: boolean;
+}
+
 const FILES_API_BETA = "files-api-2025-04-14";
 
+/** @experimental */
 export class AnthropicModel implements Model {
   readonly supportsRequestRecording = true;
   private readonly apiKey: string;
+  private readonly promptCaching: false | AnthropicPromptCachingOptions | undefined;
   private readonly model: string;
   private readonly baseURL: string;
   private readonly apiVersion: string;
@@ -55,6 +65,28 @@ export class AnthropicModel implements Model {
     }
 
     this.apiKey = options.apiKey;
+    if (options.promptCaching !== undefined && options.promptCaching !== false) {
+      if (
+        typeof options.promptCaching !== "object" ||
+        options.promptCaching === null ||
+        Array.isArray(options.promptCaching)
+      ) {
+        throw new TypeError("promptCaching must be false or an object");
+      }
+      if (options.promptCaching.ttl !== undefined && !["5m", "1h"].includes(options.promptCaching.ttl)) {
+        throw new TypeError("promptCaching.ttl must be 5m or 1h");
+      }
+      if (
+        options.promptCaching.cacheInstructions !== undefined &&
+        typeof options.promptCaching.cacheInstructions !== "boolean"
+      ) {
+        throw new TypeError("promptCaching.cacheInstructions must be a boolean");
+      }
+    }
+    this.promptCaching =
+      options.promptCaching === undefined || options.promptCaching === false
+        ? options.promptCaching
+        : { ...options.promptCaching };
     this.model = options.model;
     this.baseURL = (options.baseURL ?? "https://api.anthropic.com").replace(/\/+$/, "");
     this.apiVersion = options.apiVersion ?? "2023-06-01";
@@ -118,6 +150,16 @@ export class AnthropicModel implements Model {
     if (parts.system !== undefined) body.system = parts.system;
     if (request.tools.length > 0) {
       body.tools = toAnthropicTools(request.tools);
+    }
+    if (this.promptCaching) {
+      const cacheControl = { type: "ephemeral" as const, ttl: this.promptCaching.ttl ?? "5m" };
+      body.cache_control = cacheControl;
+      if (this.promptCaching.cacheInstructions) {
+        if (parts.system !== undefined)
+          body.system = [{ type: "text", text: parts.system, cache_control: cacheControl }];
+        const lastTool = body.tools?.at(-1);
+        if (lastTool) lastTool.cache_control = cacheControl;
+      }
     }
     if (this.thinking !== undefined) {
       body.thinking = toAnthropicThinking(this.thinking);

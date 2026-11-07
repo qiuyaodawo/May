@@ -1,5 +1,6 @@
 import { Keymap, mergeKeyBindings, type KeyBindingDefinition } from "./keybindings/index.js";
 
+/** @experimental */
 export const EDITOR_ACTIONS = {
   left: "editor.left",
   right: "editor.right",
@@ -33,8 +34,10 @@ export const EDITOR_ACTIONS = {
   tab: "editor.tab",
 } as const;
 
+/** @experimental */
 export type EditorAction = (typeof EDITOR_ACTIONS)[keyof typeof EDITOR_ACTIONS];
 
+/** @experimental */
 export const DEFAULT_EDITOR_KEYBINDINGS: readonly KeyBindingDefinition[] = [
   bind("left", EDITOR_ACTIONS.left),
   bind("right", EDITOR_ACTIONS.right),
@@ -76,6 +79,7 @@ export const DEFAULT_EDITOR_KEYBINDINGS: readonly KeyBindingDefinition[] = [
   bind("tab", EDITOR_ACTIONS.tab),
 ];
 
+/** @experimental */
 export function createEditorKeymap(overrides: readonly KeyBindingDefinition[] = []): Keymap {
   const actions = new Set<string>(Object.values(EDITOR_ACTIONS));
   for (const binding of overrides) {

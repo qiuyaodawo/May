@@ -1,4 +1,6 @@
-/** Structural equality for JSON values; object insertion order is irrelevant. */
+/** Structural equality for JSON values; object insertion order is irrelevant.
+ * @experimental
+ */
 export function jsonEqual(left: unknown, right: unknown): boolean {
   if (left === right) return true;
   if (left === null || right === null || typeof left !== "object" || typeof right !== "object") return false;

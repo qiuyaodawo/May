@@ -120,6 +120,7 @@
     "test:integration": "pnpm run build && node --test test/*/integration/*.test.mjs"
   },
   "dependencies": {
+    "@standard-schema/spec": "^1.1.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "diff": "9.0.0",

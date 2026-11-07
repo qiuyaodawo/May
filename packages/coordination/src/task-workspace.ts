@@ -5,6 +5,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { ResourceJournal, count, resourceId } from "./resource-journal.js";
 
+/** @experimental */
 export interface TaskWorkspaceOptions {
   readonly sourceDirectory: string;
   /** Private host state directory, outside the source tree and task tool roots. */
@@ -16,11 +17,13 @@ export interface TaskWorkspaceOptions {
   readonly excludeNames?: readonly string[];
 }
 
+/** @experimental */
 export interface TaskWorkspace {
   readonly taskId: string;
   readonly directory: string;
 }
 
+/** @experimental */
 export interface WorkspaceChange {
   readonly path: string;
   readonly kind: "added" | "modified" | "deleted";
@@ -28,12 +31,14 @@ export interface WorkspaceChange {
   readonly afterSha256?: string;
 }
 
+/** @experimental */
 export interface WorkspacePatchChange extends WorkspaceChange {
   readonly taskId: string;
   readonly beforeText?: string;
   readonly afterText?: string;
 }
 
+/** @experimental */
 export interface WorkspacePatchSnapshot {
   readonly sourceDirectory: string;
   readonly baselineDigest: string;
@@ -42,6 +47,7 @@ export interface WorkspacePatchSnapshot {
   readonly changes: readonly WorkspacePatchChange[];
 }
 
+/** @experimental */
 export interface WorkspacePatchLimits {
   readonly maxChangedFiles?: number;
   readonly maxFileBytes?: number;
@@ -86,7 +92,9 @@ const excluded = new Set([
   "private",
 ]);
 
-/** File-copy isolation, NOT a process sandbox. Never writes back to the source checkout. */
+/** File-copy isolation, NOT a process sandbox. Never writes back to the source checkout.
+ * @experimental
+ */
 export class TaskWorkspaceManager {
   private constructor(
     private readonly journal: ResourceJournal<WorkspaceState>,

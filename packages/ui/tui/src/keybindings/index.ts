@@ -1,3 +1,4 @@
+/** @experimental */
 export interface KeyStroke {
   readonly key: string;
   readonly ctrl: boolean;
@@ -8,12 +9,14 @@ export interface KeyStroke {
   readonly text?: string;
 }
 
+/** @experimental */
 export interface KeyBindingDefinition {
   readonly context: string;
   readonly keys: string;
   readonly action: string;
 }
 
+/** @experimental */
 export interface KeymapOptions {
   readonly leader?: string;
   /** null 表示等待后续按键，直到匹配结束或调用 reset。 */
@@ -22,6 +25,7 @@ export interface KeymapOptions {
   readonly actions?: readonly string[];
 }
 
+/** @experimental */
 export type KeymapResult =
   | { readonly type: "action"; readonly action: string }
   | {
@@ -40,6 +44,7 @@ interface PendingSequence {
   readonly contexts: readonly string[];
 }
 
+/** @experimental */
 export class Keymap {
   private readonly bindings: readonly CompiledBinding[];
   private readonly chordTimeoutMs: number;
@@ -124,6 +129,7 @@ export class Keymap {
   }
 }
 
+/** @experimental */
 export function mergeKeyBindings(
   defaults: readonly KeyBindingDefinition[],
   overrides: readonly KeyBindingDefinition[] = [],
@@ -141,6 +147,7 @@ export function mergeKeyBindings(
   ];
 }
 
+/** @experimental */
 export function keyStroke(key: string, modifiers: Partial<Omit<KeyStroke, "key">> = {}): KeyStroke {
   return normalizeKeyStroke({
     key,
@@ -152,6 +159,7 @@ export function keyStroke(key: string, modifiers: Partial<Omit<KeyStroke, "key">
   });
 }
 
+/** @experimental */
 export function normalizeKeyStroke(stroke: KeyStroke): KeyStroke {
   const text = stroke.text;
   return {
@@ -164,6 +172,7 @@ export function normalizeKeyStroke(stroke: KeyStroke): KeyStroke {
   };
 }
 
+/** @experimental */
 export function parseKeySequence(source: string, options: { readonly leader?: string } = {}): readonly KeyStroke[] {
   const tokens = source.trim().split(/\s+/u).filter(Boolean);
   if (tokens.length === 0) throw new Error("Key sequence cannot be empty");
@@ -182,10 +191,12 @@ export function parseKeySequence(source: string, options: { readonly leader?: st
   return result;
 }
 
+/** @experimental */
 export function formatKeySequence(sequence: readonly KeyStroke[]): string {
   return sequence.map(formatKeyStroke).join(" ");
 }
 
+/** @experimental */
 export function formatKeyStroke(stroke: KeyStroke): string {
   return [
     ...(stroke.ctrl ? ["ctrl"] : []),

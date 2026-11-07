@@ -13,13 +13,16 @@ import {
   type OpenMcpClientPoolOptions,
 } from "../index.js";
 
+/** @experimental */
 export const mcpService = defineService<McpClientPool>({ id: "may.mcp", version: "1.0.0", scope: "application" });
+/** @experimental */
 export const mcpHostService = defineService<McpClientPool>({
   id: "may.workspace-mcp",
   version: "1.0.0",
   scope: "host",
 });
 
+/** @experimental */
 export interface McpPluginOptions extends OpenMcpClientPoolOptions {
   readonly dataDirectory?: string;
   readonly enableInteractions?: boolean;
@@ -54,6 +57,7 @@ function configuredOptions(options: McpPluginOptions): OpenMcpClientPoolOptions 
   };
 }
 
+/** @experimental */
 export function createMcpPlugin(options: McpPluginOptions) {
   return definePlugin({
     id: "may.mcp",
@@ -79,6 +83,7 @@ export function createMcpPlugin(options: McpPluginOptions) {
   });
 }
 
+/** @experimental */
 export function createMcpHostPlugin(options: McpPluginOptions) {
   return definePlugin({
     id: "may.workspace-mcp",
@@ -98,6 +103,7 @@ export function createMcpHostPlugin(options: McpPluginOptions) {
   });
 }
 
+/** @experimental */
 export function createSharedMcpPlugin(pool: McpClientPool) {
   return definePlugin({
     id: "may.mcp",

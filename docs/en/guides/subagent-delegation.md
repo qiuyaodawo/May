@@ -53,6 +53,15 @@ Run the host starts, and the main Session never has two writers.
 
 ## Configuration
 
+Role tool lists accept `read`, `glob`, `grep`, `shell`, `edit`, `write`, and `fetch`.
+The default worker receives these coding tools; read-only tool sets contain
+`read`, `glob`, and `grep`. A role's explicit tool list limits its available tools.
+Children inherit the application's execution environment and fetch configuration.
+Shell and search execute in the configured host or container environment; file
+tools use the shared host workspace. `fetch` uses separate network approval and
+address checks. MCP servers remain on the host. See
+[execution configuration](../reference/configuration.md).
+
 Merge `apps.maybecode.subagents` into the May configuration used by your host.
 The `reviewer.model` below is a configured model profile name; replace it with
 one present in your configuration. Its model must support the selected reasoning

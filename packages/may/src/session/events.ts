@@ -14,6 +14,7 @@ import type {
 } from "../core/index.js";
 import type { SessionSteeringInput } from "./steering.js";
 
+/** @public */
 export interface SessionRecovery {
   readonly id: string;
   readonly runId: string;
@@ -22,20 +23,24 @@ export interface SessionRecovery {
   readonly status: "unknown" | "not-started";
 }
 
+/** @experimental */
 export interface SessionForkOrigin {
   readonly sessionId: string;
   readonly positionSeq: number;
   readonly runId: string;
 }
 
+/** @public */
 export type SessionApprovalDecision = "allow" | "allow-session" | "allow-persistent" | "deny";
 
+/** @public */
 export interface SessionPersistentPermissionScope {
   readonly scopeId: string;
   readonly description: string;
   readonly definitionKey: string;
 }
 
+/** @public */
 export interface SessionPermissionRule {
   readonly id: string;
   readonly scopeId: string;
@@ -49,6 +54,7 @@ export interface SessionPermissionRule {
   readonly createdBy: string;
 }
 
+/** @public */
 export type SessionPermissionRuleEvent =
   | { type: "rule.created"; rule: SessionPermissionRule }
   | { type: "rule.revoked"; ruleId: string; scopeId: string }
@@ -61,6 +67,7 @@ export type SessionPermissionRuleEvent =
       toolCallId: string;
     };
 
+/** @public */
 export interface SessionApprovalRequest {
   id: string;
   createdAt: number;
@@ -74,6 +81,7 @@ export interface SessionApprovalRequest {
   persistent?: SessionPersistentPermissionScope;
 }
 
+/** @experimental */
 export interface SessionContextCompaction {
   readonly strategy: string;
   readonly messages: readonly Message[];
@@ -86,6 +94,7 @@ export interface SessionContextCompaction {
 /**
  * Durable, application-owned display metadata associated with a tool call.
  * Session stores and exposes this event, but does not replay it into model context.
+ * @experimental
  */
 export interface SessionToolPresentation {
   readonly runId: string;
@@ -96,6 +105,7 @@ export interface SessionToolPresentation {
   readonly data: unknown;
 }
 
+/** @public */
 export type RecordablePermissionEvent = (
   | {
       type: "approval.requested";
@@ -118,6 +128,7 @@ export type RecordablePermissionEvent = (
   | SessionPermissionRuleEvent
 ) & { timestamp: number };
 
+/** @public */
 export type SessionEventPayload =
   | import("./requests.js").SessionRequestEvent
   | { type: "state.updated"; key: string; value: unknown }
@@ -200,13 +211,16 @@ export type SessionEventPayload =
   | { type: "run.failed"; runId: string; error: SerializedError }
   | { type: "run.cancelled"; runId: string; reason?: string };
 
+/** @public */
 export type SessionEvent = SessionEventPayload & {
   sessionId: string;
   seq: number;
   timestamp: number;
 };
 
-/** 旧记录的原始输出保留给 host，模型读取明确的缺失提示。 */
+/** 旧记录的原始输出保留给 host，模型读取明确的缺失提示。
+ * @experimental
+ */
 export function sessionToolResultContent(
   event: Extract<SessionEventPayload, { type: "tool.completed" }>,
 ): ContentPart[] {

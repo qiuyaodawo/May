@@ -5,6 +5,7 @@ import { hasErrorCode } from "@sortedyuan/may/storage";
 
 import type { FinishedTraceSpan, SpanExporter } from "./types.js";
 
+/** @experimental */
 export class InMemorySpanExporter implements SpanExporter {
   private readonly spans: FinishedTraceSpan[] = [];
   private dropped = 0;
@@ -35,11 +36,15 @@ export class InMemorySpanExporter implements SpanExporter {
   }
 }
 
+/** @experimental */
 export interface ConsoleSpanExporterOptions {
   readonly write?: (line: string) => void;
 }
 
-/** Writes one content-free completed span as JSON per line. */
+/**
+ * Writes one content-free completed span as JSON per line.
+ * @experimental
+ */
 export class ConsoleSpanExporter implements SpanExporter {
   private readonly write: (line: string) => void;
 
@@ -52,6 +57,7 @@ export class ConsoleSpanExporter implements SpanExporter {
   }
 }
 
+/** @experimental */
 export interface JsonlFileSpanExporterOptions {
   /** Base file path. Daily rotation inserts YYYY-MM-DD before its extension. */
   readonly path: string;
@@ -61,7 +67,10 @@ export interface JsonlFileSpanExporterOptions {
   readonly clock?: () => number;
 }
 
-/** Appends one completed span per line without holding an open file handle. */
+/**
+ * Appends one completed span per line without holding an open file handle.
+ * @experimental
+ */
 export class JsonlFileSpanExporter implements SpanExporter {
   readonly path: string;
 

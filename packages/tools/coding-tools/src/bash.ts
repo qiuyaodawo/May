@@ -7,14 +7,23 @@ import {
   type ShellToolOutput,
 } from "./shell.js";
 
-/** @deprecated Prefer the cross-platform `createShellTool`. */
+/**
+ * @deprecated Prefer the cross-platform `createShellTool`.
+ * @experimental
+ */
 export interface BashToolOptions extends Omit<ShellToolOptions, "profile"> {
   readonly executable?: string;
 }
 
-/** @deprecated Use `ShellToolInput`. */
+/**
+ * @deprecated Use `ShellToolInput`.
+ * @experimental
+ */
 export type BashToolInput = ShellToolInput;
-/** @deprecated Use `ShellToolOutput`. */
+/**
+ * @deprecated Use `ShellToolOutput`.
+ * @experimental
+ */
 export type BashToolOutput = ShellToolOutput;
 
 /**
@@ -22,6 +31,7 @@ export type BashToolOutput = ShellToolOutput;
  * Bash executable such as Git Bash to be available or configured.
  *
  * @deprecated Prefer `createShellTool`, which selects PowerShell on Windows.
+ * @experimental
  */
 export function createBashTool(options: BashToolOptions): Tool<BashToolInput, BashToolOutput> {
   const { executable, ...shellOptions } = options;

@@ -1,3 +1,4 @@
+/** @experimental */
 export class GeminiProtocolError extends Error {
   readonly code = "GEMINI_PROTOCOL_ERROR";
   constructor(message: string, options?: ErrorOptions) {
@@ -6,6 +7,7 @@ export class GeminiProtocolError extends Error {
   }
 }
 
+/** @experimental */
 export class GeminiApiError extends Error {
   readonly code = "GEMINI_API_ERROR";
   constructor(
@@ -18,6 +20,7 @@ export class GeminiApiError extends Error {
   }
 }
 
+/** @experimental */
 export class GeminiFinishReasonError extends Error {
   readonly code = "GEMINI_INCOMPLETE_RESPONSE";
   constructor(readonly finishReason: string) {

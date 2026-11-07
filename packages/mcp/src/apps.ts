@@ -8,8 +8,11 @@ import { freezeTree, object } from "./tasks.js";
 import type { McpInteractionOwner } from "./interactions.js";
 import type { McpOperationOptions, McpToolOutput } from "./types.js";
 
+/** @experimental */
 export const MCP_APPS_EXTENSION = "io.modelcontextprotocol/ui";
+/** @experimental */
 export const MCP_APP_MIME = "text/html;profile=mcp-app";
+/** @experimental */
 export interface McpAppsHostOptions {
   /** The host's normal permission executor, never a renderer-supplied executor. */
   readonly executor: ToolExecutor;
@@ -22,17 +25,22 @@ export interface McpAppsHostOptions {
     readonly signal: AbortSignal;
   }) => Promise<boolean>;
 }
+/** @experimental */
 export interface McpAppOpenOptions extends McpOperationOptions {
   readonly owner: McpInteractionOwner;
   /** Ephemeral view lifetime; defaults to ten minutes, maximum one hour. */
   readonly lifetimeMs?: number;
 }
+/** @experimental */
 export interface McpAppResource {
   readonly uri: string;
   readonly html: string;
 }
 
-/** Visibility is enforced even in terminal hosts that do not advertise Apps. */
+/**
+ * Visibility is enforced even in terminal hosts that do not advertise Apps.
+ * @experimental
+ */
 export function mcpToolVisibility(tool: Tool, audience: "model" | "app"): boolean {
   const ui = tool._meta?.ui;
   if (ui === undefined) return true;
@@ -46,6 +54,7 @@ export function mcpToolVisibility(tool: Tool, audience: "model" | "app"): boolea
       visibility.includes(audience))
   );
 }
+/** @experimental */
 export function mcpAppUri(tool: Tool): string | undefined {
   const ui = tool._meta?.ui;
   const value = object(ui) ? ui.resourceUri : undefined;
@@ -56,6 +65,7 @@ export function mcpAppUri(tool: Tool): string | undefined {
     ? value
     : undefined;
 }
+/** @experimental */
 export function parseMcpAppResource(uri: string, result: ReadResourceResult): McpAppResource {
   assertMcpContentSize(result);
   const item = result.contents[0];
@@ -79,7 +89,10 @@ interface AppOperations {
   readonly read: (uri: string, signal: AbortSignal) => Promise<ReadResourceResult>;
 }
 
-/** Backend-owned, single owner/connection view. Never send this object to untrusted code. */
+/**
+ * Backend-owned, single owner/connection view. Never send this object to untrusted code.
+ * @experimental
+ */
 export class McpAppSession {
   readonly id = randomUUID();
   private readonly controller = new AbortController();
@@ -200,6 +213,7 @@ export class McpAppSession {
     return { jsonrpc: "2.0", method: `ui/notifications/${kind}`, params: structuredClone(params) };
   }
 }
+/** @experimental */
 export function appError(): McpCapabilityError {
   return new McpCapabilityError("apps", "MCP App unavailable, unauthorized or invalid", "MCP_APP_ERROR");
 }

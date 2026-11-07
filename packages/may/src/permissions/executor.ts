@@ -29,6 +29,7 @@ import type {
 } from "./types.js";
 import type { PermissionRuleStore, PersistentPermissionRule } from "./rules.js";
 
+/** @experimental */
 export interface PermissionToolExecutorOptions {
   policy: PermissionPolicy;
   beforeCheck?: (check: PermissionCheck) => void | Promise<void>;
@@ -48,6 +49,7 @@ interface PendingApproval {
   removeAbortListener(): void;
 }
 
+/** @experimental */
 export class PermissionToolExecutor implements ToolExecutor {
   readonly events: AsyncIterable<PermissionEvent>;
 
@@ -658,6 +660,7 @@ function endPermissionSpan(span: TraceSpan | undefined, error: unknown, signal: 
   });
 }
 
+/** @experimental */
 export function permissionDefinitionKey(tool: PermissionCheck["tool"]): string {
   // 递归排序，使属性顺序不同的等价 JSON Schema 使用相同 identity。
   const canonical = JSON.stringify(

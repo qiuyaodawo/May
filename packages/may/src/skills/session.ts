@@ -1,10 +1,13 @@
 import { FatalToolExecutionError, type Tool } from "../core/index.js";
 import { MAX_SKILL_BYTES, SkillRegistry, type SkillDocument } from "./registry.js";
 
+/** @experimental */
 export const SKILL_STATE_KEY = "may.skills.active.v1";
 const MAX_ACTIVE_BYTES = 256 * 1024;
 
-/** Per-session activation snapshots, independent of the coding product. */
+/** Per-session activation snapshots, independent of the coding product.
+ * @experimental
+ */
 export class SkillSession {
   private readonly active = new Map<string, SkillDocument>();
   private tail: Promise<void> = Promise.resolve();

@@ -1,6 +1,7 @@
 import type { UsageCost } from "./pricing.js";
 import type { Usage } from "./types.js";
 
+/** @experimental */
 export class MayError extends Error {
   readonly code: string;
 
@@ -11,38 +12,46 @@ export class MayError extends Error {
   }
 }
 
+/** @experimental */
 export class ConcurrentRunError extends MayError {
   constructor() {
     super("CONCURRENT_RUN", "This May runtime already has an active run");
   }
 }
 
-/** Marks a tool or ToolExecutor failure that must terminate the run. */
+/** Marks a tool or ToolExecutor failure that must terminate the run.
+ * @experimental
+ */
 export class FatalToolExecutionError extends MayError {
   constructor(message: string, options?: ErrorOptions & { readonly code?: string }) {
     super(options?.code ?? "FATAL_TOOL_EXECUTION", message, options);
   }
 }
 
+/** @experimental */
 export class ToolSchedulerError extends MayError {
   constructor(message: string) {
     super("TOOL_SCHEDULER_ERROR", message);
   }
 }
 
+/** @experimental */
 export class ModelProtocolError extends MayError {
   constructor(message: string, options?: ErrorOptions) {
     super("MODEL_PROTOCOL_ERROR", message, options);
   }
 }
 
+/** @experimental */
 export interface ModelResponseReceipt {
   readonly usage?: Usage;
   readonly cost?: UsageCost;
 }
 
+/** @experimental */
 export interface ModelResponseValidationErrorOptions extends ErrorOptions, ModelResponseReceipt {}
 
+/** @experimental */
 export class ModelResponseValidationError extends ModelProtocolError {
   readonly responseCompleted = true;
   readonly usage?: Usage;
@@ -55,6 +64,7 @@ export class ModelResponseValidationError extends ModelProtocolError {
   }
 }
 
+/** @experimental */
 export class UnsupportedContentError extends MayError {
   readonly adapter: string;
   readonly contentType: string;
@@ -68,19 +78,23 @@ export class UnsupportedContentError extends MayError {
   }
 }
 
+/** @experimental */
 export class MaxStepsExceededError extends MayError {
   constructor(maxSteps: number) {
     super("MAX_STEPS_EXCEEDED", `Run exceeded the maximum of ${maxSteps} steps`);
   }
 }
 
+/** @experimental */
 export class RunCancelledError extends MayError {
   constructor(reason?: string) {
     super("RUN_CANCELLED", reason ?? "Run was cancelled");
   }
 }
 
-/** A failed durable barrier leaves external effects uncertain; reopen the Session. */
+/** A failed durable barrier leaves external effects uncertain; reopen the Session.
+ * @experimental
+ */
 export class RunCheckpointError extends MayError {
   constructor(cause: unknown) {
     super("RUN_CHECKPOINT_FAILED", `Run checkpoint failed: ${cause instanceof Error ? cause.message : String(cause)}`, {
@@ -89,18 +103,21 @@ export class RunCheckpointError extends MayError {
   }
 }
 
+/** @experimental */
 export class ToolNotFoundError extends MayError {
   constructor(name: string) {
     super("TOOL_NOT_FOUND", `Tool \"${name}\" was not found`);
   }
 }
 
+/** @experimental */
 export class ToolHookDeniedError extends MayError {
   constructor(reason: string) {
     super("TOOL_HOOK_DENIED", reason);
   }
 }
 
+/** @experimental */
 export class HookExecutionError extends MayError {
   readonly hookName: string;
 

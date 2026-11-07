@@ -30,10 +30,15 @@
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
-    "@sortedyuan/may": "workspace:*"
+    "@sortedyuan/may": "workspace:*",
+    "@vscode/ripgrep": "^1.18.0",
+    "html-to-text": "^10.0.1",
+    "ipaddr.js": "^2.5.0",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@sortedyuan/test-support": "workspace:*",
+    "@types/html-to-text": "^9.0.4",
     "@types/node": "^22.0.0"
   },
   "engines": {

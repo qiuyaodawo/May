@@ -4,6 +4,7 @@ import stringWidth from "string-width";
 import wrapAnsi from "wrap-ansi";
 import type { RenderResult, RenderSize } from "./component.js";
 
+/** @experimental */
 export interface TextSpan {
   readonly x: number;
   readonly width: number;
@@ -11,6 +12,7 @@ export interface TextSpan {
   readonly end: number;
 }
 
+/** @experimental */
 export interface TextRow {
   readonly sourceId: string;
   readonly source: string;
@@ -19,11 +21,13 @@ export interface TextRow {
   readonly spans: readonly TextSpan[];
 }
 
+/** @experimental */
 export interface TextCopyRange {
   readonly start: number;
   readonly end: number;
 }
 
+/** @experimental */
 export interface TextDocumentLine {
   readonly value: string;
   /** 未提供时，该行用于界面装饰，不进入复制内容。 */
@@ -32,7 +36,10 @@ export interface TextDocumentLine {
 
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
-/** 使用布局时的文字范围连接终端列坐标与复制内容。 */
+/**
+ * 使用布局时的文字范围连接终端列坐标与复制内容。
+ * @experimental
+ */
 export function renderTextDocument(
   document: readonly TextDocumentLine[],
   size: RenderSize,
@@ -158,6 +165,7 @@ function expandTabs(value: string): { value: string; starts?: readonly number[];
   return { value: value.replaceAll("\t", "  "), starts, ends };
 }
 
+/** @experimental */
 export function textRowOffset(row: TextRow, x: number): number {
   for (const span of row.spans) {
     if (x < span.x + span.width / 2) return span.start;
@@ -166,6 +174,7 @@ export function textRowOffset(row: TextRow, x: number): number {
   return row.end;
 }
 
+/** @experimental */
 export function highlightTextRow(line: string, row: TextRow, start: number, end: number): string {
   if (row.end <= start || row.start >= end) return line;
   const spans = row.spans.filter((span) => span.start < end && span.end > start);

@@ -12,6 +12,12 @@
 
 ## 启动应用
 
+对于 `anthropic-messages` adapter，MaybeCode 默认使用
+`promptCaching: { "ttl": "5m", "cacheInstructions": true }`。将 Provider 或模型的
+`options.promptCaching` 设置为 `false` 可以关闭缓存。五分钟写入价格为基础输入价格的
+1.25 倍，一小时写入为 2 倍，读取通常为 0.1 倍。最小缓存长度取决于模型，参阅
+[配置说明](../reference/configuration.md)。兼容端点拒绝 `cache_control` 时需要关闭缓存。
+
 MaybeCode 要求 Node.js 22 或更新版本。
 
 在 May 仓库根目录执行：
@@ -99,6 +105,14 @@ pnpm maybecode
 
 ## 控制工具审批
 
+默认编码工具包括 `read`、`glob`、`grep`、`shell`、`edit`、`write` 和 `fetch`。
+使用 `glob` 查找文件名称，使用 `grep` 搜索文件内容；两者遵循 `.gitignore`，
+并限制输出和执行时间。只读集合包含 `read`、`glob` 和 `grep`。`fetch` 读取
+HTTP/HTTPS 文字，将 HTML 转换为便于阅读的文字，不携带宿主凭据或 cookie。
+默认允许公网地址；`apps.maybecode.fetch.allowedOrigins` 将访问范围限制为列出的
+origin，也可以明确允许本地服务。每次重定向重新检查地址。网络访问具有独立审批
+类别，默认模式需要审批。
+
 默认模式在执行命令或修改文件之前请求批准。`--yolo` 开启自动审批，`--no-yolo`
 覆盖配置中的 YOLO 默认模式。通过 `/yolo on` 或 `/yolo off` 切换之前，暂停或取消
 活动工作。`/yolo` 同样开启模式，`/yolo status` 查询状态。
@@ -106,6 +120,27 @@ pnpm maybecode
 终端和 WebUI 在开启期间显示 **YOLO · Auto-approve**。WebUI 还提供 **Permissions**
 选择器。权限策略明确禁止的操作继续被拒绝。模式范围、重新启动行为、持久规则及
 独立的团队授权见[权限模式](../reference/configuration.md#maybecode-权限模式)。
+
+## 配置执行隔离
+
+`apps.maybecode.execution` 默认值为 `{ "mode": "host" }`。宿主命令使用启动账户的
+权限和环境变量。容器模式要求 Docker Desktop 或兼容运行时，且服务已经启动。
+启动应用前拉取镜像：
+
+```bash
+docker pull nixery.dev/shell/git/ripgrep/util-linux
+```
+
+镜像必须包含 `bash`、`git`、`rg` 和 `setsid`。按照[配置参考](../reference/configuration.md)
+设置镜像和资源限制。Docker、镜像或所需程序不可用时，应用启动失败。
+
+应用管理长期运行的容器。shell、搜索和委派工具使用其执行环境；team 检查继承执行配置。
+工作区挂载到 `/workspace`，命令工作目录从宿主路径转换为容器路径。
+文件工具继续通过宿主工作区检查访问同一份文件。容器使用非 root 用户、只读根目录、
+临时存储、关闭的网络、内存和 CPU 限制及受限权限。挂载范围排除 home、凭据和
+Docker socket。取消时等待命令终止，应用关闭时等待执行资源清理和容器删除。
+
+MCP server 继续在宿主运行。`fetch` 使用独立的宿主网络策略和审批类别。
 
 ## 在 MaybeCode 执行期间发送消息
 

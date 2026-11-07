@@ -7,6 +7,7 @@ import writeFileAtomic from "write-file-atomic";
 import { hasErrorCode } from "./errors.js";
 import { withFileAccess } from "./file-access.js";
 
+/** @experimental */
 export interface FileLock {
   readonly path: string;
   /** Reject when the lock path no longer refers to the locked file, for example after a rename. */
@@ -18,6 +19,7 @@ export interface FileLock {
  * Process-exclusive writer lock backed by an OS file lock. The OS releases it when the
  * owner exits, so a lock file left by a crashed process never blocks the next owner.
  * Owner metadata in `<path>.owner` is informational and only used in conflict errors.
+ * @experimental
  */
 export async function acquireFileLock(path: string): Promise<FileLock> {
   const noFollow = process.platform === "win32" ? 0 : constants.O_NOFOLLOW;
@@ -66,12 +68,15 @@ export async function acquireFileLock(path: string): Promise<FileLock> {
   };
 }
 
+/** @experimental */
 export interface FileLockSync {
   readonly path: string;
   release(): void;
 }
 
-/** Synchronous form of acquireFileLock for hosts built on synchronous storage such as node:sqlite. */
+/** Synchronous form of acquireFileLock for hosts built on synchronous storage such as node:sqlite.
+ * @experimental
+ */
 export function acquireFileLockSync(path: string): FileLockSync {
   const noFollow = process.platform === "win32" ? 0 : constants.O_NOFOLLOW;
   const file = openSync(path, constants.O_CREAT | constants.O_RDWR | noFollow, 0o600);
@@ -132,6 +137,7 @@ async function describeOwner(path: string): Promise<string> {
   return ` (owner: ${text.slice(0, 512)})`;
 }
 
+/** @experimental */
 export async function syncDirectory(path: string): Promise<void> {
   // Windows does not provide POSIX directory fsync through Node.
   if (process.platform === "win32") return;
@@ -143,13 +149,17 @@ export async function syncDirectory(path: string): Promise<void> {
   }
 }
 
-/** Atomically replace a file's contents and make the rename durable. */
+/** Atomically replace a file's contents and make the rename durable.
+ * @experimental
+ */
 export async function writeFileDurable(path: string, contents: string | Buffer, mode = 0o600): Promise<void> {
   await writeFileAtomic(path, contents, { mode });
   await syncDirectory(dirname(path));
 }
 
-/** Caller owns the writer lock. A failure after rename has an unknown durability outcome. */
+/** Caller owns the writer lock. A failure after rename has an unknown durability outcome.
+ * @experimental
+ */
 export async function replaceJournalFile(path: string, contents: string): Promise<FileHandle> {
   await withFileAccess(path, "exclusive", () => writeFileAtomic(path, contents, { mode: 0o600 }));
   await syncDirectory(dirname(path));

@@ -6,6 +6,9 @@ May is a developer-preview framework. Public APIs, protocol representations and
 storage formats can change before `1.0.0`. Read release notes and compile consumers
 against each upgrade. This reference describes current compatibility boundaries.
 
+The [API stability reference](stability.md) defines stability levels, versioning
+commitments, the symbol inventory and API reports.
+
 ## Supported runtime
 
 Package names use the `@sortedyuan` scope. For dependency, import and configuration

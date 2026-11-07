@@ -1,6 +1,7 @@
 import { omitUndefined } from "./omit-undefined.js";
 import type { Usage, UsageItem, UsageTokenRelation } from "./types.js";
 
+/** @experimental */
 export interface TokenPrices {
   readonly inputUsdPerMillion: number;
   readonly outputUsdPerMillion: number;
@@ -9,6 +10,7 @@ export interface TokenPrices {
   readonly reasoningUsdPerMillion?: number;
 }
 
+/** @experimental */
 export interface TokenPriceSchedule {
   readonly id: string;
   readonly version: string;
@@ -23,6 +25,7 @@ export interface TokenPriceSchedule {
   readonly items?: Readonly<Record<string, { readonly unit: string; readonly perUnit: number }>>;
 }
 
+/** @experimental */
 export interface UsageCost {
   readonly amount?: number;
   readonly currency: string;
@@ -35,11 +38,13 @@ export interface UsageCost {
   readonly effectiveAt?: string;
 }
 
+/** @experimental */
 export type UsagePricer = (
   usage: Readonly<Usage> | undefined,
   pricing: Readonly<TokenPriceSchedule> | undefined,
 ) => UsageCost;
 
+/** @experimental */
 export interface UsageTotals {
   readonly totalTokens?: number;
   readonly complete: boolean;
@@ -52,6 +57,7 @@ const detailFields = [
   ["reasoningTokens", "reasoning", "reasoningPerMillion"],
 ] as const;
 
+/** @experimental */
 export function validateTokenPrices(prices: TokenPrices): void {
   object(prices, "tokenPrices");
   const fields = [
@@ -69,6 +75,7 @@ export function validateTokenPrices(prices: TokenPrices): void {
   nonnegative(prices.outputUsdPerMillion, "tokenPrices.outputUsdPerMillion");
 }
 
+/** @experimental */
 export function resolvePriceSchedule(
   value?: TokenPriceSchedule | TokenPrices,
 ): Readonly<TokenPriceSchedule> | undefined {
@@ -137,6 +144,7 @@ export function resolvePriceSchedule(
   });
 }
 
+/** @experimental */
 export function resolveUsageTotals(usage?: Usage): UsageTotals {
   if (usage === undefined) return { complete: false, missingReasons: ["usage-missing"] };
   validateUsage(usage);
@@ -188,6 +196,7 @@ export function resolveUsageTotals(usage?: Usage): UsageTotals {
   return omitUndefined({ totalTokens, complete: missing.length === 0, missingReasons: missing });
 }
 
+/** @experimental */
 export function aggregateUsage(current: Usage | undefined, next: Usage | undefined): Usage | undefined {
   if (current === undefined && next === undefined) return undefined;
   if (current === undefined) return next === undefined ? undefined : structuredClone(next);
@@ -268,6 +277,7 @@ export function aggregateUsage(current: Usage | undefined, next: Usage | undefin
   return usage;
 }
 
+/** @experimental */
 export function priceUsage(usage?: Usage, prices?: TokenPriceSchedule | TokenPrices, pricer?: UsagePricer): UsageCost {
   const schedule = resolvePriceSchedule(prices);
   if (usage !== undefined) resolveUsageTotals(usage);
@@ -286,6 +296,7 @@ export function priceUsage(usage?: Usage, prices?: TokenPriceSchedule | TokenPri
   );
 }
 
+/** @experimental */
 export function validateUsageCost(result: UsageCost): UsageCost {
   object(result, "usage cost");
   currency(result.currency);

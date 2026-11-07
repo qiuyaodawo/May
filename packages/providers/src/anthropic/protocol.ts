@@ -1,10 +1,15 @@
 import type { JsonSchema } from "@sortedyuan/may/core";
 
+/** @experimental */
 export const ANTHROPIC_MODEL_STATE_TYPE = "@may/provider-anthropic/message-v1";
 
-/** Provider/model metadata determines concrete supported values. */
+/**
+ * Provider/model metadata determines concrete supported values.
+ * @experimental
+ */
 export type AnthropicReasoningEffort = string;
 
+/** @experimental */
 export type AnthropicThinkingConfig =
   | {
       type: "enabled";
@@ -18,6 +23,7 @@ export type AnthropicThinkingConfig =
   | { type: "disabled" };
 
 export interface AnthropicTextBlock {
+  cache_control?: AnthropicCacheControl;
   type: "text";
   text: string;
 }
@@ -75,22 +81,25 @@ export interface AnthropicRequestMessage {
 }
 
 export interface AnthropicToolDefinition {
+  cache_control?: AnthropicCacheControl;
   name: string;
   description: string;
   input_schema: JsonSchema;
 }
 
+/** @experimental */
 export interface AnthropicModelStateData {
   messageId: string;
   content: AnthropicAssistantContentBlock[];
 }
 
 export interface AnthropicMessagesRequest {
+  cache_control?: AnthropicCacheControl;
   model: string;
   max_tokens: number;
   messages: AnthropicRequestMessage[];
   stream: true;
-  system?: string;
+  system?: string | AnthropicTextBlock[];
   tools?: AnthropicToolDefinition[];
   thinking?:
     | {
@@ -104,4 +113,9 @@ export interface AnthropicMessagesRequest {
       }
     | { type: "disabled" };
   output_config?: { effort: AnthropicReasoningEffort };
+}
+
+export interface AnthropicCacheControl {
+  readonly type: "ephemeral";
+  readonly ttl?: "5m" | "1h";
 }

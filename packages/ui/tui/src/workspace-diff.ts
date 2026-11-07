@@ -5,6 +5,7 @@ import { ListSelectionModel, printableKeyText, removeLastCodePoint } from "./lis
 import { Text, sanitizeTerminalText } from "./text.js";
 import { DEFAULT_DARK_THEME, styleText, type TuiTheme } from "./theme.js";
 
+/** @experimental */
 export interface WorkspaceDiffFile {
   readonly path: string;
   readonly status: string;
@@ -13,6 +14,7 @@ export interface WorkspaceDiffFile {
   readonly deletions: number;
   readonly patch: string;
 }
+/** @experimental */
 export interface WorkspaceDiff {
   readonly runId?: string;
   readonly restorePreviewId?: string;
@@ -23,7 +25,10 @@ export interface WorkspaceDiff {
   readonly files: readonly WorkspaceDiffFile[];
 }
 
-/** 文件列表与 unified diff 使用相同的工具变化颜色，保留键盘滚动和搜索。 */
+/**
+ * 文件列表与 unified diff 使用相同的工具变化颜色，保留键盘滚动和搜索。
+ * @experimental
+ */
 export class WorkspaceDiffViewer implements InteractiveComponent {
   private readonly selection: ListSelectionModel<WorkspaceDiffFile>;
   private mode: "files" | "patch" | "search" = "files";
@@ -221,6 +226,7 @@ function navigation(key: string): "up" | "down" | "page-up" | "page-down" | "hom
   return undefined;
 }
 
+/** @experimental */
 export function workspaceGitLabel(workspace: {
   readonly status: string;
   readonly branch?: string;

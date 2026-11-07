@@ -14,6 +14,7 @@ import { delegationTool } from "./delegation-tool.js";
 import { messagingTools } from "./messaging-tools.js";
 import { handoffTool } from "./handoff-tool.js";
 
+/** @experimental */
 export interface ApplicationAgentOptions {
   readonly version: string;
   readonly definition:
@@ -31,7 +32,9 @@ export interface ApplicationAgentOptions {
   readonly onOpen?: (application: AgentApplication, execution: TaskExecution) => void;
 }
 
-/** 每个任务 controller 一个 Session；每一轮一个确定的输入与 Run。输入不会被重放。 */
+/** 每个任务 controller 一个 Session；每一轮一个确定的输入与 Run。输入不会被重放。
+ * @experimental
+ */
 export function createApplicationAgent(options: ApplicationAgentOptions): CoordinationAgent {
   name(options.version, "agent version");
   const { version, definition, store } = options;
@@ -114,7 +117,9 @@ export function createApplicationAgent(options: ApplicationAgentOptions): Coordi
   };
 }
 
-/** 为宿主管理的 Agent 对话提供已有的协作工具。 */
+/** 为宿主管理的 Agent 对话提供已有的协作工具。
+ * @experimental
+ */
 export function createCoordinationTools(context: TaskExecutionContext, onYield: () => void): readonly Tool[] {
   return [delegationTool(context, onYield), ...messagingTools(context, onYield), handoffTool(context, onYield)];
 }

@@ -21,9 +21,11 @@ import {
 } from "./validation.js";
 import type { ProviderModelSelection } from "./types.js";
 
+/** @experimental */
 export interface CapabilityValidatedModelOptions extends ModelRequestValidationOptions {
   readonly resolver?: ModelCapabilityResolver;
 }
+/** @experimental */
 export class CapabilityValidatedModel implements Model {
   readonly contextCompactor?: ModelContextCompactor;
   private readonly resolver: ModelCapabilityResolver;
@@ -240,6 +242,7 @@ export class CapabilityValidatedModel implements Model {
       : request;
   }
 }
+/** @experimental */
 export function createCapabilityValidatedModel(
   model: Model,
   selection: ProviderModelSelection,

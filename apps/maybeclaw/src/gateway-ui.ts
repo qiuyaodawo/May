@@ -478,12 +478,12 @@ export class GatewayUiHost implements UiHost {
     }
     if (command.name === "session.rename") {
       commandArgs(command, ["name"]);
-      await this.gateway.updateSession(target.id, controlActor, { name: command.args.name! });
+      this.gateway.updateSession(target.id, controlActor, { name: command.args.name! });
       return {};
     }
     if (command.name === "session.bind") {
       commandArgs(command, ["entry", "confirm"]);
-      await this.gateway.updateSession(target.id, controlActor, {
+      this.gateway.updateSession(target.id, controlActor, {
         entry: parseGatewayEntry(JSON.parse(command.args.entry!)),
         confirmBinding: command.args.confirm === "true",
       });

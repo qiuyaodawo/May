@@ -71,6 +71,7 @@ May 提供可组合的软件包，用于模型和工具执行、持久对话、�
 - [软件包与公开入口](reference/packages.md)。
 - [Provider、模型和应用配置](reference/configuration.md)。
 - [兼容性、稳定性与运行环境](reference/compatibility.md)。
+- [API 稳定性与报告](reference/stability.md)。
 - [MCP 能力与协议兼容性](reference/mcp-capabilities.md)。
 
 各个软件包的 README 描述具体导出。导入时使用 `exports` 声明的入口。

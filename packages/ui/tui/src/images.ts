@@ -9,6 +9,7 @@ import { Text, sanitizeTerminalText } from "./text.js";
 
 export { terminalImageProtocol, type ImageProtocol } from "./image-support.js";
 
+/** @experimental */
 export interface TerminalImagesOptions {
   readonly cellSize?: () => TerminalCellSize | undefined;
 }
@@ -19,6 +20,7 @@ type PreparedImage = SavedImage & {
   frame?: { key: string; sixel: string };
 };
 
+/** @experimental */
 export class TerminalImages {
   private readonly values = new Map<string, PreparedImage>();
   private sixel: typeof import("./sixel.js") | undefined;
@@ -131,6 +133,7 @@ export class TerminalImages {
   }
 }
 
+/** @experimental */
 export function encodeImage(image: ImagePlacement): string {
   if (image.protocol === "sixel") return `\x1b[?80;8452s\x1b[?80l\x1b[?8452h${image.sixel}\x1b[?80;8452r`;
   if (image.protocol === "iterm2")

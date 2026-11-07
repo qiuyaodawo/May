@@ -1,5 +1,6 @@
 import type { TraceAttributes, TraceAttributeValue } from "@sortedyuan/may/core";
 
+/** @experimental */
 export interface TelemetryLimits {
   readonly maxAttributes?: number;
   readonly maxStringLength?: number;
@@ -7,6 +8,7 @@ export interface TelemetryLimits {
   readonly maxEvents?: number;
 }
 
+/** @experimental */
 export const DEFAULT_TELEMETRY_LIMITS = Object.freeze({
   maxAttributes: 64,
   maxStringLength: 256,
@@ -14,6 +16,7 @@ export const DEFAULT_TELEMETRY_LIMITS = Object.freeze({
   maxEvents: 64,
 });
 
+/** @experimental */
 export function telemetryLimits(options: TelemetryLimits = {}): Required<TelemetryLimits> {
   const result = { ...DEFAULT_TELEMETRY_LIMITS, ...options };
   for (const [key, value] of Object.entries(result)) {
@@ -22,6 +25,7 @@ export function telemetryLimits(options: TelemetryLimits = {}): Required<Telemet
   return result;
 }
 
+/** @experimental */
 export function boundedAttributes(
   attributes: TraceAttributes,
   limits: Required<TelemetryLimits> = DEFAULT_TELEMETRY_LIMITS,

@@ -1,9 +1,13 @@
 import { omitUndefined } from "@sortedyuan/may/core";
 import { OpenAICompatibleChatModel } from "../openai-compatible/chat-model.js";
 
-/** Provider/model metadata determines concrete supported values. */
+/**
+ * Provider/model metadata determines concrete supported values.
+ * @experimental
+ */
 export type DeepSeekReasoningEffort = string;
 
+/** @experimental */
 export interface DeepSeekModelOptions {
   apiKey: string;
   model: string;
@@ -14,6 +18,7 @@ export interface DeepSeekModelOptions {
   fetch?: typeof globalThis.fetch;
 }
 
+/** @experimental */
 export class DeepSeekModel extends OpenAICompatibleChatModel {
   constructor(options: DeepSeekModelOptions) {
     const { thinking, maxTokens, ...shared } = options;

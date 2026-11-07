@@ -74,6 +74,7 @@ experience. Public APIs and persistence formats are currently in developer previ
 - [Packages and public entry points](reference/packages.md).
 - [Provider, model, and application configuration](reference/configuration.md).
 - [Compatibility, stability, and runtime requirements](reference/compatibility.md).
+- [API stability and reports](reference/stability.md).
 - [MCP capabilities and protocol compatibility](reference/mcp-capabilities.md).
 
 Package READMEs describe their individual exports. Import only entry points

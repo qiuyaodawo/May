@@ -12,7 +12,10 @@ import { omitUndefined } from "@sortedyuan/may/core";
 import { McpCapabilityError } from "./errors.js";
 import type { McpInteractionBroker, McpInteractionOwner, McpHostReviewParams } from "./interactions.js";
 
-/** Explicit compatibility switches. Disabled unless the host also supplies a UI and service. */
+/**
+ * Explicit compatibility switches. Disabled unless the host also supplies a UI and service.
+ * @experimental
+ */
 export interface McpServerHostOptions {
   readonly roots?: boolean;
   readonly sampling?: boolean;
@@ -20,6 +23,7 @@ export interface McpServerHostOptions {
   readonly legacyRequests?: "isolated";
 }
 
+/** @experimental */
 export interface McpHostRequestContext {
   readonly serverId: string;
   readonly requestId: string;
@@ -28,6 +32,7 @@ export interface McpHostRequestContext {
   readonly expiresAt: number;
 }
 
+/** @experimental */
 export interface McpSamplingService {
   /** Tool proposals/results within the sampling exchange; never invokes host tools. */
   readonly supportsTools?: boolean;
@@ -38,6 +43,7 @@ export interface McpSamplingService {
   ): Promise<CreateMessageResult | CreateMessageResultWithTools>;
 }
 
+/** @experimental */
 export interface McpHostServices {
   /** Host-selected allowlist only. The server cannot nominate directories. */
   readonly roots?: (context: McpHostRequestContext) => Promise<readonly Root[]>;
@@ -177,7 +183,7 @@ export class McpHostServiceRunner {
 
   private async samplingParams(raw: unknown): Promise<CreateMessageRequestParams> {
     hostBounded(raw, this.serverId, 48 * 1024);
-    const parsed = await specTypeSchemas.CreateMessageRequestParams["~standard"].validate(raw);
+    const parsed = specTypeSchemas.CreateMessageRequestParams["~standard"].validate(raw);
     if (parsed.issues !== undefined) throw hostFailure(this.serverId, "invalid sampling request");
     const value = parsed.value;
     if (
@@ -215,7 +221,7 @@ export class McpHostServiceRunner {
     hostBounded(raw, this.serverId, 48 * 1024);
     const schema =
       params.tools === undefined ? specTypeSchemas.CreateMessageResult : specTypeSchemas.CreateMessageResultWithTools;
-    const parsed = await schema["~standard"].validate(raw);
+    const parsed = schema["~standard"].validate(raw);
     if (parsed.issues !== undefined) throw hostFailure(this.serverId, "invalid sampling result");
     const result = parsed.value;
     for (const content of Array.isArray(result.content) ? result.content : [result.content]) {

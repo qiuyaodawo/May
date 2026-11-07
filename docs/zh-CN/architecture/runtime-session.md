@@ -70,6 +70,10 @@ flowchart LR
 
 ### `@sortedyuan/may/core`
 
+`may.ts` 管理运行状态、调度、取消、checkpoint 顺序和关闭。`model-step.ts` 通过
+`ModelStepHost` 准备请求和观察模型事件流；`tool-outcomes.ts` 转换工具结果与事件；
+`run-tracing.ts` 提供运行、模型和用量追踪辅助函数。
+
 Core 负责活动执行：
 
 - `Model`、`Tool` 和 `Context` 接口；
@@ -101,6 +105,11 @@ Context 包提供工厂和 Core 最小 `Context` 接口的可复用实现。应�
 `modelState` 序列化和恢复原生续接状态。
 
 ### `@sortedyuan/may/session`
+
+`session.ts` 组合内部模块，继续管理可变的运行状态、提交顺序、取消、关闭和持久化。
+`run-observer.ts` 转换运行时事件，`recovery.ts` 识别中断，`replay.ts` 重建历史，
+`branching.ts` 准备继承历史，`runtime-state.ts` 处理运行时状态迁移，
+`request-recorder.ts` 准备请求记录。
 
 Session 包把 Core 组合成长生命周期身份。它负责 Session 标识、元数据、串行
 提交、Context 连续性、Session 事件和存储接口，也提供可复用的内存及文件 Catalog。
@@ -162,6 +171,11 @@ Tracer 与处理器生命周期由调用方管理，可以在多个 Application
 
 ### `@sortedyuan/mcp`
 
+`client.ts` 保留公共组合入口。`connection.ts` 管理各个服务连接，`client-pool.ts`
+管理连接池状态和刷新顺序，`connection-apps.ts` 包含 Apps 集成，
+`transport-support.ts` 包含传输辅助函数。原有生命周期所有者继续管理取消和连接
+关闭顺序。
+
 MCP 包是位于工具边界的可选适配器。它依赖 Core 的 `Tool` 与追踪接口，
 Core 不依赖 MCP 或其 SDK。客户端池拥有 stdio 子进程与 Streamable HTTP 传输，通过
 发现带版本的 tools/resources/templates/prompts 元数据目录，并公开由 `tools/call`
@@ -179,6 +193,14 @@ Core 不依赖 MCP 或其 SDK。客户端池拥有 stdio 子进程与 Streamable
 I/O。运行时取消会传播到远程请求。打开客户端池的产品管理它及其进程的生命周期。
 
 ### `@sortedyuan/may/application`
+
+`application.ts` 继续管理应用状态和运行、关闭的生命周期。`plugin-composition.ts`
+准备插件与服务组合，`compaction-controller.ts` 处理 compaction 执行和持久化映射，
+`session-navigation.ts` 选择恢复、分支和插件状态。
+打开应用时，`opening-plugins.ts` 负责插件范围和服务解析，`opening-tools.ts` 负责工具
+与权限，`runtime-assembly.ts` 负责创建 runtime，`opening-session.ts` 负责打开和恢复
+Session。`application-events.ts` 连接事件转发，`opening-completion.ts` 完成初始状态
+持久化。`application-compaction.ts` 准备压缩操作，应用继续管理取消和操作顺序。
 
 Application 包提供位于 Session 与 Core 之上的独立于 UI 的编排。
 `AgentDefinition` 保存可跨 Session 复用的模型、工具、指令、权限、Context、工具执行
@@ -245,6 +267,23 @@ Session、worktree、MCP 操作以及模型配置与推理强度策略。
 的 `MaybeCodeApplication`，用于读取状态；`controller.transition(action)` 在该 Session 的
 队列中执行状态修改。随项目提供的前端使用此接口，其他 UI 也可复用同一个控制器。
 MaybeCode 渲染和命令策略由相应前端提供。
+
+`workspace.ts` 管理 Workspace 状态迁移和资源关闭。
+`workspace-configuration.ts` 准备配置和应用创建，`model-transition.ts` 检查模型配置
+和已保存的身份，`session-navigation.ts` 生成分支位置视图，`workspace-state.ts`
+定义内部共享状态类型。
+
+### `apps/maybeclaw`
+
+`gateway.ts` 组合渠道 Gateway，继续管理执行队列、取消、关闭、恢复和通知顺序。
+内部 `gateway/access.ts` 检查访问权限和更新 Session；`gateway/messages.ts` 在同一个
+事务中写入消息序号、内容、交付队列和 Session 时间；`gateway/task-projection.ts`
+维护已保存的任务视图。
+`gateway/input.ts` 处理输入，`gateway/coordination.ts` 协调 Agent，`gateway/tasks.ts`
+处理任务恢复和派发。`gateway/approvals.ts` 处理审批，`gateway/management.ts` 管理成员
+和会话，`gateway/maintenance.ts` 执行维护和 adapter 清理。`gateway/permissions.ts` 管理
+权限规则，`gateway/adapters.ts` 解析 adapter 并准备 binding。这些模块使用内部所有者接口，
+可变状态继续由 `AgentGateway` 持有。
 
 ## 事件与持久化
 

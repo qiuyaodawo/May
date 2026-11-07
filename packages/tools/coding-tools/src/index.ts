@@ -9,3 +9,8 @@ export * from "./read.js";
 export * from "./shell.js";
 export * from "./write.js";
 export * from "./workspace-path.js";
+export * from "./glob.js";
+export * from "./grep.js";
+export * from "./fetch.js";
+export * from "./execution.js";
+export * from "./search.js";

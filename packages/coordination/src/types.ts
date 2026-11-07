@@ -2,11 +2,13 @@ import type { AgentApplicationEvent } from "@sortedyuan/may";
 import type { RunBudget, RunBudgetSnapshot, Usage } from "@sortedyuan/may/core";
 import type { ApprovalDecision } from "@sortedyuan/may/permissions";
 
+/** @experimental */
 export type TaskStatus =
   "queued" | "running" | "waiting" | "cancelling" | "completed" | "failed" | "cancelled" | "recovery-required";
 
 /**
  * 静态图节点或经过宿主校验的子任务。静态依赖必须全部成功。
+ * @experimental
  */
 export interface TaskSpec {
   readonly id: string;
@@ -20,7 +22,9 @@ export interface TaskSpec {
   readonly files?: readonly string[];
 }
 
-/** Only the explicit answer crosses task boundaries, never reasoning/model state. */
+/** Only the explicit answer crosses task boundaries, never reasoning/model state.
+ * @experimental
+ */
 export interface TaskOutput {
   readonly text: string;
   readonly runId?: string;
@@ -28,12 +32,15 @@ export interface TaskOutput {
   readonly budget?: RunBudgetSnapshot;
 }
 
+/** @experimental */
 export interface TaskMessageSpec {
   readonly toTaskId: string;
   readonly text: string;
 }
 
-/** Durable task-addressed data. Sender and turn are stamped by the runtime. */
+/** Durable task-addressed data. Sender and turn are stamped by the runtime.
+ * @experimental
+ */
 export interface TaskMessage extends TaskMessageSpec {
   readonly id: string;
   readonly fromTaskId: string;
@@ -41,12 +48,14 @@ export interface TaskMessage extends TaskMessageSpec {
   readonly deliveredTurn?: number;
 }
 
+/** @experimental */
 export interface HandoffSpec {
   readonly agent: string;
   /** Explicit context summary, not a replacement for the original task input. */
   readonly input: string;
 }
 
+/** @experimental */
 export interface TaskController {
   readonly agent: string;
   readonly agentVersion: string;
@@ -56,6 +65,7 @@ export interface TaskController {
   readonly turn: number;
 }
 
+/** @experimental */
 export interface TaskHandoff {
   readonly commandId: string;
   readonly input: string;
@@ -63,20 +73,25 @@ export interface TaskHandoff {
   readonly to: TaskController;
 }
 
-/** The previous terminal attempt stays immutable; retry never rewrites its Session. */
+/** The previous terminal attempt stays immutable; retry never rewrites its Session.
+ * @experimental
+ */
 export interface TaskAttempt {
   readonly commandId: string;
   readonly finding: string;
   readonly task: Omit<CoordinationTask, "attempts">;
 }
 
-/** Host-only editing of never-submitted top-level graph nodes. */
+/** Host-only editing of never-submitted top-level graph nodes.
+ * @experimental
+ */
 export interface TaskGraphChange {
   readonly add?: readonly TaskSpec[];
   readonly update?: readonly TaskSpec[];
   readonly remove?: readonly string[];
 }
 
+/** @experimental */
 export interface TaskGraphRevision {
   readonly commandId: string;
   readonly change: TaskGraphChange;
@@ -84,6 +99,7 @@ export interface TaskGraphRevision {
   readonly previous: readonly CoordinationTask[];
 }
 
+/** @experimental */
 export interface CoordinationTask extends TaskSpec {
   /** 本轮执行前保存的 adapter 恢复协议版本；旧记录可以省略。 */
   readonly recoveryVersion?: number;
@@ -118,6 +134,7 @@ export interface CoordinationTask extends TaskSpec {
   readonly detail?: string;
 }
 
+/** @experimental */
 export interface CoordinationLimits {
   readonly maxConcurrent: number;
   readonly maxTasks: number;
@@ -137,6 +154,7 @@ export interface CoordinationLimits {
   readonly runBudget?: RunBudget;
 }
 
+/** @experimental */
 export interface CoordinationSnapshot {
   readonly format: 1;
   readonly id: string;
@@ -153,6 +171,7 @@ export interface CoordinationSnapshot {
   readonly commands: Readonly<Record<string, string>>;
 }
 
+/** @experimental */
 export interface TaskExecution {
   readonly telemetry?: import("@sortedyuan/may/core").TelemetryCorrelation;
   readonly coordinationId: string;
@@ -168,6 +187,7 @@ export interface TaskExecution {
   }[];
 }
 
+/** @experimental */
 export interface TaskExecutionContext {
   readonly signal: AbortSignal;
   report(event: AgentApplicationEvent): void;
@@ -178,10 +198,12 @@ export interface TaskExecutionContext {
   handoff?(commandId: string, handoff: HandoffSpec): Promise<{ readonly taskId: string; readonly agent: string }>;
 }
 
+/** @experimental */
 export interface TaskYield {
   readonly yielded: true;
 }
 
+/** @experimental */
 export type TaskRecovery =
   | { readonly status: "not-started" }
   | { readonly status: "completed"; readonly output: TaskOutput }
@@ -190,7 +212,9 @@ export type TaskRecovery =
   | { readonly status: "cancelled"; readonly detail: string }
   | { readonly status: "recovery-required"; readonly detail: string };
 
-/** Trusted host adapter. recover must inspect durable evidence, never execute work. */
+/** Trusted host adapter. recover must inspect durable evidence, never execute work.
+ * @experimental
+ */
 export interface CoordinationAgent {
   readonly version: string;
   /** adapter 的持久请求身份协议，由 Runtime 在 dispatch 前保存。 */
@@ -202,7 +226,9 @@ export interface CoordinationAgent {
   resolveApproval?(sessionId: string, requestId: string, decision: ApprovalDecision): Promise<boolean>;
 }
 
-/** Policy callbacks run inside state serialization. Do not await commands on the same runtime. */
+/** Policy callbacks run inside state serialization. Do not await commands on the same runtime.
+ * @experimental
+ */
 export interface CoordinationPolicy {
   /** Bump whenever execution authority or task routing changes. Checked on resume. */
   readonly version: string;
@@ -237,6 +263,7 @@ export interface CoordinationPolicy {
   authorizeGraphRewrite?(change: Readonly<TaskGraphChange>, snapshot: CoordinationSnapshot): boolean | Promise<boolean>;
 }
 
+/** @experimental */
 export type CoordinationEvent =
   | { readonly type: "state.changed"; readonly snapshot: CoordinationSnapshot }
   | {
@@ -247,13 +274,16 @@ export type CoordinationEvent =
     }
   | { readonly type: "runtime.failed"; readonly message: string };
 
-/** One exclusive writer per coordination; acknowledgement must be durable. */
+/** One exclusive writer per coordination; acknowledgement must be durable.
+ * @experimental
+ */
 export interface CoordinationJournal {
   read(): Promise<CoordinationSnapshot | undefined>;
   commit(snapshot: CoordinationSnapshot, expectedRevision: number): Promise<void>;
   close(): Promise<void>;
 }
 
+/** @experimental */
 export interface CoordinationStore {
   acquire(id: string): Promise<CoordinationJournal>;
 }

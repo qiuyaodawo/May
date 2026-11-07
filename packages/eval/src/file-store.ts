@@ -17,6 +17,7 @@ import type {
 } from "./types.js";
 import { assertJson, validateIdentifier } from "./validation.js";
 
+/** @experimental */
 export class FileEvalStore implements EvalStore {
   readonly directory: string;
   private readonly owned = new Map<string, DatabaseSync>();

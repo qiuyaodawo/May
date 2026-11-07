@@ -358,7 +358,9 @@ URL 和 file-ID 来源的字节需要宿主提供 `MediaReader`。
 `@sortedyuan/tui/node-terminal` 的 `createNodeTerminal()` 返回 `TerminalIO`。
 调用 `question(prompt, { password: true, signal })` 可以读取隐藏输入。输入和输出
 都需要连接 TTY。密码问题隔离并恢复输入历史，隐藏输入字符，并拒绝 `suggestions`。
-返回字符串为输入值。通过 `signal` 取消输入，完成后调用 `close()`。
+返回字符串为输入值。通过 `signal` 取消输入，完成后等待 `close()`。
+Node adapter 等待活动的建议提供函数，并通过 `close()` 传递其错误。
+自定义 `TerminalIO.close()` 实现可以返回 `void` 或 `Promise<void>`。
 `password` 默认值为 `false`。
 在交互终端中，`question(prompt, { onEscape, signal })` 在当前问题接收到 Esc 时
 调用 `onEscape`。回调可以取消对应 controller，使问题以 `AbortError` 结束。
@@ -372,7 +374,13 @@ URL 和 file-ID 来源的字节需要宿主提供 `MediaReader`。
 `@sortedyuan/ui-client` 导出与 UI 无关的 client 协议。`/application`、`/reading`、
 `/projection` 和 `/server` 子路径提供 application adapter、阅读状态、投影和
 server 支持。`@sortedyuan/web-ui` 提供浏览器 workbench 组件，`/styles.css` 和 `/assets`
-导出样式与资源支持。产品 adapter 保留各自的 Session/task 语义。参阅
+导出样式与资源支持。
+`UiClient.disconnect()` 和 `mountWebUI()` 返回的清理函数返回 `Promise<void>`。
+释放客户端或视图之前，需要等待这些方法。独立的 transcript reader、inspector、
+workspace UI 和 navigation 的 `dispose()` 方法也返回 Promise。界面清理等待
+已接受的 UI 工作及自定义 navigation 清理；navigation 清理回调可以返回 `void`
+或 `Promise<void>`。
+产品 adapter 保留各自的 Session/task 语义。参阅
 [Web UI 指南](../guides/web-ui.md)、
 [UI client README](../../../packages/ui/client/README.md)和
 [Web UI README](../../../packages/ui/web/README.md)。

@@ -6,6 +6,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { tryLock, unlock } from "fs-native-extensions";
 import { hasErrorCode } from "./errors.js";
 
+/** @experimental */
 export interface FileAccessOptions {
   readonly initialize?: boolean;
   readonly timeoutMs?: number;
@@ -18,7 +19,9 @@ interface AccessOwner {
 }
 const activeAccess = new AsyncLocalStorage<readonly AccessOwner[]>();
 
-/** 同一路径的全部读取和修改需要使用这个入口，并等待 action 完成文件操作。 */
+/** 同一路径的全部读取和修改需要使用这个入口，并等待 action 完成文件操作。
+ * @experimental
+ */
 export async function withFileAccess<T>(
   path: string,
   mode: "shared" | "exclusive",

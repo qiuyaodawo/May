@@ -62,7 +62,7 @@ const dispose = mountWebUI(root, client, {
   onNew: () => startFreshSession(),
 });
 await client.connect(controlToken);
-// dispose() disconnects this view, not the agent host.
+await dispose();
 ```
 
 Use your bundler for imports above, or `webUiAssets()` from `@sortedyuan/web-ui/assets`
@@ -75,6 +75,11 @@ the returned token in memory. Custom shells can pass an `initialToken` promise
 and a `connectionHint` to `mountWebUI`. With `initialToken`, the connection dialog
 shows the launcher instructions and omits manual token entry. Disposing the shell
 prevents a pending promise from connecting a closed view.
+The cleanup returned by `mountWebUI()` is asynchronous: await it to disconnect
+the client and wait for accepted UI reads and actions. Standalone transcript
+reader, inspector, and workspace UI `dispose()` methods also return promises.
+Navigation `dispose()` returns a promise and waits for navigation actions and
+custom `WebUiNavigationLifecycle.dispose()` callbacks, which may be asynchronous.
 
 When a product supplies `UiSnapshot.controls`, the composer offers slash-command
 completion and displays `UiReceipt.output` with guarded actions and confirmation

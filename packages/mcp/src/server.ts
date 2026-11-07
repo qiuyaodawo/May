@@ -11,7 +11,13 @@ import {
 } from "@modelcontextprotocol/server";
 import { serveStdio, StdioServerTransport, type StdioServerHandle } from "@modelcontextprotocol/server/stdio";
 import { AjvJsonSchemaValidator } from "@modelcontextprotocol/client/validators/ajv";
-import { omitUndefined, type Tool, type ToolExecutor, type ToolExecutionContext } from "@sortedyuan/may/core";
+import {
+  freezeToolInput,
+  omitUndefined,
+  type Tool,
+  type ToolExecutor,
+  type ToolExecutionContext,
+} from "@sortedyuan/may/core";
 import {
   assertMcpContentSize,
   mcpToolResultContent,
@@ -20,30 +26,36 @@ import {
 } from "./content.js";
 import { freezeTree, object } from "./tasks.js";
 
+/** @experimental */
 export interface MayMcpPrincipal {
   readonly id: string;
   readonly workspaceId: string;
   /** Unix milliseconds. Expired principals cannot continue pending operations. */
   readonly expiresAt?: number;
 }
+/** @experimental */
 export interface MayMcpExportContext {
   readonly principal: MayMcpPrincipal;
   readonly workspaceId: string;
   readonly signal: AbortSignal;
 }
+/** @experimental */
 export interface MayMcpToolExport {
   readonly tool: Tool;
   /** Explicit public projection: raw tool output is NEVER exported by default. */
   readonly result: (output: unknown) => CallToolResult | Promise<CallToolResult>;
 }
+/** @experimental */
 export interface MayMcpResourceExport {
   readonly definition: Resource;
   readonly read: (context: MayMcpExportContext) => Promise<ReadResourceResult>;
 }
+/** @experimental */
 export interface MayMcpPromptExport {
   readonly definition: Prompt;
   readonly get: (args: Readonly<Record<string, string>>, context: MayMcpExportContext) => Promise<GetPromptResult>;
 }
+/** @experimental */
 export interface MayMcpServerOptions {
   /** Exact externally addressed endpoint. HTTPS, or literal loopback HTTP for local use. */
   readonly endpoint: string;
@@ -64,7 +76,10 @@ export interface MayMcpServerOptions {
   readonly legacy?: "reject" | "stateless";
 }
 
-/** Independent opt-in export surface. Does not listen, load workspace tools or inspect Sessions. */
+/**
+ * Independent opt-in export surface. Does not listen, load workspace tools or inspect Sessions.
+ * @experimental
+ */
 export function createMayMcpServer(options: MayMcpServerOptions) {
   const endpoint = new URL(options.endpoint);
   if (
@@ -200,7 +215,9 @@ export function createMayMcpServer(options: MayMcpServerOptions) {
         await check(signal, "tools/call", entry.tool.name);
         const raw = structuredClone(request.params.arguments ?? {});
         if (!entry.validate(raw).valid) throw new Error("Invalid exported tool input");
-        const input = entry.tool.parse?.(raw) ?? raw;
+        const parsedInput = entry.tool.parse ? await entry.tool.parse(raw) : raw;
+        signal.throwIfAborted();
+        const input = freezeToolInput(parsedInput);
         const operationId = randomUUID();
         const context: ToolExecutionContext = {
           signal,
@@ -237,7 +254,7 @@ export function createMayMcpServer(options: MayMcpServerOptions) {
           await check(signal, "tools/call", entry.tool.name);
           const result = await bounded(signal, () => Promise.resolve(entry.result(output)));
           mcpToolResultContent("may-export", entry.tool.name, result);
-          const parsed = await specTypeSchemas.CallToolResult["~standard"].validate(result);
+          const parsed = specTypeSchemas.CallToolResult["~standard"].validate(result);
           if (parsed.issues !== undefined) throw denied();
           await check(signal, "tools/call", entry.tool.name);
           return parsed.value;
@@ -266,7 +283,7 @@ export function createMayMcpServer(options: MayMcpServerOptions) {
           entry.read({ principal: trusted, workspaceId, signal: ctx.mcpReq.signal }),
         );
         mcpResourceToUserMessage({ serverId: "may-export", uri: entry.definition.uri, result, fromCache: false });
-        const parsed = await specTypeSchemas.ReadResourceResult["~standard"].validate(result);
+        const parsed = specTypeSchemas.ReadResourceResult["~standard"].validate(result);
         if (
           parsed.issues !== undefined ||
           result.contents.some((item) => item.uri !== entry.definition.uri) ||
@@ -298,7 +315,7 @@ export function createMayMcpServer(options: MayMcpServerOptions) {
           entry.get(freezeTree(structuredClone(args)), { principal: trusted, workspaceId, signal: ctx.mcpReq.signal }),
         );
         mcpPromptToUserMessage({ serverId: "may-export", name: entry.definition.name, arguments: args, result });
-        const parsed = await specTypeSchemas.GetPromptResult["~standard"].validate(result);
+        const parsed = specTypeSchemas.GetPromptResult["~standard"].validate(result);
         if (parsed.issues !== undefined || result.messages.length > 128) throw denied();
         await check(ctx.mcpReq.signal, "prompts/get", entry.definition.name);
         return parsed.value;
@@ -418,7 +435,10 @@ class GuardedServer extends Server {
   }
 }
 
-/** Simple provisioned-token authentication; not an OAuth authorization server. */
+/**
+ * Simple provisioned-token authentication; not an OAuth authorization server.
+ * @experimental
+ */
 export function createMayMcpBearerAuthenticator(
   grants: readonly { readonly token: string; readonly principal: MayMcpPrincipal }[],
 ) {

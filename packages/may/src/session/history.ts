@@ -3,8 +3,10 @@ import type { SessionEvent } from "./events.js";
 import type { SessionStore } from "./store.js";
 import { validateSessionHistory } from "./store.js";
 
+/** @public */
 export type SessionEventType = SessionEvent["type"];
 
+/** @public */
 export interface SessionHistoryQuery {
   readonly afterSeq?: number;
   readonly beforeSeq?: number;
@@ -13,6 +15,7 @@ export interface SessionHistoryQuery {
   readonly types?: readonly SessionEventType[];
 }
 
+/** @public */
 export interface SessionHistoryPage {
   readonly events: readonly SessionEvent[];
   readonly hasMore: boolean;
@@ -23,11 +26,13 @@ export interface SessionHistoryPage {
   readonly nextSeq?: number;
 }
 
+/** @public */
 export interface SessionHistoryReaderOptions {
   readonly defaultLimit?: number;
   readonly maximumLimit?: number;
 }
 
+/** @public */
 export class SessionHistoryReader {
   private readonly defaultLimit: number;
   private readonly maximumLimit: number;
@@ -104,6 +109,7 @@ export class SessionHistoryReader {
   }
 }
 
+/** @experimental */
 export const SESSION_EVENT_TYPES: readonly SessionEventType[] = [
   "session.created",
   "session.fork.ready",

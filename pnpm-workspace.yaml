@@ -4,6 +4,7 @@ packages:
   - "packages/ui/*"
   - "apps/*"
   - "examples/*"
+  - "scripts/lint"
 allowBuilds:
   esbuild: true
   protobufjs: false

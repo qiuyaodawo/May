@@ -13,7 +13,9 @@ import {
   type UsagePricer,
 } from "./pricing.js";
 
-/** Limits for one Run/continue. Token and cost limits are checked at response boundaries. */
+/** Limits for one Run/continue. Token and cost limits are checked at response boundaries.
+ * @experimental
+ */
 export interface RunBudget {
   readonly maxDurationMs?: number;
   readonly maxSteps?: number;
@@ -26,6 +28,7 @@ export interface RunBudget {
   readonly usagePricer?: UsagePricer;
 }
 
+/** @experimental */
 export interface RunBudgetSnapshot {
   readonly elapsedMs: number;
   readonly steps: number;
@@ -39,6 +42,7 @@ export interface RunBudgetSnapshot {
   readonly latestCost?: UsageCost;
 }
 
+/** @experimental */
 export class RunBudgetExceededError extends MayError {
   constructor(
     readonly dimension: string,
@@ -49,7 +53,9 @@ export class RunBudgetExceededError extends MayError {
   }
 }
 
-/** Validate and snapshot caller-owned limits. Overrides may only tighten defaults. */
+/** Validate and snapshot caller-owned limits. Overrides may only tighten defaults.
+ * @experimental
+ */
 export function resolveRunBudget(defaults?: RunBudget, override?: RunBudget): Readonly<RunBudget> {
   for (const budget of [defaults, override]) {
     if (budget === undefined) continue;
@@ -139,6 +145,7 @@ function priceFingerprint(pricing: Readonly<TokenPriceSchedule>): string {
   ]);
 }
 
+/** @experimental */
 export class RunBudgetMeter {
   private readonly startedAt = Date.now();
   private steps = 0;

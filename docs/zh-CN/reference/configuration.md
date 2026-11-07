@@ -99,7 +99,7 @@ MaybeCode 的模型选择器可以持久化新的 `defaultModel`。它会重新�
 | `deepseek-chat`           | `thinking`、`reasoningEffort`、`maxTokens`                                                                    |
 | `zhipu-chat`              | `thinking`、`clearThinking`、`reasoningEffort`、`maxTokens`                                                   |
 | `kimi-chat`               | `thinking`、`reasoningEffort`、`maxTokens`                                                                    |
-| `anthropic-messages`      | `thinking`、`reasoningEffort`、`maxTokens`、`apiVersion`                                                      |
+| `anthropic-messages`      | `thinking`、`reasoningEffort`、`maxTokens`、`apiVersion`、`promptCaching`                                     |
 | `google-gemini`           | `maxOutputTokens`、`reasoningEffort`、`thinkingBudget`、`includeThoughts`、`responseFormat`                   |
 
 `google-gemini` 的 `baseURL` 包含 API 版本，默认使用
@@ -284,6 +284,26 @@ Anthropic 接受禁用、自适应或明确的 token 预算：
 }
 ```
 
+### Anthropic prompt caching
+
+Anthropic `options.promptCaching` 接受 `false` 或对象，例如
+`{ "ttl": "5m", "cacheInstructions": true }`。`ttl` 接受 `"5m"`（默认值）或
+`"1h"`；`cacheInstructions` 默认使用 `false`。Provider `options` 提供默认值；
+模型 `options` 整体替换缓存设置，包括显式 `false` 或 `{}`。
+providers package 默认关闭缓存。MaybeCode 对 `anthropic-messages` adapter 默认使用
+`{ "ttl": "5m", "cacheInstructions": true }`。Provider 或模型设置覆盖应用默认值。
+
+自动缓存标记最后一个可以缓存的内容块。`cacheInstructions` 同时标记 system 的
+最后一个内容块和最后一个工具，使用相同 TTL。缓存最多使用四个断点，自动缓存占用
+其中一个。最后一个内容块的 TTL 冲突时返回 HTTP 400。
+thinking 历史保持原样，thinking 内容块不会添加显式断点。
+
+五分钟写入价格为基础输入价格的 1.25 倍，一小时写入为 2 倍，读取通常为 0.1 倍。
+最小缓存长度取决于模型，例如 Sonnet 4 为 1,024 tokens，Opus 4.6 为 4,096 tokens。
+长度不足的提示会正常处理并保持缓存关闭。当前模型长度要求和价格例外参阅
+[Anthropic 缓存说明](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)。
+兼容端点可能拒绝 `cache_control`，这类端点需要设置 `options.promptCaching: false`。
+
 ## 应用插件
 
 MaybeCode 接受 `apps.maybecode.plugins`，MaybeClaw 的 May Agent 接受
@@ -332,15 +352,59 @@ MaybeCode 接受 `apps.maybecode.plugins`，MaybeClaw 的 May Agent 接受
 终端和 WebUI 显示 **YOLO · Auto-approve**，模式通知使用英文。WebUI 使用
 `UiSnapshot.badges`；classic 终端通过 `TerminalIO.updatePrompt` 更新，保留输入和
 光标。工具校验、取消和记录继续生效。MCP 用户输入请求需要回答。shell 命令具有
-宿主账户权限，团队授权独立配置。
+`apps.maybecode.execution` 指定的权限，团队授权独立配置。
 
-`apps.maybecode.persistentRules` 默认值为 `false`。启用后，`edit` 和 `write` 授权
-保存到活动项目的 `.may/permission-rules.json`，审批时显示规范化文件路径。范围包含
+`apps.maybecode.persistentRules` 默认值为 `false`。启用后，`edit`、`write` 和 `fetch` 授权
+保存到活动项目的 `.may/permission-rules.json`。文件审批显示规范化路径，网络审批使用 URL origin。范围包含
 本地用户、项目或 worktree，以及主 Agent；切换 Session 或模型保留匹配规则。宿主
 持有单个写入者的锁，关闭时释放。规则文件和锁文件排除在 Git checkpoint 之外。
 `/permissions [list|allow <id>|deny <id>|revoke <id>]` 和 WebUI 管理已有范围。
 规则记录操作人员，禁止规则优先。`openConfiguredMaybeCode({ persistentRules })`
 覆盖配置。参阅[权限策略](../guides/permission-policy.md)。
+
+## MaybeCode 执行和网页访问
+
+`apps.maybecode.execution` 默认值为 `{ "mode": "host" }`。容器模式要求下列全部字段。
+`network` 只接受 `"none"`；`memoryBytes` 必须为正的安全整数，`cpuCount` 必须为
+正的有限数值，`image` 必须为非空字符串。非法字段抛出 `MayConfigValidationError`，
+错误包含对应的字段路径。
+
+```json
+{
+  "apps": {
+    "maybecode": {
+      "execution": {
+        "mode": "container",
+        "image": "nixery.dev/shell/git/ripgrep/util-linux",
+        "network": "none",
+        "memoryBytes": 1073741824,
+        "cpuCount": 2
+      },
+      "fetch": {
+        "maxBytes": 1048576,
+        "timeoutMs": 30000,
+        "maxRedirects": 5
+      }
+    }
+  }
+}
+```
+
+要求 Docker Desktop 或兼容运行时，且服务已经启动。启动应用前需要拉取镜像，镜像
+必须包含 `bash`、`git`、`rg` 和 `setsid`。只将工作区挂载到 `/workspace`，根目录
+只读，提供临时存储，移除 capabilities 并禁止提升权限。Unix 使用宿主 UID:GID，
+Windows 使用 `1000:1000`。shell、搜索、委派工具和 team 检查继承执行配置。
+文件工具在宿主访问共享工作区，应用关闭时等待清理。MCP server 保持在宿主运行。
+
+`apps.maybecode.fetch` 为可选配置，省略后工具仍然可用。`maxBytes` 默认值为
+1,048,576，`timeoutMs` 默认值为 30,000，两者必须为正的安全整数。
+`maxRedirects` 默认值为 5，接受非负安全整数。`allowedOrigins` 为可选的
+HTTP/HTTPS origin 数组，例如 `["http://127.0.0.1:8080"]`；只允许列出的 origin，
+包含宿主明确列出的本地地址。省略时拒绝私有、回环、链路本地和保留地址。
+每次重定向独立检查，连接使用通过检查的 DNS 地址。请求不携带宿主凭据或 cookie。
+HTML 转换为便于阅读的文字，文字和 JSON 保留内容，其他类型报错。字节限制截断
+输出，超时和取消中止请求。网络审批独立于文件和 shell 审批。YOLO 使用现有自动
+审批规则，包含持久禁止规则。
 
 ## MaybeCode 设置
 

@@ -13,6 +13,7 @@ import type { Clipboard } from "./clipboard.js";
 import { createEditorKeymap, EDITOR_ACTIONS, type EditorAction } from "./editor-keymap.js";
 import { styleText, type TextStyle } from "./theme.js";
 
+/** @experimental */
 export interface EditorOptions {
   readonly value?: string;
   readonly prompt?: string;
@@ -31,12 +32,16 @@ export interface EditorOptions {
   readonly onSubmit?: (value: string) => void;
 }
 
+/** @experimental */
 export interface EditorHistoryOptions {
   readonly entries?: readonly string[];
   readonly maximumEntries?: number;
 }
 
-/** In-process command history that can be shared with or replaced by a UI. */
+/**
+ * In-process command history that can be shared with or replaced by a UI.
+ * @experimental
+ */
 export class EditorHistory {
   private readonly maximumEntries: number;
   private entries: string[];
@@ -86,6 +91,7 @@ export class EditorHistory {
   }
 }
 
+/** @experimental */
 export class Editor implements InteractiveComponent, FocusTarget {
   private graphemes: string[];
   private cursorIndex: number;

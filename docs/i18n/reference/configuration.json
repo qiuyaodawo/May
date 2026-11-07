@@ -18,8 +18,8 @@
     },
     {
       "heading": "Built-in adapter options",
-      "en": "cdfc1205154dcd95796fa9c6fcb6bd46ae390e3628ace063efd1b0f1e0e5c033",
-      "zh": "856595cc56dba5b004ebeead003ff3f4522c26388736d0e615a9f9c3a11196b7"
+      "en": "1645a21fdf33f7ce036291b03201c112b4ce4adb47e55a866ba54e6d80436748",
+      "zh": "aebf8d67050cc225456a04104ab20d2ae99514f2c861fbcd9d14e3e338da7aac"
     },
     {
       "heading": "Model capabilities",
@@ -47,6 +47,11 @@
       "zh": "b6c480130fa2a11e408fe29caae8472bf9e2d872da5293c0bb11a06a7eaaa156"
     },
     {
+      "heading": "Anthropic prompt caching",
+      "en": "74fdaaf634ebfe38a788a7e540bf545271071ed89492327a296d510cc00dec45",
+      "zh": "507625455b59f41c98f4066e74429732e30d18e7379f303e0c0764c3b6d25d1a"
+    },
+    {
       "heading": "Application plugins",
       "en": "f2abd99da84759d7558fcf73b2a0e3c41530abba512088c5e759a110ea71ed0d",
       "zh": "ac7a02790737a47855919f00fde512d715a5727c448ee85a672692f6f1e87bfb"
@@ -63,8 +68,13 @@
     },
     {
       "heading": "MaybeCode permission mode",
-      "en": "558c2d691207c25de800f3a8b320ccca2f7c88fc636a7111c7c816884dadafd6",
-      "zh": "6c4bb16eeb202f1bd36b29ad67c0812d82eb85a5c13ccf555274a1bd8db1b97d"
+      "en": "04a9b540fa2cf255b211a740f610360d09432adb2ab8b88d78c3c00cf6b17249",
+      "zh": "21a0d78e2435aafd632beaaf7b4d75008e070f7a92244dae8161c2457d1cf417"
+    },
+    {
+      "heading": "MaybeCode execution and web access",
+      "en": "d43037c3dcc954b3d8081a22661b963d7417bf34b1d97e92f6cdff7fb99fb446",
+      "zh": "04bac10e56f023fb5258181b93a82646b954327237cdb9cb89d7d679ddf3831b"
     },
     {
       "heading": "MaybeCode settings",

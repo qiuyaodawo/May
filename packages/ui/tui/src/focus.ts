@@ -6,7 +6,10 @@ interface FocusEntry {
   readonly target: FocusTarget;
 }
 
-/** Explicit, UI-framework-level focus order without application globals. */
+/**
+ * Explicit, UI-framework-level focus order without application globals.
+ * @experimental
+ */
 export class FocusManager {
   private readonly entries: FocusEntry[] = [];
   private activeId: string | undefined;

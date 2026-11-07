@@ -32,6 +32,10 @@ Use `--config <path>` and `--model <profile>` to choose another configured
 connection. Credentials are resolved through provider configuration and kept
 outside the team manifest.
 
+Teams save execution isolation and fetch settings in their manifest when created.
+Resume and `team verify` use those saved settings. Existing manifests without
+execution settings use host execution.
+
 `--preset supervisor|pipeline|parallel` selects orchestration, or `--plan <json-file>` supplies roles, model profiles, tool allowlists, dependencies, budgets, and exact checks. These options are mutually exclusive. Plans are validated and saved with the team; resume does not reload an external plan file. See [configurable plans](maybecode-team-plan.md).
 
 Preset defaults are:
@@ -85,7 +89,7 @@ directory; later readers open the existing coordination files read-only. Run
 existing team's records to read-only, and retain both coordination files while
 those records are in use. `status` leaves the team records unchanged.
 
-`cancel` writes a request consumed by the running owner or by the next `resume`. Ctrl+C also cancels the active team. Cancellation cannot undo an already completed provider request or tool effect, and killing a direct check process does not prove its descendants stopped.
+`cancel` writes a request consumed by the running owner or by the next `resume`. Ctrl+C also cancels the active team. Cancellation terminates active check processes through their execution environment and waits for their exit. Completed provider requests and tool effects remain recorded.
 
 `resume` uses the saved plan, authority mode, model bindings/fingerprints, and resource limits. It does not repeat completed inputs. Configuration drift, unknown effects, unknown usage, and stale writer locks fail closed. Records include private prompts, source excerpts, workspaces, Sessions, budget journals, verification evidence, and artifacts; secret-file filtering does not make these records public data.
 
@@ -105,7 +109,16 @@ The first invocation displays its scope and a digest. Confirmation must match th
 
 ## Controlled coding and permissions
 
-`--mode coding` permits explicitly listed `write`/`edit` tools in private task copies. The plan cannot enable that mode itself. `--allow-checks` independently authorizes exact configured executable/argument pairs; models choose check IDs, not arbitrary commands. **Authorized processes are not OS-sandboxed**, even when the team uses read-only file tools. They can read or write outside the copy, use the network, and launch descendants. Authorize only reviewed commands/code or use an external sandbox. No automatic dependency installation is performed.
+`--mode coding` permits explicitly listed `write`/`edit` tools in private task copies. The plan cannot enable that mode itself. `--allow-checks` independently authorizes exact configured executable/argument pairs; models choose check IDs. Commands use `apps.maybecode.execution`: host mode uses host-account permissions, while container mode mounts the task workspace, disables networking, and applies memory and CPU limits. Authorize reviewed commands and prepare their dependencies before execution. No automatic dependency installation is performed.
+
+Read-only teams include `read`, `glob`, and `grep`. Search processes and configured
+check commands use the execution configuration inherited from MaybeCode. Container
+mode requires Docker Desktop or a compatible running Docker runtime, and a pre-pulled
+image providing `bash`, `git`, `rg`, and `setsid`, such as
+`nixery.dev/shell/git/ripgrep/util-linux`. Startup fails when these prerequisites
+are unavailable. Execution owners wait for command cancellation and container
+cleanup. File tools access the same task files through host workspace checks.
+MCP servers remain on the host. See [execution configuration](../reference/configuration.md).
 
 Each task receives the same filtered baseline. Dependencies transfer reports, not edits: a pipeline reviewer does not inherit the preceding task's modified files. Task edits never merge automatically. After execution, export and review selected completed tasks:
 
