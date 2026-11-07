@@ -6,47 +6,42 @@ Create an Agent that calls a real model, calculates a sum with a tool, and saves
 conversation history. Then reopen its Session using the same in-memory store.
 You need basic JavaScript knowledge and a DeepSeek account with API access.
 
-## Prepare the workspace
+## Prepare the project directory
 
-Use a checkout of this repository, Node.js 22.16.0 or newer, and pnpm 12.4.2.
-Node.js 24 is the recommended development version. Run these commands from the
-repository root:
+Use Node.js 22.16.0 or newer and npm. Create an empty directory and enter it:
 
 ```bash
-pnpm install
-pnpm build
+mkdir quickstart-agent
+cd quickstart-agent
 ```
 
-The build must finish successfully before running code that imports May packages.
-For repository tests and CI, see [Repository development](guides/repository-development.md).
+To work on May itself, see [Repository development](guides/repository-development.md).
 For the coding application, see [Use MaybeCode](guides/maybecode.md).
 
-## Create a workspace package
+## Install the packages
 
-Create `examples/quickstart-agent/package.json` with this content. The workspace
-already includes direct children of `examples/`.
+Create `package.json` with this content:
 
 ```json
 {
-  "name": "@sortedyuan/example-quickstart-agent",
+  "name": "quickstart-agent",
   "private": true,
   "type": "module",
   "scripts": { "start": "node agent.mjs" },
   "dependencies": {
-    "@sortedyuan/may": "workspace:*",
-    "@sortedyuan/providers": "workspace:*",
+    "@sortedyuan/may": "^0.2.0",
+    "@sortedyuan/providers": "^0.4.0",
     "zod": "^4.6.7"
   }
 }
 ```
 
-Run `pnpm install` from the repository root to create the new package's links.
-`workspace:*` resolves local packages in this checkout. An external consumer must
-use available published versions and the same public import paths.
+Run `npm install` in the directory. It installs May, the provider adapters, and
+Zod from the npm registry.
 
 ## Add the Agent
 
-Create `examples/quickstart-agent/agent.mjs`:
+Create `agent.mjs` in the same directory:
 
 ```js
 import { defineAgent } from "@sortedyuan/may";
@@ -111,8 +106,8 @@ try {
 }
 ```
 
-`inputSchema` describes the tool to the model. `parse()` validates the actual
-arguments. The policy allows only this arithmetic tool, and `maxSteps` bounds the
+The Zod `schema` describes the tool input to the model, and `defineTool` validates
+the actual arguments against it. The policy allows only this arithmetic tool, and `maxSteps` bounds the
 model/tool loop. `close()` waits for application work and releases its lifecycle
 resources; the injected store remains available for reopening the Session.
 
@@ -124,7 +119,7 @@ For example, in PowerShell:
 
 ```powershell
 $env:DEEPSEEK_MODEL = 'your-supported-model-id'
-pnpm --filter @sortedyuan/example-quickstart-agent start
+npm start
 ```
 
 Replace `your-supported-model-id` before running. The program sends live requests

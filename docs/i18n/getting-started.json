@@ -12,24 +12,24 @@
       "zh": "857018628ec8273a0d800e9dc037326f1ef4a68030547b99e2bfc5c7da6986a5"
     },
     {
-      "heading": "Prepare the workspace",
-      "en": "ff11ddae23843803ed1714fcf7fa77ca42b67fe95319e27717eb25df34cf0355",
-      "zh": "b9bac14d4d7471a114282ffa54ab5af351699bf5dc201da93d78f642a5534de7"
+      "heading": "Prepare the project directory",
+      "en": "221d86c693c9b41f7d07c492408ae848bff5c8fc4ba135bc61d78ee4a952b389",
+      "zh": "afa8bfe70e2cccecf958181ce01d18dd1ccf2b7586c9bbdada7f899469395660"
     },
     {
-      "heading": "Create a workspace package",
-      "en": "8eb17929092130e575c83867e571d06d04c3c3d4fc885ce711124ed6cb67f4ce",
-      "zh": "b813f3f19bf745d6b348586301eb42604b746a8f238b8055ed4ae50d8ea9937c"
+      "heading": "Install the packages",
+      "en": "4a96ebafb109679005fd69a20117d9eac5d33c19e316b165d54aaf6c5abe4b8d",
+      "zh": "7c4913d5d4a64df2145016033e92bc244433577f249cec883dbc0116bf4f696c"
     },
     {
       "heading": "Add the Agent",
-      "en": "1c360a948de60576f4760eb635c627debb41d20133ce3ad6f71b6ec40670d61f",
-      "zh": "2c3ae0377121dd08ec1442162e109e919326c352009f8eb144038c8b0b3970e3"
+      "en": "c06224085765b6fad5161edd6e98c9a1bcfb0246417ab77038cfeae5388b1614",
+      "zh": "295b02c37851780ac881febac9c2228e682bb56599b60267ae116c642905e272"
     },
     {
       "heading": "Run and check the result",
-      "en": "06343aec13ced13a527166ccf894ed19bd742def6383cd3a8bef89d8df45d92e",
-      "zh": "611c4c5c91a51d1d37933b2a7690fe54f471aceca9c132fad7a6e5105c8f41c5"
+      "en": "eae84798a093767bf40b0f292256cd3204b8fee2c4e062146056834069c021ad",
+      "zh": "66e8f6eda54625e6647d59e024640242694f362a9c7cb1a2d1489663071d45af"
     },
     {
       "heading": "Persist across process restarts",

@@ -6,46 +6,41 @@
 内存存储重新打开 Session。需要具备基础 JavaScript 知识，以及能够访问 API 的
 DeepSeek 账户。
 
-## 准备工作目录
+## 准备项目目录
 
-使用本仓库、Node.js 22.16.0 或更新版本，以及 pnpm 12.4.2。推荐使用 Node.js 24
-进行开发。在仓库根目录执行：
+使用 Node.js 22.16.0 或更新版本，以及 npm。创建一个空目录并进入：
 
 ```bash
-pnpm install
-pnpm build
+mkdir quickstart-agent
+cd quickstart-agent
 ```
 
-构建成功后才能运行导入 May package 的代码。仓库测试与 CI 见
-[仓库开发](guides/repository-development.md)，编码应用操作见
+开发 May 本身见[仓库开发](guides/repository-development.md)，编码应用操作见
 [使用 MaybeCode](guides/maybecode.md)。
 
-## 创建工作目录中的 package
+## 安装 package
 
-创建 `examples/quickstart-agent/package.json`，填写以下内容。工作目录配置已经
-包含 `examples/` 的直接子目录。
+创建 `package.json`，填写以下内容：
 
 ```json
 {
-  "name": "@sortedyuan/example-quickstart-agent",
+  "name": "quickstart-agent",
   "private": true,
   "type": "module",
   "scripts": { "start": "node agent.mjs" },
   "dependencies": {
-    "@sortedyuan/may": "workspace:*",
-    "@sortedyuan/providers": "workspace:*",
+    "@sortedyuan/may": "^0.2.0",
+    "@sortedyuan/providers": "^0.4.0",
     "zod": "^4.6.7"
   }
 }
 ```
 
-在仓库根目录执行 `pnpm install`，为新增 package 创建链接。`workspace:*` 使用
-本仓库的 package；仓库外部的使用者需要选择可用的发布版本，并使用相同的公开
-导入路径。
+在该目录执行 `npm install`，从 npm registry 安装 May、provider adapter 和 Zod。
 
 ## 添加 Agent
 
-创建 `examples/quickstart-agent/agent.mjs`：
+在同一目录创建 `agent.mjs`：
 
 ```js
 import { defineAgent } from "@sortedyuan/may";
@@ -110,7 +105,7 @@ try {
 }
 ```
 
-`inputSchema` 向模型描述工具，`parse()` 校验实际参数。权限策略仅允许这个加法工具，
+Zod `schema` 向模型描述工具输入，`defineTool` 按它校验实际参数。权限策略仅允许这个加法工具，
 `maxSteps` 限制模型和工具循环的次数。`close()` 等待应用工作结束并释放应用管理的
 资源；传入的存储继续保留，可用于重新打开 Session。
 
@@ -121,7 +116,7 @@ try {
 
 ```powershell
 $env:DEEPSEEK_MODEL = 'your-supported-model-id'
-pnpm --filter @sortedyuan/example-quickstart-agent start
+npm start
 ```
 
 执行前替换 `your-supported-model-id`。程序会向 DeepSeek 发送真实请求，使用账户
