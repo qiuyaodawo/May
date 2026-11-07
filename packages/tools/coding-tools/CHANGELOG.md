@@ -1,5 +1,24 @@
 # @sortedyuan/coding-tools
 
+## 0.4.0
+
+### Minor Changes
+
+- 886bfa6: Add bounded workspace glob and grep tools, HTTP/HTTPS text fetching with address
+  validation and network approvals, and configurable host or Docker execution shared
+  by coding tools, delegated agents, and team checks. Document execution prerequisites,
+  configuration, and the installed MaybeCode workflow in English and Simplified Chinese.
+
+### Patch Changes
+
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [495b234]
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [886bfa6]
+  - @sortedyuan/may@0.2.0
+
 ## 0.3.0
 
 ### Minor Changes

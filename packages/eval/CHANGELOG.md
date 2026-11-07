@@ -1,5 +1,39 @@
 # @sortedyuan/eval
 
+## 0.4.1
+
+### Patch Changes
+
+- 495b234: Add default-on durable logical model request recording. Sessions retain effective messages,
+  tool definitions, provider request bodies and individual attempt outcomes, with
+  content reuse and read-only history queries. Built-in providers, retry wrappers,
+  application summaries and native OpenAI compaction support awaited recording
+  before network execution. MaybeCode exposes requestRecording configuration and
+  the WebUI displays saved model requests in record details. Budget wrappers
+  preserve request-recording capability.
+
+  New request-history event types require a reader supporting this release.
+  Existing histories remain readable; logical recording defaults to required. Provider bodies
+  require the independent providerBodyRecording option. Request definitions and references
+  are saved in batches before dispatch. Breaking change: custom runtimes
+  and adapters must explicitly implement the recording capability before enabling
+  required mode, or explicitly select requestRecording: "off" when migrating.
+  Authentication remains separate from saved request content.
+
+- 886bfa6: Keep file-operation cleanup within the caller's operation result. Wait for evaluation process cancellation, MCP subscription and transport cleanup, and delegation request background work before their owners finish closing. Propagate cleanup and delegation cancellation failures to callers.
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [495b234]
+- Updated dependencies [9a95d38]
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [f3709c4]
+- Updated dependencies [886bfa6]
+- Updated dependencies [886bfa6]
+  - @sortedyuan/may@0.2.0
+  - @sortedyuan/coordination@0.6.0
+  - @sortedyuan/observability@0.3.1
+
 ## 0.4.0
 
 ### Minor Changes

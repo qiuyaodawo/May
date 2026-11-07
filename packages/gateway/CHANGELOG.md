@@ -1,5 +1,25 @@
 # @sortedyuan/gateway
 
+## 0.2.0
+
+### Minor Changes
+
+- 886bfa6: Add defineTool with Standard Schema validation and draft-07 input schema conversion. Validation failures expose field paths through ToolInputValidationError. Tool parsing supports asynchronous validation and preserves null and undefined results across MCP execution.
+
+  Migration: callers invoking tool.parse() directly must await its result. Execution adapters await parsing, check cancellation, and freeze the parsed input before execution.
+
+### Patch Changes
+
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [495b234]
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [ba426cf]
+- Updated dependencies [886bfa6]
+  - @sortedyuan/may@0.2.0
+  - @sortedyuan/media@0.4.1
+
 ## 0.1.0
 
 ### Minor Changes

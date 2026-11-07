@@ -1,5 +1,18 @@
 # @sortedyuan/media
 
+## 0.4.1
+
+### Patch Changes
+
+- ba426cf: `FileMediaStore.save` writes images with `write-file-atomic`, which is now a runtime dependency.
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [495b234]
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [886bfa6]
+  - @sortedyuan/may@0.2.0
+
 ## 0.4.0
 
 ### Minor Changes

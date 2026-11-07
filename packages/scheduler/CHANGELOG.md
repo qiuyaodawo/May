@@ -1,5 +1,17 @@
 # @sortedyuan/scheduler
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [495b234]
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [886bfa6]
+  - @sortedyuan/may@0.2.0
+
 ## 0.3.0
 
 ### Minor Changes

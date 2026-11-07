@@ -1,5 +1,29 @@
 # @sortedyuan/tui
 
+## 0.4.0
+
+### Minor Changes
+
+- 886bfa6: Track browser synchronization, Web UI reads and actions, and terminal completion work through shutdown. Surface background errors through the owning connection or interface, and explicitly handle all transcript event variants.
+
+  Breaking change: `UiClient.disconnect()` and the cleanup function returned by `mountWebUI()` now return `Promise<void>`. Transcript reader, inspector, and workspace UI `dispose()` methods also return promises. `TerminalIO.close()` permits `Promise<void>`, and the Node terminal adapter waits for completion providers when closing. Await these cleanup methods before releasing their owners; synchronous custom `TerminalIO.close()` implementations remain supported.
+
+  Navigation `dispose()` is also asynchronous, and custom navigation cleanup callbacks may return `Promise<void>`; the shell waits for them during cleanup.
+
+### Patch Changes
+
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [495b234]
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [ba426cf]
+- Updated dependencies [886bfa6]
+- Updated dependencies [886bfa6]
+  - @sortedyuan/may@0.2.0
+  - @sortedyuan/media@0.4.1
+  - @sortedyuan/coding-tools@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

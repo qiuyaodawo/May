@@ -1,5 +1,43 @@
 # @sortedyuan/ui-client
 
+## 0.4.0
+
+### Minor Changes
+
+- 495b234: Add default-on durable logical model request recording. Sessions retain effective messages,
+  tool definitions, provider request bodies and individual attempt outcomes, with
+  content reuse and read-only history queries. Built-in providers, retry wrappers,
+  application summaries and native OpenAI compaction support awaited recording
+  before network execution. MaybeCode exposes requestRecording configuration and
+  the WebUI displays saved model requests in record details. Budget wrappers
+  preserve request-recording capability.
+
+  New request-history event types require a reader supporting this release.
+  Existing histories remain readable; logical recording defaults to required. Provider bodies
+  require the independent providerBodyRecording option. Request definitions and references
+  are saved in batches before dispatch. Breaking change: custom runtimes
+  and adapters must explicitly implement the recording capability before enabling
+  required mode, or explicitly select requestRecording: "off" when migrating.
+  Authentication remains separate from saved request content.
+
+- 886bfa6: Track browser synchronization, Web UI reads and actions, and terminal completion work through shutdown. Surface background errors through the owning connection or interface, and explicitly handle all transcript event variants.
+
+  Breaking change: `UiClient.disconnect()` and the cleanup function returned by `mountWebUI()` now return `Promise<void>`. Transcript reader, inspector, and workspace UI `dispose()` methods also return promises. `TerminalIO.close()` permits `Promise<void>`, and the Node terminal adapter waits for completion providers when closing. Await these cleanup methods before releasing their owners; synchronous custom `TerminalIO.close()` implementations remain supported.
+
+  Navigation `dispose()` is also asynchronous, and custom navigation cleanup callbacks may return `Promise<void>`; the shell waits for them during cleanup.
+
+### Patch Changes
+
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [495b234]
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [ba426cf]
+- Updated dependencies [886bfa6]
+  - @sortedyuan/may@0.2.0
+  - @sortedyuan/media@0.4.1
+
 ## 0.3.0
 
 ### Minor Changes

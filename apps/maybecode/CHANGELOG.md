@@ -1,5 +1,89 @@
 # @sortedyuan/maybecode
 
+## 0.5.0
+
+### Minor Changes
+
+- 886bfa6: Add Anthropic automatic prompt caching with configurable TTL and instruction cache breakpoints. Provider and model options support promptCaching, including false to disable caching. MaybeCode enables five-minute caching and instruction breakpoints by default for Anthropic models.
+- 9a95d38: Consolidate shared infrastructure and let each application own its configuration schema.
+
+  `@sortedyuan/may`:
+
+  - Breaking: `may-config.schema.json` describes only `providers`, `models` and `defaultModel`; `apps` entries are plain objects validated by their applications. `parseMayConfig` validates the whole file against this schema, so adapter-specific provider options that the schema does not list are rejected. Use a custom adapter name for adapter options outside the built-in list.
+  - New: `createApplicationConfigSchema(id, section, title)` composes an application section with the core schema, and `createApplicationConfigValidator(id, section)` validates `apps.<id>`; both report `MayConfigValidationError` with the failing field path.
+  - Breaking: `acquireFileLock` uses an operating-system lock that the process exit releases; `recoverFileLock` is removed. Import file locking and access helpers from `@sortedyuan/may/storage`; the `./session/file-access` export is removed.
+  - Breaking: `AgentController.listRecoveries()` is required. `AgentWorkspace.workspace` returns the workspace of the selected session without reading it from the application.
+  - New exports: `omitUndefined`, `AsyncStateSerializer`, `hasErrorCode` and atomic file writing based on `write-file-atomic`.
+  - Session record writes now reject the request or Run that triggered them instead of being dropped.
+
+  `@sortedyuan/providers`:
+
+  - Breaking: DeepSeek, Kimi and Zhipu models share `OpenAICompatibleChatModel`. Their provider-specific error classes are replaced by `OpenAICompatibleApiError`, `OpenAICompatibleProtocolError` and `OpenAICompatibleFinishReasonError` with a `provider` field. Migrate checks such as `error instanceof DeepSeekApiError` to `error instanceof OpenAICompatibleApiError && error.provider === "DeepSeek"`.
+
+  `@sortedyuan/coordination`:
+
+  - Breaking: `resolveSubagentConfiguration` accepts the validated `apps.maybecode.subagents` value instead of the whole configuration. `SubagentHostOptions` requires `requestRecording` and `providerBodyRecording`, and child Sessions use them; `createDelegationPlugin` accepts both options.
+
+  `@sortedyuan/maybecode`:
+
+  - Breaking: the package exports only `runMaybeCode`, `openConfiguredMaybeCode`, `MaybeCodeController` with its event types, and `MaybeCodeUsageError`.
+  - Breaking: `MaybeCodeController` exposes the active `application` and `transition()` for queued state changes; read-only forwarders such as `getGoal()`, `modelInfo`, `instructions`, `listSkills()` and the delegation readers move to `controller.application`.
+  - Breaking: the classic terminal UI and `--ui classic` are removed; `retained` is the default and `web` remains available.
+  - Breaking: deprecated options are removed; use `autoCompaction.mode: "provider-native"`.
+  - `apps.maybecode` is validated by the schema exported as `@sortedyuan/maybecode/config/schema`; invalid values report `MayConfigValidationError` with the field path.
+  - Team runs and sub-agents follow `apps.maybecode.requestRecording` and `providerBodyRecording`.
+
+  `@sortedyuan/mcp` uses the shared atomic file writing and credential locking. `@sortedyuan/web-ui` shows an error when submitting an approval fails.
+
+- 495b234: Add default-on durable logical model request recording. Sessions retain effective messages,
+  tool definitions, provider request bodies and individual attempt outcomes, with
+  content reuse and read-only history queries. Built-in providers, retry wrappers,
+  application summaries and native OpenAI compaction support awaited recording
+  before network execution. MaybeCode exposes requestRecording configuration and
+  the WebUI displays saved model requests in record details. Budget wrappers
+  preserve request-recording capability.
+
+  New request-history event types require a reader supporting this release.
+  Existing histories remain readable; logical recording defaults to required. Provider bodies
+  require the independent providerBodyRecording option. Request definitions and references
+  are saved in batches before dispatch. Breaking change: custom runtimes
+  and adapters must explicitly implement the recording capability before enabling
+  required mode, or explicitly select requestRecording: "off" when migrating.
+  Authentication remains separate from saved request content.
+
+- 886bfa6: Add bounded workspace glob and grep tools, HTTP/HTTPS text fetching with address
+  validation and network approvals, and configurable host or Docker execution shared
+  by coding tools, delegated agents, and team checks. Document execution prerequisites,
+  configuration, and the installed MaybeCode workflow in English and Simplified Chinese.
+
+### Patch Changes
+
+- 886bfa6: Track background steering, cancellation, event forwarding, UI actions, and resource watches through application shutdown. Propagate background failures to application callers and wait for terminal and web resource cleanup before returning.
+- 9a95d38: MaybeCode keeps a newly created Session on exit when it holds a goal, so a goal that was started or paused before its first Run can be resumed later. `@sortedyuan/may/goals` exports `GOAL_STATE_KEY`, the Session state key that stores the current goal.
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [495b234]
+- Updated dependencies [9a95d38]
+- Updated dependencies [886bfa6]
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [886bfa6]
+- Updated dependencies [ba426cf]
+- Updated dependencies [04c17db]
+- Updated dependencies [f3709c4]
+- Updated dependencies [886bfa6]
+- Updated dependencies [886bfa6]
+  - @sortedyuan/providers@0.4.0
+  - @sortedyuan/may@0.2.0
+  - @sortedyuan/coordination@0.6.0
+  - @sortedyuan/mcp@0.4.0
+  - @sortedyuan/web-ui@0.4.0
+  - @sortedyuan/ui-client@0.4.0
+  - @sortedyuan/tui@0.4.0
+  - @sortedyuan/media@0.4.1
+  - @sortedyuan/observability@0.3.1
+  - @sortedyuan/coding-tools@0.4.0
+
 ## 0.4.0
 
 ### Minor Changes

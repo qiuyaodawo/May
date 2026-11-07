@@ -1,5 +1,18 @@
 # @sortedyuan/observability
 
+## 0.3.1
+
+### Patch Changes
+
+- f3709c4: Use @opentelemetry/api 1.9.x, starting at 1.9.1, to satisfy the supported API range of the OpenTelemetry SDK dependencies during fresh installations.
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [495b234]
+- Updated dependencies [886bfa6]
+- Updated dependencies [9a95d38]
+- Updated dependencies [886bfa6]
+  - @sortedyuan/may@0.2.0
+
 ## 0.3.0
 
 ### Minor Changes
