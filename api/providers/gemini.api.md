@@ -66,13 +66,19 @@ export interface GeminiGenerateContentRequest {
         parts: GeminiPart[];
     };
     // (undocumented)
-    tools?: {
+    toolConfig?: {
+        includeServerSideToolInvocations: true;
+    };
+    // (undocumented)
+    tools?: ({
         functionDeclarations: {
             name: string;
             description: string;
             parametersJsonSchema: JsonSchema;
         }[];
-    }[];
+    } | {
+        googleSearch: Record<string, unknown>;
+    })[];
 }
 
 // @public (undocumented)
@@ -102,10 +108,16 @@ export interface GeminiModelOptions {
     reasoningEffort?: string;
     // (undocumented)
     thinkingBudget?: number;
+    // (undocumented)
+    webSearch?: false | WebSearchOptions;
 }
 
 // @public (undocumented)
 export interface GeminiModelStateData {
+    // (undocumented)
+    groundingMetadata?: GeminiGrounding;
+    // (undocumented)
+    origin?: ServerToolOrigin;
     // (undocumented)
     parts: GeminiPart[];
     // (undocumented)
@@ -142,6 +154,19 @@ export interface GeminiPart {
     thought?: boolean;
     // (undocumented)
     thoughtSignature?: string;
+    // (undocumented)
+    toolCall?: {
+        id?: string;
+        toolType: string;
+        toolName?: string;
+        args?: Record<string, unknown>;
+    };
+    // (undocumented)
+    toolResponse?: {
+        id?: string;
+        toolType: string;
+        response?: Record<string, unknown>;
+    };
 }
 
 // @public (undocumented)

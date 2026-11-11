@@ -2,7 +2,10 @@ import { randomUUID } from "node:crypto";
 import { open, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
-/** Commit complete contents, never truncate the destination on cancellation. */
+/**
+ * Commit complete contents, never truncate the destination on cancellation.
+ * @experimental
+ */
 export async function atomicWriteText(path: string, text: string, signal: AbortSignal): Promise<void> {
   signal.throwIfAborted();
   const mode = await stat(path).then(

@@ -8,6 +8,7 @@ import { omitUndefined, type Model } from "@sortedyuan/may/core";
 import { GeminiModel, type GeminiModelOptions } from "./gemini/index.js";
 
 import { ProviderConfigurationError } from "./errors.js";
+import { selectionWebSearch, validateWebSearch } from "./web-search.js";
 import {
   attachModelLimits,
   modelOption,
@@ -109,6 +110,7 @@ function createGeminiModel(
     );
   const baseURL = providerBaseURL(selection);
   const options: GeminiModelOptions = omitUndefined({
+    webSearch: validateWebSearch(selection.adapter, selectionWebSearch(selection)),
     ...credentials(selection),
     baseURL,
     maxOutputTokens,
@@ -138,6 +140,7 @@ function createDeepSeekModel(
     selection.limits?.maxOutputTokens;
   const baseURL = providerBaseURL(selection);
   const options: DeepSeekModelOptions = omitUndefined({
+    webSearch: validateWebSearch(selection.adapter, selectionWebSearch(selection)),
     ...credentials(selection),
     baseURL,
     thinking,
@@ -170,6 +173,7 @@ function createZhipuModel(
     selection.limits?.maxOutputTokens;
   const baseURL = providerBaseURL(selection);
   const options: ZhipuModelOptions = omitUndefined({
+    webSearch: validateWebSearch(selection.adapter, selectionWebSearch(selection)),
     ...credentials(selection),
     baseURL,
     thinking,
@@ -195,6 +199,7 @@ function createKimiModel(
     selection.limits?.maxOutputTokens;
   const baseURL = providerBaseURL(selection);
   const options: KimiModelOptions = omitUndefined({
+    webSearch: validateWebSearch(selection.adapter, selectionWebSearch(selection)),
     ...credentials(selection),
     baseURL,
     thinking,
@@ -243,6 +248,7 @@ function createAnthropicModel(
             ),
           });
   const options: AnthropicModelOptions = omitUndefined({
+    webSearch: validateWebSearch(selection.adapter, selectionWebSearch(selection)),
     ...credentials(selection),
     baseURL,
     apiVersion,
@@ -278,6 +284,7 @@ function createOpenAIModel(
   const store = optionalBoolean(tuningOption(selection, "store"), optionField(selection, "store"));
   const baseURL = providerBaseURL(selection);
   const options: OpenAIResponsesModelOptions = omitUndefined({
+    webSearch: validateWebSearch(selection.adapter, selectionWebSearch(selection)),
     ...credentials(selection),
     baseURL,
     maxOutputTokens,
@@ -304,6 +311,7 @@ function createOpenAIChatCompletionsModel(
   const store = optionalBoolean(tuningOption(selection, "store"), optionField(selection, "store"));
   const baseURL = providerBaseURL(selection);
   const options: OpenAIChatCompletionsModelOptions = omitUndefined({
+    webSearch: validateWebSearch(selection.adapter, selectionWebSearch(selection)),
     ...credentials(selection),
     baseURL,
     maxOutputTokens,

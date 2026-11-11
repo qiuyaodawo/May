@@ -4,7 +4,7 @@ import { MaybeCodeConfigError } from "./errors.js";
 /** 子 Agent 角色在共享工作区里可以使用的编码工具。
  * @experimental
  */
-export type SubagentToolName = "read" | "shell" | "edit" | "write" | "glob" | "grep" | "fetch";
+export type SubagentToolName = string;
 
 /** @experimental */
 export const SUBAGENT_TOOL_NAMES: readonly SubagentToolName[] = [

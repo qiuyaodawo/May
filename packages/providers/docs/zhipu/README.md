@@ -4,6 +4,19 @@ Zhipu GLM model adapter for May. It is built on `OpenAICompatibleChatModel` and
 reports failures with the shared [OpenAI-compatible errors](../openai-compatible/README.md)
 whose `provider` is `"Zhipu"`.
 
+## Web search
+
+Set constructor `webSearch` or provider/model `options.webSearch` to
+`{ searchEngine: "search_std" }` to authorize server search. Omission and
+`false` disable it. Engines are `search_std`, `search_pro`, `search_pro_sogou`,
+and `search_pro_quark`; optional fields are `count`, `domainFilter`,
+`recencyFilter`, `contentSize`, and `searchPrompt`. Responses expose sources in
+`serverToolCalls` with generated `may:web_search:<responseId>` IDs. Unreported
+search counts mark usage partial with `web-search-usage-unreported`.
+For host execution with tool approvals, use coding-tools
+`createZhipuSearchBackend` with `createWebSearchTool` and leave server search
+disabled. See [configuration](../../../../docs/en/reference/configuration.md#server-search).
+
 ```ts
 import { InMemoryContext, May } from "@sortedyuan/may/core";
 import { ZhipuModel } from "@sortedyuan/providers/zhipu";

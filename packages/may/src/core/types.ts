@@ -5,9 +5,37 @@ export type JsonSchema = Readonly<Record<string, unknown>>;
 export type MediaSource =
   { type: "url"; url: string } | { type: "base64"; mediaType: string; data: string } | { type: "file"; fileId: string };
 
+/** @experimental */
+export interface Citation {
+  readonly type: "url";
+  readonly url: string;
+  readonly title?: string;
+  readonly citedText?: string;
+  /** UTF-16 code unit range inside the owning text part. */
+  readonly range?: { readonly start: number; readonly end: number };
+}
+
+/** @experimental */
+export interface ServerToolSource {
+  readonly url: string;
+  readonly title?: string;
+  readonly published?: string;
+}
+
+/** @experimental */
+export interface ServerToolCall {
+  readonly id: string;
+  readonly kind: string;
+  readonly name: string;
+  readonly input?: unknown;
+  readonly status: "pending" | "completed" | "failed";
+  readonly sources?: readonly ServerToolSource[];
+  readonly error?: { readonly code: string };
+}
+
 /** @public */
 export type ContentPart =
-  | { type: "text"; text: string }
+  | { type: "text"; text: string; citations?: Citation[] }
   | { type: "reasoning"; text: string }
   | { type: "json"; value: unknown }
   | {
@@ -42,6 +70,7 @@ export interface ToolCall {
   id: string;
   name: string;
   input: unknown;
+  rawInput?: string;
 }
 
 /** @public */
@@ -57,6 +86,8 @@ export interface AssistantMessage {
   role: "assistant";
   content: ContentPart[];
   toolCalls?: ToolCall[];
+  serverToolCalls?: ServerToolCall[];
+  continuation?: "server-tool-pause";
   /** Provider-specific continuation state that May persists but never reads. */
   modelState?: ModelState;
 }
@@ -72,6 +103,25 @@ export interface ToolMessage {
 
 /** @public */
 export type Message = SystemMessage | UserMessage | AssistantMessage | ToolMessage;
+
+/** Index of the last assistant message when its server interaction is unfinished.
+ * @experimental
+ */
+export function pendingServerToolInteractionIndex(messages: readonly Message[]): number | undefined {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]!;
+    if (message.role !== "assistant") continue;
+    return message.continuation !== undefined || message.serverToolCalls?.some((call) => call.status === "pending")
+      ? index
+      : undefined;
+  }
+  return undefined;
+}
+
+/** @experimental */
+export function hasPendingServerToolInteraction(messages: readonly Message[]): boolean {
+  return pendingServerToolInteractionIndex(messages) !== undefined;
+}
 
 /** @experimental */
 export interface Usage {

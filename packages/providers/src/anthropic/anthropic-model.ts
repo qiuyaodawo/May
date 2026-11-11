@@ -5,9 +5,19 @@ import { toAnthropicRequestParts, toAnthropicThinking, toAnthropicTools } from "
 import { AnthropicApiError } from "./errors.js";
 import type { AnthropicMessagesRequest, AnthropicReasoningEffort, AnthropicThinkingConfig } from "./protocol.js";
 import { streamAnthropicResponse } from "./stream.js";
+import {
+  assertServerToolOrigin,
+  serverToolOrigin,
+  unfinishedServerMessage,
+  validateWebSearch,
+  webSearchRequest,
+  withServerToolOrigin,
+  type WebSearchOptions,
+} from "../web-search.js";
 
 /** @experimental */
 export interface AnthropicModelOptions {
+  webSearch?: false | WebSearchOptions;
   promptCaching?: false | AnthropicPromptCachingOptions;
   apiKey: string;
   model: string;
@@ -39,6 +49,7 @@ export class AnthropicModel implements Model {
   private readonly thinking: AnthropicThinkingConfig | undefined;
   private readonly reasoningEffort: AnthropicReasoningEffort | undefined;
   private readonly fetchImplementation: typeof globalThis.fetch;
+  private readonly webSearch: false | WebSearchOptions | undefined;
 
   constructor(options: AnthropicModelOptions) {
     if (options.apiKey.trim() === "") {
@@ -65,6 +76,7 @@ export class AnthropicModel implements Model {
     }
 
     this.apiKey = options.apiKey;
+    this.webSearch = validateWebSearch("anthropic-messages", options.webSearch);
     if (options.promptCaching !== undefined && options.promptCaching !== false) {
       if (
         typeof options.promptCaching !== "object" ||
@@ -135,10 +147,24 @@ export class AnthropicModel implements Model {
     });
 
     if (!response.ok) throw await createApiError(response);
-    yield* streamAnthropicResponse(response, options.signal);
+    const origin = serverToolOrigin(
+      "anthropic-messages",
+      this.model,
+      this.baseURL,
+      this.webSearch ? webSearchRequest("anthropic-messages", this.webSearch) : undefined,
+    );
+    for await (const event of streamAnthropicResponse(response, options.signal, request.messages)) {
+      if (event.type === "response.completed" && event.message.modelState)
+        event.message.modelState = withServerToolOrigin(event.message.modelState, origin);
+      yield event;
+    }
   }
 
   private createRequest(request: ModelRequest): AnthropicMessagesRequest {
+    const search = this.webSearch ? webSearchRequest("anthropic-messages", this.webSearch) : undefined;
+    assertServerToolOrigin(request, serverToolOrigin("anthropic-messages", this.model, this.baseURL, search));
+    if (this.webSearch && request.tools.some((tool) => tool.name === "web_search"))
+      throw new TypeError("web_search function conflicts with the Anthropic server tool");
     const parts = toAnthropicRequestParts(request.messages);
     const body: AnthropicMessagesRequest = {
       model: this.model,
@@ -150,6 +176,13 @@ export class AnthropicModel implements Model {
     if (parts.system !== undefined) body.system = parts.system;
     if (request.tools.length > 0) {
       body.tools = toAnthropicTools(request.tools);
+    }
+    if (search) body.tools = [...(body.tools ?? []), search as NonNullable<AnthropicMessagesRequest["tools"]>[number]];
+    const pending = unfinishedServerMessage(request.messages);
+    if (pending?.modelState?.data) {
+      const container = (pending.modelState.data as { container?: { id?: string } | string }).container;
+      const id = typeof container === "string" ? container : container?.id;
+      if (id !== undefined) body.container = id;
     }
     if (this.promptCaching) {
       const cacheControl = { type: "ephemeral" as const, ttl: this.promptCaching.ttl ?? "5m" };

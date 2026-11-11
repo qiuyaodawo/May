@@ -1,4 +1,5 @@
 import type { ContextSnapshot, Message, ToolMessage } from "../core/index.js";
+import { pendingServerToolInteractionIndex } from "../core/index.js";
 
 import type { ContextCompactionStrategy } from "./compaction.js";
 
@@ -21,12 +22,14 @@ export class PruneOldToolResultsStrategy implements ContextCompactionStrategy {
   }
 
   compact(snapshot: Readonly<ContextSnapshot>): readonly Message[] {
+    const protectedIndex = pendingServerToolInteractionIndex(snapshot.messages);
     const toolIndexes = snapshot.messages
       .map((message, index) => (message.role === "tool" ? index : undefined))
       .filter((index): index is number => index !== undefined);
     const retained = new Set(this.keepRecentToolResults === 0 ? [] : toolIndexes.slice(-this.keepRecentToolResults));
 
     return snapshot.messages.map((message, index) => {
+      if (protectedIndex !== undefined && index >= protectedIndex) return message;
       if (message.role !== "tool" || retained.has(index)) return message;
       if (isPrunedToolMessage(message)) return message;
       const bytes = utf8Bytes(JSON.stringify(message.content));

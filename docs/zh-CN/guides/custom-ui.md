@@ -82,7 +82,8 @@ export async function projectApplication(
         store.appendNotice("warning", event.error.message);
         break;
       case "tool.presentation":
-        // 按应用声明的 kind/version 处理展示数据。
+        // store 配置的 projector 按 kind/version 解码展示数据。
+        store.appendToolPresentation(event.presentation);
         break;
     }
   }
@@ -128,6 +129,12 @@ Application 关闭后，`projectApplication()` 才会正常结束。产品通过
 
 `TranscriptView` 使用默认 registry 显示标准编码工具，未知工具使用通用显示组件。
 产品显示组件注册在 `ToolRendererRegistry` 实例上，通过视图 options 传入。
+
+`TranscriptStore` 使用 `ToolPresentationProjector` 解码 `tool.presentation` 记录。
+默认的 projector 解码标准编码工具的变更预览；遇到它无法识别的记录时，对话记录保持原样。
+要显示自己的展示格式，向 `new TranscriptStore()` 传入 `toolPresentationProjector`。
+projector 返回工具名称、工具输入和显示值；store 把显示值保存为 `item.presentation`，
+你的显示组件从这个字段读取。
 
 Raw-mode retained TUI 使用 `NodeTerminalDriver`；逐行提示界面使用
 `@sortedyuan/tui/node-terminal` 的 `createNodeTerminal()`。二者管理不同输入模式，

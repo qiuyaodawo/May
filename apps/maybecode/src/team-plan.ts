@@ -11,6 +11,13 @@ export type TeamToolName =
   | "glob"
   | "grep"
   | "fetch"
+  | "lsp_diagnostics"
+  | "lsp_definition"
+  | "lsp_references"
+  | "lsp_hover"
+  | "lsp_document_symbols"
+  | "lsp_workspace_symbols"
+  | "lsp_rename"
   | "list_files"
   | "publish_artifact"
   | "read_artifact"
@@ -41,6 +48,12 @@ export interface TeamPlan {
 
 const MAX_PLAN_BYTES = 1_048_576;
 const READ_TOOLS: readonly TeamToolName[] = [
+  "lsp_diagnostics",
+  "lsp_definition",
+  "lsp_references",
+  "lsp_hover",
+  "lsp_document_symbols",
+  "lsp_workspace_symbols",
   "read",
   "glob",
   "grep",
@@ -50,7 +63,7 @@ const READ_TOOLS: readonly TeamToolName[] = [
   "submit_report",
   "run_check",
 ];
-const ALL_TOOLS: readonly TeamToolName[] = [...READ_TOOLS, "fetch", "write", "edit"];
+const ALL_TOOLS: readonly TeamToolName[] = [...READ_TOOLS, "fetch", "write", "edit", "lsp_rename"];
 const LIMIT_CAPS = {
   maxConcurrent: 8,
   maxTasks: 128,

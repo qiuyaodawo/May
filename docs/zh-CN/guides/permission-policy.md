@@ -20,6 +20,24 @@
 
 权限与工具分离，使同一个 capability 可以用于不同产品策略。
 
+## MaybeCode 搜索与 LSP 权限
+
+设置 Provider 或模型的 `options.webSearch`，即在该配置范围内授权 Provider 搜索。
+服务端工具在模型请求期间执行。启用前配置域名、`maxUses` 和 Anthropic
+`allowedCallers`；包含 code execution 的 caller 同时授权该服务端能力。
+
+宿主 `web_search` 使用常规工具审批。默认授权键为 `web-search:<permissionVersion>`，
+工具的 permission version 标识后端或 Kimi Formula URI。
+MaybeCode 可以在当前权限范围内持久化该授权。
+`apps.maybecode.webSearch: false` 关闭搜索，并拒绝声明为每次回复都会搜索的模型。
+
+列出 LSP 服务器即授权启动其进程并执行项目程序。
+六个查询工具 `lsp_diagnostics`、`lsp_definition`、`lsp_references`、`lsp_hover`、
+`lsp_document_symbols`、`lsp_workspace_symbols` 在默认策略和只读模式下允许执行。
+`lsp_rename` 需要审批并提供多个文件的预览，只读模式下拒绝，yolo 模式下允许。
+只读模式下拒绝宿主 `web_search`。共享文件 guard 在取得锁之前检查每个重命名目标
+是否属于子 Agent 获得授权的文件范围。
+
 ## 默认拒绝策略
 
 创建策略模块，明确允许的操作范围。以下示例要求已经注册 `add` 和

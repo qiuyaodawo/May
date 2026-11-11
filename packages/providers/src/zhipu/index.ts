@@ -1,5 +1,6 @@
 import { omitUndefined } from "@sortedyuan/may/core";
 import { OpenAICompatibleChatModel } from "../openai-compatible/chat-model.js";
+import { validateWebSearch, webSearchRequest, type WebSearchOptions } from "../web-search.js";
 
 /**
  * Provider/model metadata determines concrete supported values.
@@ -9,6 +10,7 @@ export type ZhipuReasoningEffort = string;
 
 /** @experimental */
 export interface ZhipuModelOptions {
+  webSearch?: false | WebSearchOptions;
   apiKey: string;
   model: string;
   baseURL?: string;
@@ -23,6 +25,7 @@ export interface ZhipuModelOptions {
 export class ZhipuModel extends OpenAICompatibleChatModel {
   constructor(options: ZhipuModelOptions) {
     const { thinking = "enabled", clearThinking = false, maxTokens, ...shared } = options;
+    const search = validateWebSearch("zhipu-chat", options.webSearch);
     super(omitUndefined({ ...shared, maxOutputTokens: maxTokens }), {
       provider: "Zhipu",
       adapter: "zhipu-chat",
@@ -34,6 +37,11 @@ export class ZhipuModel extends OpenAICompatibleChatModel {
       requireDone: false,
       supportsResponseFormat: false,
       extendRequest: (body, request) => {
+        if (search)
+          body.tools = [
+            ...(body.tools ?? []),
+            webSearchRequest("zhipu-chat", search) as { type: "web_search"; web_search: Record<string, unknown> },
+          ];
         body.thinking = thinking === "enabled" ? { type: thinking, clear_thinking: clearThinking } : { type: thinking };
         if (request.tools.length > 0) body.tool_stream = true;
       },

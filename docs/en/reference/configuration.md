@@ -53,6 +53,100 @@ settings without adding `$schema` to the file. Applications build their composed
 with `createApplicationConfigSchema(id, section, title)` from `@sortedyuan/may/config` and
 validate their entry with `createApplicationConfigValidator(id, section)`.
 
+## Server search
+
+Set `providers.<name>.options.webSearch` or `models.<name>.options.webSearch` to
+an object to authorize server search. Omission leaves it disabled; `{}` enables
+adapter defaults, except Zhipu requires `searchEngine`. A model value replaces
+the entire provider value; `false` disables it.
+
+| Adapter                   | `webSearch` fields                                                                                                                                                                                 |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `anthropic-messages`      | `version` (default `web_search_20250305`; also `web_search_20260209`, `web_search_20260318`), `maxUses`, `allowedDomains`, `blockedDomains`, `userLocation`, `allowedCallers`, `responseInclusion` |
+| `openai-responses`        | `allowedDomains`, `blockedDomains`, `userLocation`, `searchContextSize`                                                                                                                            |
+| `openai-chat-completions` | `userLocation`, `searchContextSize`; requires `gpt-5-search-api`                                                                                                                                   |
+| `google-gemini`           | `timeRange: { startTime, endTime }`, `searchTypes: ["web", "image"]`                                                                                                                               |
+| `zhipu-chat`              | required `searchEngine`, optional `count`, `domainFilter`, `recencyFilter`, `contentSize`, `searchPrompt`                                                                                          |
+
+`userLocation` accepts nonempty `city`, `region`, `country`, and `timezone`
+fields, with at least one present. `searchContextSize` accepts `low`, `medium`,
+or `high`. Domain lists are mutually exclusive. Anthropic `responseInclusion`
+accepts `full` or `none` and requires `version: "web_search_20260318"`;
+`allowedCallers` accepts `direct` and `code_execution_20260120`. Newer search
+versions can invoke server code execution. A client function named `web_search`
+conflicts with Anthropic server search and raises `TypeError`.
+
+Gemini requires both time endpoints in chronological order. Zhipu engines are
+`search_std`, `search_pro`, `search_pro_sogou`, and `search_pro_quark`;
+`recencyFilter` accepts `oneDay`, `oneWeek`, `oneMonth`, `oneYear`, or `noLimit`,
+and `contentSize` accepts `medium` or `high`. Invalid combinations raise
+`ProviderConfigurationError`. `deepseek-chat` and `kimi-chat` reject `webSearch`,
+including `false`; use host search tools for those adapters.
+
+Capability fields are `serverTools.webSearch`, `serverTools.webSearchWithFunctions`,
+and `serverTools.alwaysSearches`. Request validation checks search and combined
+function support using `unknownCapabilityPolicy`. Anthropic discovery reads
+the provider's search capability. `gpt-5-search-api` always searches, including
+when no search options are supplied.
+
+## MaybeCode search and language servers
+
+`apps.maybecode.webSearch: false` disables host search and overrides server search
+for adapters accepting that option. Selecting an always-searching model then
+fails. Otherwise, configure `webSearch.hostTool` with `backend` (`deepseek`,
+`zhipu`, or `kimi-formula`) and `provider` (a key in `providers`). Zhipu also
+requires `searchEngine`. Credentials and `baseURL` come from that provider;
+missing providers or credentials fail configuration loading. `webSearch.maxResults`
+defaults to 10, with a maximum of 50 for DeepSeek and Zhipu tools.
+
+```json
+{
+  "apps": {
+    "maybecode": {
+      "webSearch": {
+        "hostTool": { "backend": "deepseek", "provider": "deepseek" },
+        "maxResults": 10
+      },
+      "lsp": {
+        "servers": { "typescript": {}, "python": {} },
+        "editDiagnostics": true,
+        "diagnosticSeverities": ["error", "warning"],
+        "startTimeoutMs": 60000,
+        "requestTimeoutMs": 15000,
+        "diagnosticsTimeoutMs": 3000
+      }
+    }
+  }
+}
+```
+
+At Run start, enabled server search takes precedence over the configured host
+tool. Kimi Formula host tools are available only with `kimi-chat`. `/model`
+reports search status. Host search uses tool approval and contributes usage.
+
+Omitting `lsp` or setting it to `false` disables LSP. Listing servers authorizes
+their processes to execute project programs. Presets are `typescript`, `python`,
+`rust`, and `go`; servers start on demand. Each `servers.<id>` accepts `command`,
+`args`, `languages` (languageId to extension array), `settings`,
+`initializationOptions`, and `env`. Preset fields can be overridden. Custom ids
+require `command` and `languages`; duplicate extensions fail loading.
+`editDiagnostics` defaults to true. Additional manager limits are
+`shutdownTimeoutMs: 5000`, `maxFileBytes: 1048576`, `maxResults: 200`,
+`maxHoverChars: 8000`, `maxEditDiagnostics: 20`, `maxDiagnostics: 200`, and
+`maxServers: 4`. See [LSP tools](../../../packages/tools/lsp/README.md) for inputs,
+diagnostic status, rename recovery, and server installation.
+
+The library execution option `cacheDirectory` provides writable server storage;
+`cachePath` exposes its environment path, `/may-cache` in containers.
+`toEnvironmentPath` and `toHostPath` translate workspace paths, and
+`spawn(..., { stdin: "pipe" })` enables stdio protocol communication. MaybeCode
+creates a workspace-specific cache under its data directory. Container images
+must contain the configured servers and their runtimes; workspace npm servers
+use the image's `node`. Container networking remains `none`. Prepare Go modules,
+Cargo dependencies, and Rust sources in the workspace or image. Cache-based
+`HOME`, `XDG_CACHE_HOME`, and `GOCACHE` accompany `GOFLAGS=-mod=readonly`,
+`GOPROXY=off`, and `CARGO_NET_OFFLINE=true`.
+
 ## Top-level fields
 
 | Field          | Required | Description                                                                                      |
@@ -101,15 +195,15 @@ the command form `/model <profile-prefix> --default` is used.
 
 `options` is adapter-specific. The built-in registry currently recognizes:
 
-| Adapter                   | Options                                                                                                       |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `openai-responses`        | `maxOutputTokens`, `reasoningEffort`, `reasoningSummary`, `serverCompactThreshold`, `store`, `responseFormat` |
-| `openai-chat-completions` | `maxOutputTokens`, `reasoningEffort`, `store`, `responseFormat`                                               |
-| `deepseek-chat`           | `thinking`, `reasoningEffort`, `maxTokens`                                                                    |
-| `zhipu-chat`              | `thinking`, `clearThinking`, `reasoningEffort`, `maxTokens`                                                   |
-| `kimi-chat`               | `thinking`, `reasoningEffort`, `maxTokens`                                                                    |
-| `anthropic-messages`      | `thinking`, `reasoningEffort`, `maxTokens`, `apiVersion`, `promptCaching`                                     |
-| `google-gemini`           | `maxOutputTokens`, `reasoningEffort`, `thinkingBudget`, `includeThoughts`, `responseFormat`                   |
+| Adapter                   | Options                                                                                                                    |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `openai-responses`        | `maxOutputTokens`, `reasoningEffort`, `reasoningSummary`, `serverCompactThreshold`, `store`, `responseFormat`, `webSearch` |
+| `openai-chat-completions` | `maxOutputTokens`, `reasoningEffort`, `store`, `responseFormat`, `webSearch`                                               |
+| `deepseek-chat`           | `thinking`, `reasoningEffort`, `maxTokens`                                                                                 |
+| `zhipu-chat`              | `thinking`, `clearThinking`, `reasoningEffort`, `maxTokens`, `webSearch`                                                   |
+| `kimi-chat`               | `thinking`, `reasoningEffort`, `maxTokens`                                                                                 |
+| `anthropic-messages`      | `thinking`, `reasoningEffort`, `maxTokens`, `apiVersion`, `promptCaching`, `webSearch`                                     |
+| `google-gemini`           | `maxOutputTokens`, `reasoningEffort`, `thinkingBudget`, `includeThoughts`, `responseFormat`, `webSearch`                   |
 
 For `google-gemini`, `baseURL` includes the API version and defaults to
 `https://generativelanguage.googleapis.com/v1beta`. A compatible gateway can use

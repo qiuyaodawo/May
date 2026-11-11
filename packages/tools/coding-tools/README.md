@@ -180,6 +180,46 @@ real Bash executable rather than the platform's implicit default shell.
 
 ## Search and web access
 
+### Host web search
+
+`createWebSearchTool({ backend })` creates a separately registered `web_search`
+tool with `workspaceEffect: "read"` and `permissionVersion: backend.id`.
+`createDeepSeekSearchBackend({ apiKey, baseURL? })` calls `/v1/tools/search`.
+`createZhipuSearchBackend({ apiKey, baseURL?, searchEngine })` calls
+`/web_search`; engines are `search_std`, `search_pro`, `search_pro_sogou`, and
+`search_pro_quark`. Backend factories also accept `fetch`.
+
+Input is `{ query, count? }`, with 1–128 Unicode characters in a nonblank query.
+`maxResults` defaults to 10 (maximum 50); `count` defaults to that limit.
+Other defaults are `timeoutMs: 30000`, `maxResponseBytes: 1048576`, and
+`maxSummaryChars: 2000`. Output is `{ items, usage }`; items contain `title`,
+`url`, `summary`, and optional `siteName` and `published`. Summaries and result
+counts are bounded. Oversized responses, HTTP errors, and timeouts fail.
+DeepSeek query operators include `site:`, `-site:`, `after:`, `before:`, and
+`lang:`. `Tool.usage(output)` reports search requests to Core;
+`ToolUsageError` reports usage from failed executions. Uncertain remote outcomes are partial.
+Hosts apply their own approval policy before executing these network tools.
+
+### File feedback and shared guards
+
+`createCodingTools`, `createEditTool`, and `createWriteTool` accept
+`fileFeedback: WorkspaceFileFeedback`. After a successful write, `record(path,
+content)` runs inside the file guard and synchronously returns an optional
+ticket. Its `result(signal)` runs after releasing the guard. Tool output then
+includes `diagnostics` with `status`, `items`, `truncated`, and optional `reason`
+and `receivedAt`. LSP provides this integration through `manager.fileFeedback`.
+Only `complete` with an empty list confirms no reported problems for that
+document version. `pending`, `unknown`, and `unavailable` describe incomplete,
+unversioned, and failed feedback. Feedback failures preserve successful writes;
+caller cancellation remains an error.
+
+`WorkspaceFileGuard.runMany(paths, tool, operation)` protects multiple files
+together. `WorkspaceFileOperation.tool` includes `lsp_rename`. The root exports
+`atomicWriteText`; `/change-preview` exports `createTextChangePreview` for
+host-prepared text differences.
+
+### Filesystem search and fetch
+
 `createGlobTool(options)` and `createGrepTool(options)` accept `SearchToolOptions`:
 `cwd`, optional `maxResults` (default 1000), `maxOutputBytes` (default 1 MiB),
 `timeoutMs` (default 30000), and `execution`. Both use `@vscode/ripgrep`, respect
@@ -209,7 +249,7 @@ hosts should apply a separate network permission policy.
 
 ## Execution environments
 
-`openCodingExecutionEnvironment({ workspace, isolation, signal? })` opens a
+`openCodingExecutionEnvironment({ workspace, isolation, cacheDirectory?, signal? })` opens a
 `CodingExecutionEnvironment` with `workspace`, `isolation`, `spawn`, and async
 `close()`. Pass it as `execution` to shell, search, or coding-tool factories.
 Pass its `isolation` as `execution` to `codingRuntimeInstructions` to describe
@@ -226,7 +266,7 @@ providing `bash`, `git`, `rg`, and `setsid`:
 docker pull nixery.dev/shell/git/ripgrep/util-linux
 ```
 
-The workspace is the only host directory mounted, at `/workspace`, with working
+The workspace is mounted at `/workspace`, with working
 directory translation for Windows and Unix paths. File tools access the same
 files through host path checks. The container uses the Unix host UID:GID or
 `1000:1000` on Windows, a read-only root, temporary storage, no network, memory
@@ -235,3 +275,15 @@ credentials, and Docker socket mounts are excluded. Missing Docker, images, or
 required programs cause startup errors. Cancellation waits for command shutdown;
 `close()` waits for processes and container removal. Host `fetch` and MCP services
 use their own network and permission boundaries.
+
+`cacheDirectory` adds a writable host cache, mounted at `/may-cache` in
+containers. `cachePath` gives the path seen by child processes, or `undefined`
+when no cache was supplied. `toEnvironmentPath` and `toHostPath` map workspace
+paths; reverse mapping returns `undefined` outside the workspace.
+`spawn` accepts `stdin: "pipe"` for interactive stdio protocols; the default
+`"cancel"` reserves stdin for process cancellation. Both modes terminate the
+process group on cancellation. Close language-server managers before closing
+their environment. LSP container images need server commands and runtimes,
+plus cached Go/Cargo dependencies and Rust sources. The environment sets
+cache-based `HOME`, `XDG_CACHE_HOME`, and `GOCACHE`, and uses
+`GOFLAGS=-mod=readonly`, `GOPROXY=off`, and `CARGO_NET_OFFLINE=true`.

@@ -72,7 +72,10 @@ export function createMaybeCodeWebHost(
                 command: "model.switch",
                 label: "模型配置",
                 value: app.application.modelInfo?.profile ?? models[0]!.name,
-                options: models.map((m) => ({ value: m.name, label: m.name })),
+                options: models.map((m) => ({
+                  value: m.name,
+                  label: `${m.name}${m.searchStatus ? ` · ${m.searchStatus}` : ""}`,
+                })),
               },
             ]
           : []),
@@ -112,6 +115,7 @@ export function createMaybeCodeWebHost(
         fields: [
           { label: "当前模型", value: app.application.modelInfo?.model ?? "未知" },
           { label: "Provider", value: app.application.modelInfo?.provider ?? "未知" },
+          { label: "搜索", value: app.application.modelInfo?.searchStatus ?? "未知" },
         ],
       },
       ...(app.getModelCapabilities && app.modelCapabilitiesAvailable !== false

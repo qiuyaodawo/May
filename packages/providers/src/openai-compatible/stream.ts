@@ -1,9 +1,14 @@
-import type { AssistantMessage, ModelEvent, ToolCall, Usage } from "@sortedyuan/may/core";
+import { randomUUID } from "node:crypto";
+import type { AssistantMessage, Citation, ModelEvent, ToolCall, Usage } from "@sortedyuan/may/core";
 import type { OpenAICompatibleChunk, OpenAICompatibleToolCallDelta } from "./protocol.js";
 import { readSseData } from "./http.js";
+import type { ServerToolOrigin } from "../web-search.js";
 
 /** @experimental */
 export interface OpenAICompatibleStreamOptions {
+  webSearch?: boolean;
+  zhipu?: boolean;
+  origin?: ServerToolOrigin;
   signal: AbortSignal;
   providerName: string;
   requireDone?: boolean;
@@ -29,6 +34,9 @@ export async function* streamOpenAICompatibleResponse(
   let finishReason: string | undefined;
   let receivedDone = false;
   const pendingCalls = new Map<number, PendingToolCall>();
+  const citations: Citation[] = [];
+  const searchResults: NonNullable<OpenAICompatibleChunk["web_search"]> = [];
+  let responseId = randomUUID() as string;
 
   for await (const data of readSseData(response, options.signal, options.protocolError, options.providerName)) {
     if (data === "[DONE]") {
@@ -36,6 +44,8 @@ export async function* streamOpenAICompatibleResponse(
       break;
     }
     const chunk = parseChunk(data, options);
+    if (chunk.id !== undefined) responseId = chunk.id;
+    if (options.zhipu && chunk.web_search !== undefined) searchResults.push(...chunk.web_search);
     // 服务端可能在 HTTP 200 的流中报告错误，必须在 [DONE] 与 finish_reason 判定之前处理。
     if (chunk.error !== undefined) {
       throw options.protocolError(
@@ -48,6 +58,16 @@ export async function* streamOpenAICompatibleResponse(
     for (const choice of chunk.choices ?? []) {
       if (choice.index !== 0) continue;
       const delta = choice.delta;
+      for (const annotation of delta?.annotations ?? [])
+        if (annotation.type === "url_citation" && annotation.url_citation) {
+          const citation = annotation.url_citation;
+          citations.push({
+            type: "url",
+            url: citation.url,
+            ...(citation.title === undefined ? {} : { title: citation.title }),
+            range: { start: citation.start_index, end: citation.end_index },
+          });
+        }
 
       if (typeof delta?.reasoning_content === "string") {
         hasReasoningContent = true;
@@ -97,8 +117,38 @@ export async function* streamOpenAICompatibleResponse(
   if (hasReasoningContent) {
     message.content.push({ type: "reasoning", text: reasoning });
   }
-  if (text !== "") message.content.push({ type: "text", text });
+  for (const citation of citations)
+    if (
+      typeof citation.url !== "string" ||
+      !Number.isSafeInteger(citation.range!.start) ||
+      !Number.isSafeInteger(citation.range!.end) ||
+      citation.range!.start < 0 ||
+      citation.range!.end < citation.range!.start ||
+      citation.range!.end > text.length
+    )
+      throw options.protocolError("Invalid url_citation range");
+  if (text !== "") message.content.push({ type: "text", text, ...(citations.length ? { citations } : {}) });
   if (toolCalls.length > 0) message.toolCalls = toolCalls;
+  if (searchResults.length > 0) {
+    const call = {
+      id: `may:web_search:${responseId}`,
+      kind: "web_search",
+      name: "web_search",
+      status: "completed" as const,
+      sources: searchResults.map((item) => ({
+        url: item.link,
+        ...(item.title === undefined ? {} : { title: item.title }),
+        ...(item.publish_date === undefined ? {} : { published: item.publish_date }),
+      })),
+    };
+    message.serverToolCalls = [call];
+    yield { type: "server_tool.updated", call };
+  }
+  if (options.webSearch || searchResults.length > 0)
+    usage = { ...usage, completeness: { status: "partial", reason: "web-search-usage-unreported" } };
+  if ((options.webSearch || searchResults.length > 0) && options.origin) {
+    message.modelState = { type: `${options.origin.adapter}.message.v1`, data: { responseId, origin: options.origin } };
+  }
 
   const completed: Extract<ModelEvent, { type: "response.completed" }> = {
     type: "response.completed",
@@ -176,6 +226,7 @@ function completeToolCalls(calls: Map<number, PendingToolCall>, options: OpenAIC
         id: call.id,
         name: call.name,
         input: parseToolInput(call.arguments, options),
+        rawInput: call.arguments,
       };
     });
 }

@@ -10,6 +10,7 @@ import { OpenAIResponsesModel } from "@sortedyuan/providers";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
 import { TranscriptStore } from "@sortedyuan/tui/transcript";
+import { readCodingToolPresentation } from "@sortedyuan/tui/tool-renderers";
 import { MaybeCodeWorkspace } from "../dist/workspace.js";
 
 test("runs coding tools and reuses an approved session grant", async (t) => {
@@ -104,7 +105,9 @@ test("runs coding tools and reuses an approved session grant", async (t) => {
   const restoredTranscript = new TranscriptStore();
   restoredTranscript.loadHistory(await resumed.history());
   assert.deepEqual(
-    restoredTranscript.items.filter((item) => item.kind === "tool").map((item) => item.preview?.kind),
+    restoredTranscript.items
+      .filter((item) => item.kind === "tool")
+      .map((item) => readCodingToolPresentation(item)?.preview.kind),
     ["create", "update"],
   );
   await resumed.close();

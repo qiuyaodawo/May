@@ -88,7 +88,7 @@ export const SUBAGENT_DEFAULT_MAX_STEPS = 24;
 export const SUBAGENT_TOOL_NAMES: readonly SubagentToolName[];
 
 // @public
-export type SubagentToolName = "read" | "shell" | "edit" | "write" | "glob" | "grep" | "fetch";
+export type SubagentToolName = string;
 
 // (No @packageDocumentation comment for this package)
 

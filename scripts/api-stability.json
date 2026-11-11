@@ -1,5 +1,477 @@
 [
   {
+    "package": "@sortedyuan/may",
+    "entrypoint": "./core",
+    "symbol": "ToolUsageError",
+    "stability": "experimental",
+    "since": "0.2.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": ".",
+    "symbol": "atomicWriteText",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": ".",
+    "symbol": "WorkspaceDiagnostic",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": ".",
+    "symbol": "WorkspaceFileFeedbackResult",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": ".",
+    "symbol": "WorkspaceFileFeedbackTicket",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": ".",
+    "symbol": "WorkspaceFileFeedback",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": ".",
+    "symbol": "createTextChangePreview",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": "./change-preview",
+    "symbol": "createTextChangePreview",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": ".",
+    "symbol": "createWebSearchTool",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": ".",
+    "symbol": "createDeepSeekSearchBackend",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": ".",
+    "symbol": "createZhipuSearchBackend",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": ".",
+    "symbol": "WebSearchResultItem",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": ".",
+    "symbol": "WebSearchBackend",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": ".",
+    "symbol": "WebSearchToolOptions",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": ".",
+    "symbol": "WebSearchOutput",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/coding-tools",
+    "entrypoint": ".",
+    "symbol": "WebSearchToolError",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/may",
+    "entrypoint": "./core",
+    "symbol": "ServerToolContinuationLimitError",
+    "stability": "experimental",
+    "since": "0.2.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/may",
+    "entrypoint": "./core",
+    "symbol": "pendingServerToolInteractionIndex",
+    "stability": "experimental",
+    "since": "0.2.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/may",
+    "entrypoint": "./core",
+    "symbol": "hasPendingServerToolInteraction",
+    "stability": "experimental",
+    "since": "0.2.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/may",
+    "entrypoint": "./core",
+    "symbol": "Citation",
+    "stability": "experimental",
+    "since": "0.2.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/may",
+    "entrypoint": "./core",
+    "symbol": "ServerToolSource",
+    "stability": "experimental",
+    "since": "0.2.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/may",
+    "entrypoint": "./core",
+    "symbol": "ServerToolCall",
+    "stability": "experimental",
+    "since": "0.2.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/providers",
+    "entrypoint": ".",
+    "symbol": "WebSearchOptions",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/providers",
+    "entrypoint": ".",
+    "symbol": "ServerToolStateMismatchError",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/providers",
+    "entrypoint": ".",
+    "symbol": "createKimiFormulaTools",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/providers",
+    "entrypoint": ".",
+    "symbol": "KimiFormulaError",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/providers",
+    "entrypoint": ".",
+    "symbol": "KimiFormulaRawInputError",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/providers",
+    "entrypoint": ".",
+    "symbol": "KimiFormulaToolsOptions",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/providers",
+    "entrypoint": "./kimi",
+    "symbol": "createKimiFormulaTools",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/providers",
+    "entrypoint": "./kimi",
+    "symbol": "KimiFormulaError",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/providers",
+    "entrypoint": "./kimi",
+    "symbol": "KimiFormulaRawInputError",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/providers",
+    "entrypoint": "./kimi",
+    "symbol": "KimiFormulaToolsOptions",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LANGUAGE_SERVER_PRESETS",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LanguageServerDefinition",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LanguageServerManagerOptions",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "SymbolPosition",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LspLocation",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "ServerBusy",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LocationList",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "HoverText",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LspSymbol",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "SymbolList",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "FileDiagnostics",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LanguageServerStatus",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "RenameFile",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "RenamePlan",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "RenameOutput",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "RenamePreview",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LanguageServerManager",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LspTimeoutError",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LspServerNotFoundError",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LspServerExitedError",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LspRenameConflictError",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LspRenameWriteError",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LspProtocolError",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "openLanguageServerManager",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "createLspTools",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "createRenamePreview",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/lsp-tools",
+    "entrypoint": ".",
+    "symbol": "LspToolsOptions",
+    "stability": "experimental",
+    "since": "0.0.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
     "package": "@sortedyuan/coding-tools",
     "entrypoint": ".",
     "symbol": "assertFileExistence",
@@ -12426,6 +12898,62 @@
   {
     "package": "@sortedyuan/tui",
     "entrypoint": ".",
+    "symbol": "createCodingToolPresentationProjector",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/tui",
+    "entrypoint": ".",
+    "symbol": "codingChangePresentation",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/tui",
+    "entrypoint": ".",
+    "symbol": "readCodingToolPresentation",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/tui",
+    "entrypoint": ".",
+    "symbol": "CodingToolPresentation",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/tui",
+    "entrypoint": ".",
+    "symbol": "ToolPresentationProjection",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/tui",
+    "entrypoint": ".",
+    "symbol": "ToolPresentationProjector",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/tui",
+    "entrypoint": ".",
+    "symbol": "TranscriptStoreOptions",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/tui",
+    "entrypoint": ".",
     "symbol": "createEditorKeymap",
     "stability": "experimental",
     "since": "0.3.0",
@@ -13682,6 +14210,38 @@
   {
     "package": "@sortedyuan/tui",
     "entrypoint": "./tool-renderers",
+    "symbol": "createCodingToolPresentationProjector",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/tui",
+    "entrypoint": "./tool-renderers",
+    "symbol": "codingChangePresentation",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/tui",
+    "entrypoint": "./tool-renderers",
+    "symbol": "readCodingToolPresentation",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/tui",
+    "entrypoint": "./tool-renderers",
+    "symbol": "CodingToolPresentation",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/tui",
+    "entrypoint": "./tool-renderers",
     "symbol": "renderDiff",
     "stability": "experimental",
     "since": "0.3.0",
@@ -13781,6 +14341,30 @@
     "symbol": "TranscriptStore",
     "stability": "experimental",
     "since": "0.3.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/tui",
+    "entrypoint": "./transcript",
+    "symbol": "TranscriptStoreOptions",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/tui",
+    "entrypoint": "./transcript",
+    "symbol": "ToolPresentationProjection",
+    "stability": "experimental",
+    "since": "0.4.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/tui",
+    "entrypoint": "./transcript",
+    "symbol": "ToolPresentationProjector",
+    "stability": "experimental",
+    "since": "0.4.0",
     "docs": "docs/en/reference/stability.md"
   },
   {

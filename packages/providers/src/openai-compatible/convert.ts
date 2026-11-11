@@ -64,7 +64,7 @@ function convertToolCall(call: ToolCall): OpenAICompatibleToolCall {
     type: "function",
     function: {
       name: call.name,
-      arguments: serializeJson(call.input),
+      arguments: call.rawInput ?? serializeJson(call.input),
     },
   };
 }

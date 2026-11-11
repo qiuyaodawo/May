@@ -1,4 +1,9 @@
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { createHash } from "node:crypto";
+import { homedir } from "node:os";
+import { openLanguageServerManager, type LanguageServerManager } from "@sortedyuan/lsp-tools";
+import { createMaybeCodeToolPresentation } from "./tool-presentation.js";
+import type { MaybeCodeLspSettings, MaybeCodeWebSearchSettings } from "./settings.js";
 import type { ProjectGitWorkspace } from "@sortedyuan/may/application/git-workspace";
 import { GitRequestController, requestMainRunIds, startGitGoalRequest, startGitRequest } from "./git-request.js";
 import { mediaHistory } from "./media-history.js";
@@ -7,10 +12,7 @@ import type { SkillRegistry } from "@sortedyuan/may/skills";
 import { applicationServices, defineAgent, withDefaultCompactionThreshold } from "@sortedyuan/may";
 import type { AgentApplication, AgentApplicationEvent, AgentRun, AgentApplicationFork } from "@sortedyuan/may";
 import {
-  createToolChangePreview,
   decodeToolChangePreviewPresentation,
-  TOOL_CHANGE_PREVIEW_PRESENTATION_KIND,
-  TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION,
   openCodingExecutionEnvironment,
   type CodingExecutionEnvironment,
   type CodingExecutionIsolation,
@@ -27,11 +29,13 @@ import {
 } from "@sortedyuan/may/context";
 import {
   AsyncEventQueue,
+  hasPendingServerToolInteraction,
   RunCancelledError,
   isStreamingMayEvent,
   omitUndefined,
   ToolRegistry,
   type Model,
+  type Context,
   type RunOptions,
   type RunBudget,
   type Tool,
@@ -120,6 +124,10 @@ export interface MaybeCodeSubagentOptions {
 }
 
 export interface MaybeCodeApplicationOptions {
+  readonly lsp?: false | MaybeCodeLspSettings;
+  readonly webSearch?: false | MaybeCodeWebSearchSettings;
+  readonly searchToolsForModel?: (model: MaybeCodeModelInfo | undefined) => Promise<readonly Tool[]>;
+  readonly dataDirectory?: string;
   readonly execution?: CodingExecutionIsolation;
   readonly fetch?: FetchToolOptions;
   readonly requestRecording?: "off" | "required";
@@ -209,6 +217,8 @@ export class MaybeCodeApplication {
     instructions: MaybeCodeInstructionState,
     private readonly createModelPlugins: (update: MaybeCodeModelUpdate) => MaybeCodePluginComposition,
     readonly execution: CodingExecutionEnvironment,
+    readonly lsp?: LanguageServerManager,
+    private readonly contextSource?: () => Context | undefined,
   ) {
     this.workspace = workspace;
     this.agent = application;
@@ -222,23 +232,44 @@ export class MaybeCodeApplication {
   }
 
   static async open(options: MaybeCodeApplicationOptions): Promise<MaybeCodeApplication> {
+    const storeDirectory = (options.store as { readonly directory?: string }).directory;
+    const dataDirectory = options.dataDirectory ?? storeDirectory ?? join(homedir(), ".may", "maybecode");
+    const workspaceKey = createHash("sha256").update(resolve(options.workspace)).digest("hex");
     const execution = await openCodingExecutionEnvironment({
       workspace: options.workspace,
       isolation: options.execution ?? { mode: "host" },
+      cacheDirectory: join(dataDirectory, "cache", workspaceKey),
     });
     let opened = false;
+    let lsp: LanguageServerManager | undefined;
     try {
-      const product = await MaybeCodeApplication.openWithExecution(options, execution);
+      if (options.lsp) {
+        const { servers, editDiagnostics: _editDiagnostics, ...limits } = options.lsp;
+        lsp = await openLanguageServerManager({
+          ...limits,
+          execution,
+          dataDirectory,
+          servers: Object.entries(servers).map(([id, server]) => ({ id, ...server })),
+        });
+      }
+      const product = await MaybeCodeApplication.openWithExecution(options, execution, lsp);
       opened = true;
       return product;
     } finally {
-      if (!opened) await execution.close();
+      if (!opened) {
+        try {
+          await lsp?.close();
+        } finally {
+          await execution.close();
+        }
+      }
     }
   }
 
   private static async openWithExecution(
     options: MaybeCodeApplicationOptions,
     execution: CodingExecutionEnvironment,
+    lsp?: LanguageServerManager,
   ): Promise<MaybeCodeApplication> {
     const workspace = resolve(options.workspace);
     const configuredTools = ToolRegistry.compose(options.tools ?? [], options.additionalTools ?? []);
@@ -265,6 +296,7 @@ export class MaybeCodeApplication {
       : options.modelInfo;
 
     let product: MaybeCodeApplication | undefined;
+    let activeContext: Context | undefined;
     const gitRequest = new GitRequestController(options.gitWorkspace);
     const createPlugins = (current: MaybeCodeApplicationOptions) =>
       createMaybeCodePlugins(
@@ -288,6 +320,10 @@ export class MaybeCodeApplication {
         {
           workspace,
           execution,
+          ...omitUndefined({ lsp }),
+          onContext: (context) => {
+            activeContext = context;
+          },
           gitRequest,
           instructions: instructions.system.content,
           instructionsSource: () => instructionState.current.system.content,
@@ -327,16 +363,7 @@ export class MaybeCodeApplication {
       },
       maxSteps: options.maxSteps ?? MAYBECODE_MAX_STEPS,
       sessionHistory: { retrieval: true },
-      createToolPresentation: async (check) => {
-        const preview = await createToolChangePreview(workspace, check.tool.name, check.input);
-        return preview === undefined
-          ? undefined
-          : {
-              kind: TOOL_CHANGE_PREVIEW_PRESENTATION_KIND,
-              version: TOOL_CHANGE_PREVIEW_PRESENTATION_VERSION,
-              data: preview,
-            };
-      },
+      createToolPresentation: (check) => createMaybeCodeToolPresentation(workspace, lsp, check),
       validateSession: (metadata) => assertWorkspace(metadata, workspace),
       closeReason: "MaybeCode is closing",
     });
@@ -371,6 +398,8 @@ export class MaybeCodeApplication {
         return createPlugins({ ...base, ...update });
       },
       execution,
+      lsp,
+      () => activeContext,
     );
     product.gitRequest = gitRequest;
     product.permissionScopeId =
@@ -449,9 +478,12 @@ export class MaybeCodeApplication {
     ) {
       throw new Error("Finish the MCP interaction before changing the model");
     }
-    const composition = this.createModelPlugins(update);
     this.updatingModel = true;
-    const operation = this.replaceModelPlugins(composition, update);
+    const operation = (async () => {
+      await this.assertModelChangeSafe();
+      const composition = this.createModelPlugins(update);
+      await this.replaceModelPlugins(composition, update);
+    })();
     this.modelUpdate = operation;
     try {
       await operation;
@@ -459,6 +491,14 @@ export class MaybeCodeApplication {
       this.updatingModel = false;
       this.modelUpdate = undefined;
     }
+  }
+
+  async assertModelChangeSafe(): Promise<void> {
+    // Failed replacements retain the Context checked before its services were suspended.
+    if (this.modelUpdateFailure !== undefined) return;
+    const snapshot = await this.contextSource?.()?.snapshot();
+    if (snapshot && hasPendingServerToolInteraction(snapshot.messages))
+      throw new Error("Continue the pending server tool interaction before changing the model");
   }
 
   private async replaceModelPlugins(
@@ -953,7 +993,11 @@ export class MaybeCodeApplication {
       if (failures.length) throw new AggregateError(failures, "MaybeCode background operations failed");
     } finally {
       try {
-        await this.execution.close();
+        try {
+          await this.lsp?.close();
+        } finally {
+          await this.execution.close();
+        }
       } finally {
         this.eventQueue.close();
       }
@@ -993,6 +1037,10 @@ export class MaybeCodeApplication {
         continue;
       }
       const value = event.presentation;
+      if (value.kind === "maybecode.lsp-rename-preview") {
+        this.eventQueue.push(event);
+        continue;
+      }
       const preview = decodeToolChangePreviewPresentation(value.kind, value.version, value.data);
       if (preview === undefined) continue;
       this.eventQueue.push({

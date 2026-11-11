@@ -3,7 +3,7 @@
   "private": true,
   "packageManager": "pnpm@12.4.2",
   "engines": {
-    "node": ">=22.16.0"
+    "node": ">=22"
   },
   "scripts": {
     "lint": "eslint .",
@@ -29,6 +29,7 @@
     "test:integration:kimi": "pnpm build && node --test packages/providers/test/kimi/integration/*.test.mjs",
     "test:integration:anthropic": "pnpm build && node --test packages/providers/test/anthropic/integration/*.test.mjs",
     "test:integration:maybecode": "pnpm --filter @sortedyuan/maybecode run test:integration",
+    "test:integration:lsp": "pnpm --filter @sortedyuan/lsp-tools run test:integration",
     "test:package:maybecode": "node scripts/test-maybecode-package.mjs",
     "test:package:plugin": "node scripts/test-plugin-package.mjs",
     "test:package:scheduler": "node scripts/test-scheduler-package.mjs",
@@ -48,6 +49,7 @@
     "@changesets/cli": "3.0.3",
     "@microsoft/api-extractor": "^7.60.1",
     "@sortedyuan/coding-tools": "workspace:*",
+    "@sortedyuan/lsp-tools": "workspace:*",
     "@sortedyuan/may": "workspace:*",
     "@sortedyuan/observability": "workspace:*",
     "@sortedyuan/providers": "workspace:*",

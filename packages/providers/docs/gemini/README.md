@@ -4,6 +4,19 @@ Native Google Gemini `streamGenerateContent` adapter for May. The built-in
 adapter ID is `google-gemini`. This package is independently consumable and is
 also re-exported by `@sortedyuan/providers`.
 
+## Web search
+
+Set constructor `webSearch` or provider/model `options.webSearch` to `{}` to
+enable Google Search. Omission and `false` disable it. Optional fields are
+`timeRange: { startTime, endTime }` (both endpoints required in chronological
+order) and `searchTypes` (`web`, `image`). The adapter requests server-side
+tool invocations, preserves native tool parts, and publishes `serverToolCalls`.
+Grounding sources become citations; UTF-8 byte ranges are converted to UTF-16
+ranges within the corresponding text part. Search queries contribute
+`web-search` request usage. Combined function/search support is checked through
+`serverTools.webSearchWithFunctions` and `unknownCapabilityPolicy`. See
+[configuration](../../../../docs/en/reference/configuration.md#server-search).
+
 ```ts
 import { GeminiModel } from "@sortedyuan/providers/gemini";
 

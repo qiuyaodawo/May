@@ -942,7 +942,7 @@ class ModelPrompt implements InteractiveComponent {
       models.map((model) => ({
         value: model,
         label: `${model.name === currentProfile ? "* " : ""}${model.name}` + `${model.isDefault ? " [default]" : ""}`,
-        description: `${model.provider}/${model.model} · ${model.adapter}`,
+        description: `${model.provider}/${model.model} · ${model.adapter}${model.searchStatus ? ` · ${model.searchStatus}` : ""}`,
       })),
       {
         onSelect: (item) => this.complete({ type: "switch", profile: item.value.name }),

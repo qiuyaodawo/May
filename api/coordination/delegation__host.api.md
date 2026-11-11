@@ -34,6 +34,7 @@ import { Tracer } from '@sortedyuan/may/core';
 import type { Usage } from '@sortedyuan/may/core';
 import { UsageCost } from '@sortedyuan/may/core';
 import { UserMessage } from '@sortedyuan/may/core';
+import { WorkspaceFileGuard } from '@sortedyuan/coding-tools';
 
 // @public (undocumented)
 export const MAIN_AGENT = "main";

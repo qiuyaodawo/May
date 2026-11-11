@@ -128,6 +128,11 @@ export async function consumeModel(
         throw new RunCancelledError(reason);
       }
       await host.observe(runtimeHooks.modelEvent, event, { runId, step, signal });
+      if (event.type === "server_tool.updated") {
+        singleAttempt?.content("tool");
+        emit({ type: "model.server_tool.updated", step, call: event.call });
+        continue;
+      }
       if (event.type === "text.delta") {
         if (event.delta.length > 0) singleAttempt?.content("text");
         emit({ type: "model.text.delta", step, delta: event.delta });

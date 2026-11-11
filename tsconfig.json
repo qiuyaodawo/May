@@ -11,6 +11,7 @@
     { "path": "./packages/coordination" },
     { "path": "./packages/providers" },
     { "path": "./packages/tools/coding-tools" },
+    { "path": "./packages/tools/lsp" },
     { "path": "./packages/ui/tui" },
     { "path": "./apps/cli" },
     { "path": "./apps/eval" },

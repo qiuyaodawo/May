@@ -24,6 +24,12 @@ export function createCodingPermissionPolicy(
       options.readOnly &&
       ![
         "read",
+        "lsp_diagnostics",
+        "lsp_definition",
+        "lsp_references",
+        "lsp_hover",
+        "lsp_document_symbols",
+        "lsp_workspace_symbols",
         "glob",
         "grep",
         "skill_read",
@@ -38,6 +44,18 @@ export function createCodingPermissionPolicy(
     )
       return "deny";
     let decision = await policy(check);
+    if (
+      options.persistent &&
+      options.policy === undefined &&
+      check.tool.name === "web_search" &&
+      typeof decision === "object" &&
+      decision.decision === "ask"
+    ) {
+      decision = {
+        ...decision,
+        persistent: { scopeId: options.persistent.scopeId, description: decision.grantKey ?? "web_search" },
+      };
+    }
     if (options.persistent && check.tool.name === "fetch" && options.policy === undefined) {
       const url = stringField(check.input, "url");
       if (url !== undefined) {
@@ -97,6 +115,12 @@ function defaultCodingPermission(check: PermissionCheck): PermissionDecision {
   if (
     [
       "read",
+      "lsp_diagnostics",
+      "lsp_definition",
+      "lsp_references",
+      "lsp_hover",
+      "lsp_document_symbols",
+      "lsp_workspace_symbols",
       "glob",
       "grep",
       "skill_read",
@@ -142,6 +166,9 @@ function defaultCodingPermission(check: PermissionCheck): PermissionDecision {
     const url = stringField(check.input, "url");
     return url === undefined ? "ask" : { decision: "ask", grantKey: `network:${new URL(url).origin}` };
   }
+
+  if (check.tool.name === "web_search")
+    return { decision: "ask", grantKey: `web-search:${check.tool.permissionVersion ?? "unknown"}` };
 
   return "ask";
 }

@@ -1,5 +1,6 @@
 import { omitUndefined } from "@sortedyuan/may/core";
 import { OpenAICompatibleChatModel } from "../openai-compatible/chat-model.js";
+import type { WebSearchOptions } from "../web-search.js";
 
 /**
  * Provider/model metadata determines concrete supported values.
@@ -9,6 +10,7 @@ export type DeepSeekReasoningEffort = string;
 
 /** @experimental */
 export interface DeepSeekModelOptions {
+  webSearch?: false | WebSearchOptions;
   apiKey: string;
   model: string;
   baseURL?: string;

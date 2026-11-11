@@ -2,6 +2,27 @@
 
 **English** | [简体中文](../../zh-CN/architecture/runtime-session.md)
 
+## Server-tool continuation
+
+An assistant message with `continuation: "server-tool-pause"` completes its Step
+and starts another model call. Each continuation counts toward `maxSteps` and
+`maxModelCalls`. `maxServerToolContinuations` defaults to 8 consecutive pauses;
+exceeding it raises `ServerToolContinuationLimitError`. Session retains the
+paused assistant message, so a later `continue()` can resume it.
+
+The pause boundary skips steering input consumption and end hooks. A Step with
+pending `serverToolCalls` also preserves steering input after client tools finish.
+Host `shouldYield` can yield at the completed Step boundary. `model.completed`
+provides the durable checkpoint for both resumed requests and replay.
+
+Context compaction and pruning preserve the unfinished interaction from its
+assistant message onward; automatic compaction waits for completion. Adapters
+verify the originating adapter, model, endpoint, and server-tool configuration
+before replaying pending state and raise `ServerToolStateMismatchError` on a
+change. MaybeCode requires completing this interaction before model switching.
+
+## Resource ownership
+
 This page explains which module owns Agent execution, conversation state, and
 application resources. Use it when deciding where an extension belongs or
 reviewing dependencies between reusable packages and products.
@@ -61,16 +82,26 @@ flowchart LR
   MCP --> Core
   Apps --> TUI["@sortedyuan/tui"]
   TUI --> Core
-  TUI --> Terminal[coding-tools / media]
+  TUI --> CodingTools["@sortedyuan/coding-tools"]
+  TUI --> Media["@sortedyuan/media"]
   Apps --> Providers["@sortedyuan/providers"]
   Providers --> Core
   Apps --> Gateway["@sortedyuan/gateway"]
   Gateway --> Application
+  Apps --> Coordination["@sortedyuan/coordination"]
+  Coordination --> Application
+  Coordination --> CodingTools
+  Coordination --> MCP
+  Eval["@sortedyuan/eval"] --> Coordination
+  Eval --> Observability
 ```
 
 The diagram shows selected module dependencies. Package manifests define the
 complete install dependencies. Reusable modules depend on public framework
 interfaces, and product composition remains under `apps`.
+`@sortedyuan/coordination` imports `@sortedyuan/coding-tools` and `@sortedyuan/mcp`
+only from its `delegation` subpaths. Both packages are install dependencies of
+`@sortedyuan/coordination`, so installing `@sortedyuan/eval` installs them as well.
 
 ### `@sortedyuan/may/core`
 
@@ -267,6 +298,13 @@ queue. A product can rebuild the active application on the same Session through
 `transitionApplication`, or serialize product-only configuration work through
 `runStateTransition`.
 
+`git-workspace.ts` provides `ProjectGitWorkspace` through the
+`@sortedyuan/may/application/git-workspace` subpath. It manages project Git
+checkpoints, diffs, restoration previews and registered worktrees for a Node.js
+host. The file imports only `core` and `storage`; the other application modules
+run without it, and the host decides when to commit and when to create worktrees.
+See [Git workspaces and file checkpoints](../guides/git-workspaces.md).
+
 These classes provide ordering and dependency-injection seams; they do not
 define a provider registry, a system prompt, a coding permission policy, model
 profiles, UI commands, or terminal rendering. Definition collaborators remain
@@ -293,6 +331,14 @@ retained transcript. It is exposed through `@sortedyuan/tui/transcript` and
 controller calls are still supplied by the application. A graphical or remote
 UI can consume a headless controller directly.
 
+`TranscriptStore` passes each `tool.presentation` record to a
+`ToolPresentationProjector` and stores the returned value on the tool item as
+`presentation`. Tool renderers interpret that value. The standard coding projector
+and coding renderers in `@sortedyuan/tui/tool-renderers` decode change previews
+with `@sortedyuan/coding-tools/change-preview`; they are the defaults of
+`TranscriptStore` and `TranscriptView`. An application that displays another
+presentation format supplies its own projector and renderer registry.
+
 ### `apps/maybecode`
 
 MaybeCode is an application composition layer, not another runtime. It selects
@@ -313,7 +359,9 @@ The application keeps only product policy and compatibility adapters:
 - optional local tracing configuration plus ownership of its shared processor;
 - optional stdio / Streamable HTTP MCP configuration plus ownership of its shared client pool;
 - slash-command definitions, product events, theme, page layout, model/session
-  picker flows, and the retained terminal behavior.
+  picker flows, and the retained terminal behavior;
+- the `team` command: plans, isolated task workspaces, verification, patch review
+  and recovery built on `@sortedyuan/coordination`.
 
 `MaybeCodeApplication` is a product composition around one `AgentApplication`,
 which it exposes as `agent`. It adds goals, sub-agent requests, Git checkpoints,
@@ -336,6 +384,17 @@ controller without inheriting MaybeCode's rendering or command policy.
 `session-navigation.ts` projects branch points, and `workspace-state.ts` defines
 the internal shared state types.
 
+`team.ts` is the `team` command entry. It reads the saved manifest version and
+loads `team-v2.ts` for version 2 teams or `team-v1.ts` for version 1 teams.
+`team-v1.ts` keeps the version 1 `resume`, `status` and `cancel` operations.
+`team-v2.ts` runs version 2 teams with `team-plan.ts` for plans and presets,
+`team-verification.ts` for reports, checks and acceptance, `team-patches.ts` for
+patch creation, review and application, and `team-recovery.ts` for inspection
+and retry decisions. `team-execution.ts` owns execution environments and language
+servers for task workspaces. `team-common.ts` holds the command dependencies and
+the `list_files` tool used by both versions.
+See [MaybeCode teams](../guides/maybecode-team.md).
+
 ### `apps/maybeclaw`
 
 `gateway.ts` composes the channel Gateway and retains ownership of execution
@@ -351,6 +410,14 @@ and sessions, and `gateway/maintenance.ts` performs maintenance and adapter clea
 adapters and prepares bindings.
 These modules use internal owner interfaces; mutable state remains owned by
 `AgentGateway`.
+
+`gateway-run.ts` parses the command line and starts or calls the Gateway.
+`gateway-host.ts` defines `GatewayHost`, which starts channel adapters and the
+plugin host and runs the delivery cycle. `gateway-repository.ts` defines
+`GatewayRepository`, which writes related Gateway and channel records in one
+SQLite transaction. `gateway-ui.ts` defines `GatewayUiHost`, the `UiHost` that
+exposes Gateway sessions to `@sortedyuan/ui-client`. `gateway-browser.ts` contains
+the browser sign-in and management views built on `@sortedyuan/web-ui`.
 
 ## Events and persistence
 

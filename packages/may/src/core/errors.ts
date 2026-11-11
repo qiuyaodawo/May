@@ -36,6 +36,16 @@ export class ToolSchedulerError extends MayError {
 }
 
 /** @experimental */
+export class ToolUsageError extends MayError {
+  readonly usage: Usage;
+
+  constructor(message: string, usage: Usage, options?: ErrorOptions) {
+    super("TOOL_USAGE_ERROR", message, options);
+    this.usage = structuredClone(usage);
+  }
+}
+
+/** @experimental */
 export class ModelProtocolError extends MayError {
   constructor(message: string, options?: ErrorOptions) {
     super("MODEL_PROTOCOL_ERROR", message, options);
@@ -128,5 +138,15 @@ export class HookExecutionError extends MayError {
       { cause },
     );
     this.hookName = hookName;
+  }
+}
+
+/** @experimental */
+export class ServerToolContinuationLimitError extends MayError {
+  constructor(readonly continuations: number) {
+    super(
+      "SERVER_TOOL_CONTINUATION_LIMIT",
+      `Server tool continuation limit exceeded after ${continuations} consecutive pauses`,
+    );
   }
 }

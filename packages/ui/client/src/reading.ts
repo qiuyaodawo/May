@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { readSessionTranscript, readRecordedModelRequests, type SessionEvent } from "@sortedyuan/may/session";
+import { assistantDisplayContent, lspRenamePreviewText } from "./display-content.js";
 import {
   UiError,
   type UiBlock,
@@ -113,12 +114,20 @@ function eventFields(event: SessionEvent): { id: string; fields: Partial<Record<
       },
     };
   if (event.type === "tool.presentation")
-    return { id: `tool:${event.runId}:${event.toolCallId}`, fields: { presentation: display(event.data) } };
+    return {
+      id: `tool:${event.runId}:${event.toolCallId}`,
+      fields: {
+        presentation:
+          event.kind === "maybecode.lsp-rename-preview" && event.version === 1
+            ? lspRenamePreviewText(event.data)
+            : display(event.data),
+      },
+    };
   if (event.type === "assistant.completed")
     return {
       id: `assistant:${event.runId}:${event.step}`,
       fields: {
-        text: event.message.content
+        text: assistantDisplayContent(event.message)
           .filter((part) => part.type === "text")
           .map((part) => part.text)
           .join(""),

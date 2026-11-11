@@ -12,14 +12,24 @@
       "zh": "c1a591c05f9daf2a053acbb028c7b0d09a6310e69f66361387ef6148623ae67a"
     },
     {
+      "heading": "Server search",
+      "en": "cca8c25a0527ebc6771fac4ce59726f49d221fb95299e35c60217177f962a6e6",
+      "zh": "d15eea1b5475db4e7cfd43086cff899ae5e0d295fa3c4d94b42dc5204a872d24"
+    },
+    {
+      "heading": "MaybeCode search and language servers",
+      "en": "c0ecd09d305c6afc98cef7b14b6e38879221b1b905c8c01fa2dbc6601b3f0b59",
+      "zh": "a9707dc420a736663ae82edbf30d7aa2ddfe282f542c908a34cfda0607fe6d57"
+    },
+    {
       "heading": "Top-level fields",
       "en": "06c937d7ac264e2ec1eefa2e53741cad6de91ffbc60b59f80c302c445ce2b425",
       "zh": "b398e87fa48f51e19b85e6c166bc57b821452a7cced2cac08706822d657ddd13"
     },
     {
       "heading": "Built-in adapter options",
-      "en": "1645a21fdf33f7ce036291b03201c112b4ce4adb47e55a866ba54e6d80436748",
-      "zh": "aebf8d67050cc225456a04104ab20d2ae99514f2c861fbcd9d14e3e338da7aac"
+      "en": "f1a36a343ce405eb12bccc7262e7a4e602b30fe1f6275ef1e39de50acba0685d",
+      "zh": "43feac60a610cdbca97174add7c38ea872451f52e4457a8c16d2a2b8dedfb3fe"
     },
     {
       "heading": "Model capabilities",

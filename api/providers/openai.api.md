@@ -77,12 +77,16 @@ export interface OpenAIResponsesModelOptions {
     readonly serverCompactThreshold?: number;
     // (undocumented)
     readonly store?: boolean;
+    // (undocumented)
+    readonly webSearch?: false | WebSearchOptions;
 }
 
 // @public (undocumented)
 export interface OpenAIResponsesModelStateData {
     // (undocumented)
     readonly items: readonly unknown[];
+    // (undocumented)
+    readonly origin?: ServerToolOrigin;
 }
 
 // @public (undocumented)

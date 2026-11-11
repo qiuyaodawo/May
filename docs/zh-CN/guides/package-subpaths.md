@@ -69,7 +69,7 @@ const historyTool = createSessionHistoryTool({ source: session });
 及持久状态格式保持不变。已有 Session 和 Skill 状态无需转换；保留应用配置中明确
 指定的插件 ID。
 
-[发布清单](../../../scripts/release-packages.json)包含 14 个包，Telegram 和 Feishu
+[发布清单](../../../scripts/release-packages.json)包含 15 个包，其中包括 `@sortedyuan/lsp-tools`。Telegram 和 Feishu
 渠道属于 MaybeClaw 的内部模块。
 仓库通过 `pnpm release:check`、指定外部目录的 `pnpm test:package:release` 和
 `pnpm test:package:plugin` 验证。这些安装检查在仓库外安装 tarball，插件检查运行

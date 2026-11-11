@@ -6,10 +6,13 @@
 
 import { CodingToolsOptions } from '@sortedyuan/coding-tools';
 import type { Tool } from '@sortedyuan/may/core';
+import { WorkspaceFileGuard } from '@sortedyuan/coding-tools';
 
 // @public
 export class SharedWorkspaceFileGuard {
-    constructor(workspace: string, options?: Pick<CodingToolsOptions, "execution" | "fetch">);
+    constructor(workspace: string, options?: Pick<CodingToolsOptions, "execution" | "fetch" | "fileFeedback"> & {
+        readonly toolFactories?: Readonly<Record<string, (guard: WorkspaceFileGuard) => Tool>>;
+    });
     create(options: {
         readonly names: readonly SubagentToolName[];
         readonly files?: readonly string[];

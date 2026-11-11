@@ -24,9 +24,18 @@ import {
   type OpenAIReasoningSummary,
 } from "./protocol.js";
 import { parseUsage, streamOpenAIResponse } from "./stream.js";
+import {
+  assertServerToolOrigin,
+  serverToolOrigin,
+  validateWebSearch,
+  webSearchRequest,
+  withServerToolOrigin,
+  type WebSearchOptions,
+} from "../web-search.js";
 
 /** @experimental */
 export interface OpenAIResponsesModelOptions {
+  readonly webSearch?: false | WebSearchOptions;
   readonly apiKey: string;
   readonly model: string;
   readonly baseURL?: string;
@@ -52,6 +61,7 @@ export class OpenAIResponsesModel implements Model {
   private readonly serverCompactThreshold: number | undefined;
   private readonly store: boolean;
   private readonly fetchImplementation: typeof globalThis.fetch;
+  private readonly webSearch: false | WebSearchOptions | undefined;
 
   constructor(options: OpenAIResponsesModelOptions) {
     if (options.apiKey.trim() === "") throw new TypeError("apiKey must not be empty");
@@ -59,6 +69,7 @@ export class OpenAIResponsesModel implements Model {
     validateOptionalPositiveInteger(options.maxOutputTokens, "maxOutputTokens");
     validateOptionalPositiveInteger(options.serverCompactThreshold, "serverCompactThreshold");
     this.apiKey = options.apiKey;
+    this.webSearch = validateWebSearch("openai-responses", options.webSearch);
     this.model = options.model;
     this.baseURL = (options.baseURL ?? "https://api.openai.com/v1").replace(/\/+$/u, "");
     this.maxOutputTokens = options.maxOutputTokens;
@@ -76,6 +87,15 @@ export class OpenAIResponsesModel implements Model {
 
   async *stream(request: ModelRequest, options: ModelStreamOptions): AsyncIterable<ModelEvent> {
     assertModelResponseFormat(request);
+    assertServerToolOrigin(
+      request,
+      serverToolOrigin(
+        "openai-responses",
+        this.model,
+        this.baseURL,
+        this.webSearch ? webSearchRequest("openai-responses", this.webSearch) : undefined,
+      ),
+    );
     const parts = toOpenAIResponsesRequestParts(request.messages);
     const body: Record<string, unknown> = {
       model: this.model,
@@ -86,6 +106,10 @@ export class OpenAIResponsesModel implements Model {
     };
     if (parts.instructions !== undefined) body.instructions = parts.instructions;
     if (request.tools.length > 0) body.tools = toOpenAIResponsesTools(request.tools);
+    if (this.webSearch) {
+      body.tools = [...((body.tools as unknown[]) ?? []), webSearchRequest("openai-responses", this.webSearch)];
+      (body.include as string[]).push("web_search_call.action.sources");
+    }
     if (request.responseFormat !== undefined) {
       const format = request.responseFormat;
       body.text = {
@@ -127,6 +151,16 @@ export class OpenAIResponsesModel implements Model {
   private async *execute(body: string, request: ModelRequest, options: ModelStreamOptions): AsyncIterable<ModelEvent> {
     const response = await this.fetch("/responses", body, options.signal);
     for await (const event of streamOpenAIResponse(response, options.signal)) {
+      if (event.type === "response.completed" && event.message.modelState)
+        event.message.modelState = withServerToolOrigin(
+          event.message.modelState,
+          serverToolOrigin(
+            "openai-responses",
+            this.model,
+            this.baseURL,
+            this.webSearch ? webSearchRequest("openai-responses", this.webSearch) : undefined,
+          ),
+        );
       if (event.type === "response.completed") validateStructuredModelResponse(event.message, request, event);
       yield event;
     }

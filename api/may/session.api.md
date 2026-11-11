@@ -428,6 +428,7 @@ export type SessionEventPayload = SessionRequestEvent | {
     step: number;
     call: ToolCall;
     output: unknown;
+    usage?: Usage;
     content?: ContentPart[];
 } | {
     type: "tool.failed";
@@ -435,6 +436,7 @@ export type SessionEventPayload = SessionRequestEvent | {
     step: number;
     call: ToolCall;
     error: SerializedError;
+    usage?: Usage;
 } | ({
     type: "tool.presentation";
 } & SessionToolPresentation) | {

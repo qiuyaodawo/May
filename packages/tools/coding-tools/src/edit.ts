@@ -5,6 +5,7 @@ import { requireObject, requirePositiveIntegerOption, requireString } from "./in
 import { assertTextWithinLimit, readTextFile } from "./text-file.js";
 import { resolveExistingWorkspacePath } from "./workspace-path.js";
 import { assertFileExistence, type WorkspaceFileGuard } from "./guard.js";
+import type { WorkspaceFileFeedback, WorkspaceFileFeedbackResult } from "./file-feedback.js";
 
 /** @experimental */
 export const DEFAULT_EDIT_MAX_BYTES = 1024 * 1024;
@@ -16,6 +17,7 @@ export interface EditToolOptions {
   readonly allowHardLinks?: boolean;
   /** 宿主守卫：在同一把文件锁内完成检查与修改。 */
   readonly guard?: WorkspaceFileGuard;
+  readonly fileFeedback?: WorkspaceFileFeedback;
 }
 
 /** @experimental */
@@ -29,6 +31,7 @@ export interface EditToolInput {
 export interface EditToolOutput {
   readonly path: string;
   readonly replacements: 1;
+  readonly diagnostics?: WorkspaceFileFeedbackResult["diagnostics"];
 }
 
 /** @experimental */
@@ -79,18 +82,20 @@ export function createEditTool(options: EditToolOptions): Tool<EditToolInput, Ed
         assertTextWithinLimit(updated, file.relative, maxBytes);
         context.signal.throwIfAborted();
         await atomicWriteText(file.absolute, updated, context.signal);
-        return { output: { path: file.relative, replacements: 1 as const }, content: updated };
+        const ticket = options.fileFeedback?.record(file, updated);
+        return { output: { path: file.relative, replacements: 1 as const }, content: updated, ticket };
       };
-      if (options.guard === undefined) return (await edit()).output;
-      const exists = await assertFileExistence(file, context.signal);
-      return (
-        await options.guard<{ readonly output: EditToolOutput; readonly content: string }>({
-          tool: "edit",
-          path: file,
-          exists,
-          run: edit,
-        })
-      ).output;
+      const result =
+        options.guard === undefined
+          ? await edit()
+          : await options.guard({
+              tool: "edit",
+              path: file,
+              exists: await assertFileExistence(file, context.signal),
+              run: edit,
+            });
+      if (result.ticket === undefined) return result.output;
+      return { ...result.output, ...(await result.ticket.result(context.signal)) };
     },
   };
 }

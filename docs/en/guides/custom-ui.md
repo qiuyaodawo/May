@@ -88,7 +88,8 @@ export async function projectApplication(
         store.appendNotice("warning", event.error.message);
         break;
       case "tool.presentation":
-        // 按应用声明的 kind/version 处理展示数据。
+        // store 配置的 projector 按 kind/version 解码展示数据。
+        store.appendToolPresentation(event.presentation);
         break;
     }
   }
@@ -140,6 +141,14 @@ path calls `application.close()` before awaiting the projection task.
 unknown tools with a generic renderer. Register product renderers on a
 `ToolRendererRegistry` instance and pass it in the view options; there is no
 global UI registry.
+
+`TranscriptStore` decodes `tool.presentation` records with a
+`ToolPresentationProjector`. The default projector decodes the change previews of
+the standard coding tools, and a record it does not recognize leaves the transcript
+unchanged. To display your own presentation format, pass `toolPresentationProjector`
+to `new TranscriptStore()`. The projector returns the tool name, the tool input and
+a display value; the store saves the value as `item.presentation`, and your
+renderer reads it from there.
 
 Use `NodeTerminalDriver` for a raw-mode retained screen. Use
 `createNodeTerminal()` from `@sortedyuan/tui/node-terminal` for a line-oriented prompt

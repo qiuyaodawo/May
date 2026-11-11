@@ -29,6 +29,7 @@ Core 负责一次模型与工具执行循环。完整 Agent 产品还需要持�
 - 应用共享排序、取消、持久化与关闭逻辑。
 - UI 可以面向 `AgentController` 等 headless 接口编写。
 - Core 可以用于临时任务与完全自定义的运行环境。
-- 产品映射通用事件或提供命名策略时，需要自己的组合封装。
+- 产品围绕 `AgentApplication` 和 `AgentWorkspace` 增加自己的组合类，保存产品状态和策略。
+  MaybeCode 的组合类增加 Goal、子 Agent 请求、Git 检查点、模型更新、worktree 和 MCP 操作。
 - `AgentDefinition` 组合行为，应用另行提供 Session 存储与身份。详见
   [构建 Agent](../../guides/building-an-agent.md)。

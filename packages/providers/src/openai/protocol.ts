@@ -12,6 +12,7 @@ export type OpenAIReasoningSummary = "auto" | "concise" | "detailed";
 
 /** @experimental */
 export interface OpenAIResponsesModelStateData {
+  readonly origin?: import("../web-search.js").ServerToolOrigin;
   readonly items: readonly unknown[];
 }
 

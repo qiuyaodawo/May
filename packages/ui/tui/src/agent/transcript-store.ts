@@ -1,4 +1,11 @@
-import type { AssistantMessage, ContentPart, MayEvent, ToolCall, UserMessage } from "@sortedyuan/may/core";
+import type {
+  AssistantMessage,
+  ContentPart,
+  MayEvent,
+  ServerToolCall,
+  ToolCall,
+  UserMessage,
+} from "@sortedyuan/may/core";
 import { omitUndefined } from "@sortedyuan/may/core";
 import type { ApprovalDecision, ApprovalRequest, PermissionEvent } from "@sortedyuan/may/permissions";
 import {
@@ -7,9 +14,10 @@ import {
   sessionToolFailureStatus,
   type SessionEvent,
   type SessionToolStatus,
+  type SessionToolPresentation,
   type SessionTranscriptEntry,
 } from "@sortedyuan/may/session";
-import { decodeToolChangePreviewPresentation, type ToolChangePreview } from "@sortedyuan/coding-tools/change-preview";
+import { createCodingToolPresentationProjector } from "./tool-renderers.js";
 
 /** @experimental */
 export type TranscriptItem =
@@ -49,8 +57,34 @@ export interface ToolTranscriptItem {
   readonly progress: readonly string[];
   readonly output?: unknown;
   readonly error?: string;
-  readonly preview?: ToolChangePreview;
+  /** Value produced by the store's `ToolPresentationProjector`; tool renderers interpret it. */
+  readonly presentation?: unknown;
   readonly timestamp: number;
+}
+
+/**
+ * Display data for one tool call, decoded from application-owned presentation metadata.
+ * @experimental
+ */
+export interface ToolPresentationProjection {
+  /** Names the tool call when the presentation arrives before the call itself. */
+  readonly toolName: string;
+  readonly input: unknown;
+  readonly value: unknown;
+}
+
+/**
+ * Decodes saved or live tool presentation metadata. Returning `undefined` leaves the transcript unchanged.
+ * @experimental
+ */
+export type ToolPresentationProjector = (
+  presentation: SessionToolPresentation,
+) => ToolPresentationProjection | undefined;
+
+/** @experimental */
+export interface TranscriptStoreOptions {
+  /** Defaults to the projector for the standard May coding tools. */
+  readonly toolPresentationProjector?: ToolPresentationProjector;
 }
 
 /** @experimental */
@@ -84,11 +118,12 @@ export type TranscriptListener = (store: TranscriptStore) => void;
  * Mutable terminal projection of durable session history and live May events.
  *
  * Product-specific events stay outside this package: applications can reset the
- * projection and append notices or coding change previews through the explicit
+ * projection and append notices or tool presentations through the explicit
  * methods below.
  * @experimental
  */
 export class TranscriptStore {
+  private readonly toolPresentationProjector: ToolPresentationProjector;
   private values: TranscriptItem[] = [];
   private readonly listeners = new Set<TranscriptListener>();
   private localSequence = 0;
@@ -97,6 +132,10 @@ export class TranscriptStore {
   private readonly transcriptReader = new SessionTranscriptReader();
   private readonly approvalTools = new Map<string, string>();
   private readonly cancelledApprovals = new Set<string>();
+
+  constructor(options: TranscriptStoreOptions = {}) {
+    this.toolPresentationProjector = options.toolPresentationProjector ?? createCodingToolPresentationProjector();
+  }
 
   /** 当前轮次完成后可供阅读的最终正文。 */
   get latestReply(): AssistantTranscriptItem | undefined {
@@ -147,15 +186,20 @@ export class TranscriptStore {
     this.changed();
   }
 
-  /** Attach an application-produced coding change preview to a tool call. */
-  appendChangePreview(
+  /** Attach application-produced display data to a tool call. */
+  attachToolPresentation(
     runId: string,
     step: number,
     toolCallId: string,
-    preview: ToolChangePreview,
+    projection: ToolPresentationProjection,
     timestamp = Date.now(),
   ): void {
-    this.projectChangePreview(runId, step, toolCallId, preview, timestamp);
+    this.projectToolPresentationValue(runId, step, toolCallId, projection, timestamp);
+    this.changed();
+  }
+
+  appendToolPresentation(presentation: SessionToolPresentation, timestamp = Date.now()): void {
+    this.projectToolPresentation(presentation, timestamp);
     this.changed();
   }
 
@@ -209,7 +253,11 @@ export class TranscriptStore {
           reasoning: item.reasoning + event.delta,
         }));
         break;
+      case "model.server_tool.updated":
+        this.projectServerTool(event.call, event.timestamp);
+        break;
       case "model.completed": {
+        for (const call of event.message.serverToolCalls ?? []) this.projectServerTool(call, event.timestamp);
         const completed = assistantContent(event.message);
         this.updateAssistant(event, (item) => ({
           ...item,
@@ -329,28 +377,17 @@ export class TranscriptStore {
     });
   }
 
-  private projectChangePreview(
+  private projectToolPresentationValue(
     runId: string,
     step: number,
     toolCallId: string,
-    preview: ToolChangePreview,
+    projection: ToolPresentationProjection,
     timestamp: number,
   ): void {
-    const id = toolId(runId, toolCallId);
-    if (!this.replace(id, (item) => (item.kind === "tool" ? { ...item, preview } : item))) {
-      this.append({
-        id,
-        kind: "tool",
-        runId,
-        step,
-        call: { id: toolCallId, name: preview.tool, input: { path: preview.path } },
-        status: "running",
-        streamedOutput: "",
-        progress: [],
-        preview,
-        timestamp,
-      });
-    }
+    this.ensureTool(runId, step, { id: toolCallId, name: projection.toolName, input: projection.input }, timestamp);
+    this.replace(toolId(runId, toolCallId), (item) =>
+      item.kind === "tool" ? { ...item, presentation: projection.value } : item,
+    );
   }
 
   private projectSessionEvent(event: SessionEvent): void {
@@ -405,6 +442,7 @@ export class TranscriptStore {
         );
         break;
       case "assistant.completed": {
+        for (const call of event.message.serverToolCalls ?? []) this.projectServerTool(call, event.timestamp);
         const content = assistantContent(event.message);
         this.append({
           id: assistantId(event.runId, event.step),
@@ -435,10 +473,7 @@ export class TranscriptStore {
         this.cancelledApprovals.delete(toolId(event.runId, event.call.id));
         break;
       case "tool.presentation": {
-        const preview = decodeToolChangePreviewPresentation(event.kind, event.version, event.data);
-        if (preview !== undefined) {
-          this.projectChangePreview(event.runId, event.step, event.toolCallId, preview, event.timestamp);
-        }
+        this.projectToolPresentation(event, event.timestamp);
         break;
       }
       case "approval.requested":
@@ -611,10 +646,28 @@ export class TranscriptStore {
     this.append({ id, kind: "notice", level, text, timestamp });
   }
 
+  private projectServerTool(call: ServerToolCall, timestamp: number): void {
+    const sources = (call.sources ?? []).map((source) => `${source.title ?? source.url} · ${source.url}`);
+    const text = [
+      `${call.name}: ${call.status}`,
+      ...(call.input === undefined ? [] : [JSON.stringify(call.input)]),
+      ...sources,
+      ...(call.error ? [call.error.code] : []),
+    ].join("\n");
+    this.appendNoticeItem(`server-tool:${call.id}`, call.status === "failed" ? "error" : "info", text, timestamp);
+  }
+
+  private projectToolPresentation(event: SessionToolPresentation, timestamp: number): void {
+    const projection = this.toolPresentationProjector(event);
+    if (projection) this.projectToolPresentationValue(event.runId, event.step, event.toolCallId, projection, timestamp);
+  }
+
   private appendHistoryTool(item: ToolTranscriptItem): void {
     const existing = this.values.find((value) => value.id === item.id);
     this.append(
-      existing?.kind === "tool" && existing.preview !== undefined ? { ...item, preview: existing.preview } : item,
+      existing?.kind === "tool" && existing.presentation !== undefined
+        ? { ...item, presentation: existing.presentation }
+        : item,
     );
   }
 
@@ -678,9 +731,19 @@ function assistantContent(message: AssistantMessage): {
 } {
   return {
     content: message.content,
-    text: contentText(message.content, "text"),
+    text: contentText(message.content, "text") + searchSources(message),
     reasoning: contentText(message.content, "reasoning"),
   };
+}
+
+function searchSources(message: AssistantMessage): string {
+  const sources = new Map<string, string>();
+  for (const part of message.content)
+    if (part.type === "text")
+      for (const citation of part.citations ?? []) sources.set(citation.url, citation.title ?? citation.url);
+  for (const call of message.serverToolCalls ?? [])
+    for (const source of call.sources ?? []) sources.set(source.url, source.title ?? source.url);
+  return sources.size ? `\n\nSources:\n${[...sources].map(([url, title]) => `${title} · ${url}`).join("\n")}` : "";
 }
 
 function contentText(content: readonly ContentPart[], type: "text" | "reasoning"): string {

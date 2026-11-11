@@ -32,6 +32,8 @@ export interface ZhipuModelOptions {
     reasoningEffort?: ZhipuReasoningEffort;
     // (undocumented)
     thinking?: "enabled" | "disabled";
+    // (undocumented)
+    webSearch?: false | WebSearchOptions;
 }
 
 // @public

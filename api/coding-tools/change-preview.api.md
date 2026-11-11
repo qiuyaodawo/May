@@ -5,6 +5,9 @@
 ```ts
 
 // @public (undocumented)
+export function createTextChangePreview(tool: "edit" | "write", path: string, original: string | undefined, updated: string): ToolChangePreview;
+
+// @public (undocumented)
 export function createToolChangePreview(workspace: string, toolName: string, input: unknown): Promise<ToolChangePreview | undefined>;
 
 // @public (undocumented)

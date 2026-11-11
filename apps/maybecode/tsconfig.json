@@ -18,6 +18,7 @@
     { "path": "../../packages/observability" },
     { "path": "../../packages/providers" },
     { "path": "../../packages/tools/coding-tools" },
+    { "path": "../../packages/tools/lsp" },
     { "path": "../../packages/ui/client" },
     { "path": "../../packages/ui/web" }
   ]

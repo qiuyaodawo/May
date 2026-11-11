@@ -8,6 +8,7 @@ import {
 } from "@sortedyuan/may/config";
 import { omitUndefined, type ModelRequest } from "@sortedyuan/may/core";
 import type { ProviderModelSelection } from "./types.js";
+import { selectionWebSearch } from "./web-search.js";
 
 export { MODEL_CAPABILITY_KEYS };
 export type { ModelCapabilityKey, ModelCapabilityDeclaration };
@@ -133,7 +134,14 @@ export class ModelCapabilityResolver {
     if (connectionReasoning !== undefined) assertReasoningCapabilities(connectionReasoning);
     const effective: Partial<Record<ModelCapabilityKey, CapabilityValue>> = {};
     for (const field of requested) {
-      const value = explicit[field] ?? declaredLimit(selection, field) ?? discovered.fields[field] ?? UNKNOWN;
+      const builtin =
+        selection.adapter === "openai-chat-completions" &&
+        selection.model === "gpt-5-search-api" &&
+        field === "serverTools.alwaysSearches"
+          ? known(true, "builtin")
+          : undefined;
+      const value =
+        explicit[field] ?? declaredLimit(selection, field) ?? discovered.fields[field] ?? builtin ?? UNKNOWN;
       model[field] = value;
       effective[field] = intersectCapability(field, [value, adapter[field], connection[field]]);
     }
@@ -187,6 +195,14 @@ export class ModelCapabilityResolver {
           used.add(`input.${part.type}` as ModelCapabilityKey);
       }
     if (request.tools.length > 0) used.add("tools");
+    const search = selectionWebSearch(selection);
+    if (
+      (search !== undefined && search !== false) ||
+      (selection.adapter === "openai-chat-completions" && selection.model === "gpt-5-search-api")
+    ) {
+      used.add("serverTools.webSearch");
+      if (request.tools.length > 0) used.add("serverTools.webSearchWithFunctions");
+    }
     if (request.responseFormat !== undefined)
       used.add(request.responseFormat.type === "json" ? "structuredOutput.json" : "structuredOutput.jsonSchema");
     const thinking = selection.options.thinking;
@@ -434,6 +450,7 @@ export function builtinAdapterCapabilities(adapter: string): ModelCapabilityFiel
         "output.image": true,
         "output.audio": true,
         tools: true,
+        "serverTools.webSearch": true,
         "structuredOutput.json": true,
         "structuredOutput.jsonSchema": true,
         "structuredOutput.schemaDialects": ["draft-07", "2020-12"],
@@ -467,6 +484,7 @@ export function builtinAdapterCapabilities(adapter: string): ModelCapabilityFiel
     "output.image": responses,
     "output.audio": false,
     tools: true,
+    "serverTools.webSearch": responses || anthropic || openaiChat || adapter === "zhipu-chat",
     "structuredOutput.json": responses || openaiChat,
     "structuredOutput.jsonSchema": responses || openaiChat,
     "structuredOutput.schemaDialects": responses || openaiChat ? ["draft-07", "2020-12"] : false,
@@ -604,8 +622,39 @@ function entryReasoningEffort(entry: Record<string, unknown>): ReasoningEffortCa
 /** Reads reasoning levels from the model endpoint of every built-in adapter. */
 class ModelListCapabilityDiscovery implements ModelCapabilityDiscovery {
   readonly name = "model-list";
+  private readonly entries = new WeakMap<ProviderModelSelection, unknown>();
   constructor(private readonly fetchImplementation: typeof globalThis.fetch) {}
+  async discoverCapabilities(selection: ProviderModelSelection): Promise<ModelCapabilityFields | undefined> {
+    if (selection.adapter !== "anthropic-messages") return undefined;
+    const endpoint = modelEndpoint(selection)!;
+    const response = await this.fetchImplementation(endpoint.url, {
+      signal: AbortSignal.timeout(10_000),
+      headers: endpoint.headers,
+    });
+    if (response.status === 404) {
+      this.entries.set(selection, undefined);
+      return undefined;
+    }
+    if (!response.ok) throw new Error("Capability catalog request failed");
+    const body: unknown = await response.json();
+    const entry = isRecord(body) ? endpoint.entry(body) : undefined;
+    this.entries.set(selection, entry);
+    if (
+      !isRecord(entry) ||
+      !isRecord(entry.capabilities) ||
+      !isRecord(entry.capabilities.server_tools) ||
+      !isRecord(entry.capabilities.server_tools.web_search)
+    )
+      return undefined;
+    const supported = entry.capabilities.server_tools.web_search.supported;
+    return typeof supported === "boolean" ? { "serverTools.webSearch": known(supported, "provider") } : undefined;
+  }
   async discoverReasoningEffort(selection: ProviderModelSelection): Promise<ReasoningEffortCapabilities | undefined> {
+    if (this.entries.has(selection)) {
+      const entry = this.entries.get(selection);
+      this.entries.delete(selection);
+      return isRecord(entry) ? entryReasoningEffort(entry) : undefined;
+    }
     const endpoint = modelEndpoint(selection);
     if (endpoint === undefined) return undefined;
     const response = await this.fetchImplementation(endpoint.url, {

@@ -178,6 +178,9 @@ importers:
       '@sortedyuan/coding-tools':
         specifier: workspace:*
         version: link:packages/tools/coding-tools
+      '@sortedyuan/lsp-tools':
+        specifier: workspace:*
+        version: link:packages/tools/lsp
       '@sortedyuan/may':
         specifier: workspace:*
         version: link:packages/may
@@ -322,6 +325,9 @@ importers:
       '@sortedyuan/coordination':
         specifier: workspace:*
         version: link:../../packages/coordination
+      '@sortedyuan/lsp-tools':
+        specifier: workspace:*
+        version: link:../../packages/tools/lsp
       '@sortedyuan/may':
         specifier: workspace:*
         version: link:../../packages/may
@@ -670,6 +676,58 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.20.1
+
+  packages/tools/lsp:
+    dependencies:
+      '@sortedyuan/coding-tools':
+        specifier: workspace:*
+        version: link:../coding-tools
+      '@sortedyuan/may':
+        specifier: workspace:*
+        version: link:../../may
+      picomatch:
+        specifier: 4.0.7
+        version: 4.0.7
+      vscode-jsonrpc:
+        specifier: 10.0.0
+        version: 10.0.0
+      vscode-languageserver-protocol:
+        specifier: 3.18.5
+        version: 3.18.5
+      vscode-languageserver-textdocument:
+        specifier: 1.0.16
+        version: 1.0.16
+      vscode-uri:
+        specifier: 3.2.0
+        version: 3.2.0
+      which:
+        specifier: 6.0.1
+        version: 6.0.1
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@sortedyuan/coordination':
+        specifier: workspace:*
+        version: link:../../coordination
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.20.1
+      '@types/picomatch':
+        specifier: ^4.0.2
+        version: 4.0.3
+      '@types/which':
+        specifier: ^3.0.4
+        version: 3.0.4
+      pyright:
+        specifier: 1.1.414
+        version: 1.1.414
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      typescript-language-server:
+        specifier: 6.0.3
+        version: 6.0.3
 
   packages/ui/client:
     dependencies:
@@ -1766,6 +1824,9 @@ packages:
   '@types/node@22.20.1':
     resolution: {integrity: sha512-EANqOCF9QFyra+4pfxUcX9STKJpCLjMbObVzljIJomAWSnuSIEAvyzEU53GaajbXJEgdh0iEcPL+DGvpUd4k1Q==}
 
+  '@types/picomatch@4.0.3':
+    resolution: {integrity: sha512-iG0T6+nYJ9FAPmx9SsUlnwcq1ZVRuCXcVEvWnntoPlrOpwtSTKNDC9uVAxTsC3PUvJ+99n4RpAcNgBbHX3JSnQ==}
+
   '@types/pngjs@6.0.5':
     resolution: {integrity: sha512-0k5eKfrA83JOZPppLtS2C7OUtyNAl2wKNxfyYl9Q5g9lPkgBl/9hNyAu6HuEH2J4XmIv2znEpkDd0SaZVxW6iQ==}
 
@@ -1777,6 +1838,9 @@ packages:
 
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
+
+  '@types/which@3.0.4':
+    resolution: {integrity: sha512-liyfuo/106JdlgSchJzXEQCVArk0CvevqPote8F8HgWgJ3dRCcTHgJIsLDuee0kxk/mhbInzIZk3QWSZJ8R+2w==}
 
   '@types/write-file-atomic@4.0.3':
     resolution: {integrity: sha512-qdo+vZRchyJIHNeuI1nrpsLw+hnkgqP/8mlaN6Wle/NKhydHmUN9l4p3ZE8yP90AJNJW4uB8HQhedb4f1vNayQ==}
@@ -2419,6 +2483,11 @@ packages:
   fs-native-extensions@1.5.1:
     resolution: {integrity: sha512-abjiHKkYdcH5M9ikBEJb0MKb/fEpPtZx/yfLHzTptvUAoiFayX0tIe0BTLBU4SAoRyjZLzA0dP1Rn2p0+QRyVg==}
 
+  fsevents@2.3.3:
+    resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
+
   function-bind@1.1.2:
     resolution: {integrity: sha512-7XHNxH7qX9xG5mIwxkhumTox/MIRNcOgDrxWsMt2pAr23WHp6MrRlN7FBSFpCpr+oVO0F744iUgR82nJMfG2SA==}
 
@@ -2594,6 +2663,10 @@ packages:
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
+
+  isexe@4.0.0:
+    resolution: {integrity: sha512-FFUtZMpoZ8RqHS3XeXEmHWLA4thH+ZxCv2lOiPIn1Xc7CxrqhWzNSDzD+/chS/zbYezmiwWLdQC09JdQKmthOw==}
+    engines: {node: '>=20'}
 
   jimp@1.6.1:
     resolution: {integrity: sha512-hNQh6rZtWfSVWSNVmvq87N5BPJsNH7k7I7qyrXf9DOma9xATQk3fsyHazCQe51nCjdkoWdTmh0vD7bjVSLoxxw==}
@@ -2985,6 +3058,11 @@ packages:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
 
+  pyright@1.1.414:
+    resolution: {integrity: sha512-FPZZb51jepDX4eP7TEYDeNFtmE3WgwkkEcJpvH3/QmUSsj0EAy3LXu+xB4T/FWDejtsXlCfFr/rbWFjwuwuXww==}
+    engines: {node: '>=14.0.0'}
+    hasBin: true
+
   qified@0.10.1:
     resolution: {integrity: sha512-+Owyggi9IxT1ePKGafcI87ubSmxol6smwJ+RAHDQlx9+9cPwFWDiKFFCPuWhr9ignlGpZ9vDQLw67N4dcTVFEA==}
     engines: {node: '>=20'}
@@ -3197,6 +3275,11 @@ packages:
       eslint: ^8.57.0 || ^9.0.0 || ^10.0.0
       typescript: '>=4.8.4 <6.1.0'
 
+  typescript-language-server@6.0.3:
+    resolution: {integrity: sha512-iAxKyLXRNbnxGfCGZ/j4ilAb0PSNommvTvcghF8B8sq5JFGDKEQwzNEFZ0KTYEwzcA7rtRa+2OPeouiFR8L5KA==}
+    engines: {node: '>=22.22.2'}
+    hasBin: true
+
   typescript@5.9.3:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
     engines: {node: '>=14.17'}
@@ -3249,9 +3332,29 @@ packages:
   utif2@4.1.0:
     resolution: {integrity: sha512-+oknB9FHrJ7oW7A2WZYajOcv4FcDR4CfoGB0dPNfxbi4GO05RRnFmt5oa23+9w32EanrYcSJWspUiJkLMs+37w==}
 
+  vscode-jsonrpc@10.0.0:
+    resolution: {integrity: sha512-USSfxg0vDIpTQqlQBGxF3mBARyoS8cU7LHLpbYNh6dOJt32dlskxPWB0Irrh5TllTmyf7oNLAvqDqzklbwwnpA==}
+    engines: {node: '>=14.17.0'}
+
+  vscode-jsonrpc@5.0.1:
+    resolution: {integrity: sha512-JvONPptw3GAQGXlVV2utDcHx0BiY34FupW/kI6mZ5x06ER5DdPG/tXWMVHjTNULF5uKPOUUD0SaXg5QaubJL0A==}
+    engines: {node: '>=8.0.0 || >=10.0.0'}
+
   vscode-jsonrpc@9.0.2:
     resolution: {integrity: sha512-SbQSV9yRemARxeXw6LU5sS6Zq0e9/DgCCX5yelH263ZQWukbTk8EF8fjTrr1dziasf4GwlJbvTwFnTrnQFWZXQ==}
     engines: {node: '>=14.0.0'}
+
+  vscode-languageserver-protocol@3.18.5:
+    resolution: {integrity: sha512-FW4fBMzZ99N8xeob4py0l050wgCoRgTpEq5Xcsb9lM1bc29UKGR/wSV+4knaqFxssFHajy7OzNiKP/m3U1ZEuA==}
+
+  vscode-languageserver-textdocument@1.0.16:
+    resolution: {integrity: sha512-qeNEuOi9a3qkqRf7Gfez2WL2VwlBTLCNekHBGO9kxPVUp9XuY15yfTJ9jwvOwKI0I2MhUUfZq95NSp+LK1CLQg==}
+
+  vscode-languageserver-types@3.18.5:
+    resolution: {integrity: sha512-kPd6+JQNz3HMJvjKlqUxERSlZHAntl/aGpsk7ImwIh0ewDKDcjgAEyVSYciPiOJD3ftbK9IrfiqUeTZLSbCizw==}
+
+  vscode-uri@3.2.0:
+    resolution: {integrity: sha512-m2gXo3bn0G1kT9InzMf07fTbqMbGtyckj3bH5ktLO+1Ssv+yiATZ4dhwaQv9UZWxJh6E9IFGnQyjgWVDWVBDrg==}
 
   which-runtime@1.4.0:
     resolution: {integrity: sha512-0ugbP4CJW4e2D20jvEcC4973dCgIaHI4Rw1PT+26U9zEve7FyYdWAIwUnoeOYvoCfn+wXHoHTKb1KhkYlb60Pw==}
@@ -3259,6 +3362,11 @@ packages:
   which@2.0.2:
     resolution: {integrity: sha512-BLI3Tl1TW3Pvl70l3yq3Y64i+awpwXqsGBYWkkqMtnbXgrMD+yj7rhW0kuEDxzJaYXGjEW5ogapKNMEKNMjibA==}
     engines: {node: '>= 8'}
+    hasBin: true
+
+  which@6.0.1:
+    resolution: {integrity: sha512-oGLe46MIrCRqX7ytPUf66EAYvdeMIZYn3WaocqqKZAxrBpkqHfL/qvTyJ/bTk5+AqHCjXmrv3CEWgy368zhRUg==}
+    engines: {node: ^20.17.0 || >=22.9.0}
     hasBin: true
 
   word-wrap@1.2.5:
@@ -4316,6 +4424,8 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
+  '@types/picomatch@4.0.3': {}
+
   '@types/pngjs@6.0.5':
     dependencies:
       '@types/node': 22.20.1
@@ -4325,6 +4435,8 @@ snapshots:
   '@types/shell-quote@1.7.5': {}
 
   '@types/unist@3.0.3': {}
+
+  '@types/which@3.0.4': {}
 
   '@types/write-file-atomic@4.0.3':
     dependencies:
@@ -4972,6 +5084,9 @@ snapshots:
     transitivePeerDependencies:
       - bare-url
 
+  fsevents@2.3.3:
+    optional: true
+
   function-bind@1.1.2: {}
 
   get-east-asian-width@1.6.0: {}
@@ -5121,6 +5236,8 @@ snapshots:
       system-architecture: 0.1.0
 
   isexe@2.0.0: {}
+
+  isexe@4.0.0: {}
 
   jimp@1.6.1(supports-color@8.1.1):
     dependencies:
@@ -5674,6 +5791,10 @@ snapshots:
 
   punycode@2.3.1: {}
 
+  pyright@1.1.414:
+    optionalDependencies:
+      fsevents: 2.3.3
+
   qified@0.10.1:
     dependencies:
       hookified: 2.2.0
@@ -5906,6 +6027,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  typescript-language-server@6.0.3:
+    dependencies:
+      vscode-jsonrpc: 5.0.1
+      vscode-languageserver-protocol: 3.18.5
+
   typescript@5.9.3: {}
 
   typescript@6.0.3: {}
@@ -5972,13 +6098,32 @@ snapshots:
     dependencies:
       pako: 1.0.11
 
+  vscode-jsonrpc@10.0.0: {}
+
+  vscode-jsonrpc@5.0.1: {}
+
   vscode-jsonrpc@9.0.2(patch_hash=f4280266a458a0c659987f7c4809f88177087f031b7349855764540aee508230): {}
+
+  vscode-languageserver-protocol@3.18.5:
+    dependencies:
+      vscode-jsonrpc: 10.0.0
+      vscode-languageserver-types: 3.18.5
+
+  vscode-languageserver-textdocument@1.0.16: {}
+
+  vscode-languageserver-types@3.18.5: {}
+
+  vscode-uri@3.2.0: {}
 
   which-runtime@1.4.0: {}
 
   which@2.0.2:
     dependencies:
       isexe: 2.0.0
+
+  which@6.0.1:
+    dependencies:
+      isexe: 4.0.0
 
   word-wrap@1.2.5: {}
 

@@ -328,8 +328,8 @@ test("assembles multiple interleaved tool calls in index order", async () => {
   const completed = events.at(-1);
 
   assert.deepEqual(completed.message.toolCalls, [
-    { id: "call_a", name: "first", input: { x: 1 } },
-    { id: "call_b", name: "second", input: "not-json" },
+    { id: "call_a", name: "first", input: { x: 1 }, rawInput: '{"x":1}' },
+    { id: "call_b", name: "second", input: "not-json", rawInput: '"not-json"' },
   ]);
 });
 

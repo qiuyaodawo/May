@@ -66,7 +66,38 @@ export function createApplicationConfigValidator<T>(
 /** @experimental */
 export const validateMayConfigDocument: (value: unknown, path: string) => void = (() => {
   const validate = compile(mayConfigSchema);
-  return (value: unknown, path: string) => assertValid(validate, value, path, "config");
+  const definitions = mayConfigSchema.$defs as Readonly<Record<string, unknown>>;
+  const optionSchemas = {
+    "anthropic-messages": "anthropicWebSearch",
+    "openai-responses": "openaiWebSearch",
+    "openai-chat-completions": "openaiChatWebSearch",
+    "google-gemini": "geminiWebSearch",
+    "zhipu-chat": "zhipuWebSearch",
+    "deepseek-chat": undefined,
+    "kimi-chat": undefined,
+  };
+  const validators = new Map(
+    Object.entries(optionSchemas).map(([adapter, name]) => [
+      adapter,
+      compile({
+        $defs: definitions,
+        type: "object",
+        properties: {
+          webSearch: name === undefined ? false : { $ref: `#/$defs/${name}` },
+        },
+      }),
+    ]),
+  );
+  return (value: unknown, path: string) => {
+    assertValid(validate, value, path, "config");
+    const config = value as import("./types.js").MayConfig;
+    for (const [name, model] of Object.entries(config.models ?? {})) {
+      const adapter = model.adapter ?? config.providers[model.provider]?.adapter;
+      const validator = adapter === undefined ? undefined : validators.get(adapter);
+      if (validator !== undefined && model.options !== undefined)
+        assertValid(validator, model.options, path, `models.${name}.options`);
+    }
+  };
 })();
 
 function compile(schema: JsonSchemaObject): ValidateFunction {

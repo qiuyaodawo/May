@@ -1,4 +1,5 @@
 import { realpath, stat } from "node:fs/promises";
+import { configuredSearchTools, searchStatus } from "./search.js";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -15,7 +16,7 @@ import type {
   ContextFactory,
   ContextSummarizer,
 } from "@sortedyuan/may/context";
-import { omitUndefined, resolveRunBudget, type Model, type RunBudget } from "@sortedyuan/may/core";
+import { omitUndefined, resolveRunBudget, type Model, type RunBudget, type Tool } from "@sortedyuan/may/core";
 import {
   type McpOAuthManager,
   type McpTaskJournal,
@@ -219,9 +220,23 @@ export async function openConfiguredMaybeCode(
     runtimeOptions: Readonly<Record<string, unknown>> = {},
   ): MaybeCodeModelConfiguration => {
     const selected = selectionFor(profile);
+    if (
+      settings.webSearch === false &&
+      ((selected.adapter === "openai-chat-completions" && selected.model === "gpt-5-search-api") ||
+        selected.capabilities?.fields?.["serverTools.alwaysSearches"] === true ||
+        selected.providerConfig.capabilities?.fields?.["serverTools.alwaysSearches"] === true)
+    )
+      throw new MaybeCodeConfigError("This model searches on every reply and conflicts with webSearch: false");
+    const mergedOptions = { ...selected.options, ...runtimeOptions };
+    const { webSearch: _webSearch, ...withoutSearch } = mergedOptions;
     const selection: SelectedMaybeCodeModel = {
       ...selected,
-      options: { ...selected.options, ...runtimeOptions },
+      options:
+        settings.webSearch === false
+          ? ["deepseek-chat", "kimi-chat"].includes(selected.adapter)
+            ? withoutSearch
+            : { ...mergedOptions, webSearch: false }
+          : mergedOptions,
     };
     const baseModel =
       dependencies.createModel === undefined
@@ -236,11 +251,13 @@ export async function openConfiguredMaybeCode(
         provider: selection.provider,
         adapter: selection.adapter,
         model: selection.model,
+        searchStatus: searchStatus(settings.webSearch, selection.adapter, selection.options, selection.model),
       },
       contextBudget,
     });
   };
   const initialModel = pluginModel ? undefined : configureModel(options.model);
+  let searchTools: Promise<readonly Tool[]> | undefined;
   const modelProfiles = pluginModel
     ? []
     : Object.entries(config.models).map(([name, profile]) => {
@@ -255,6 +272,12 @@ export async function openConfiguredMaybeCode(
           adapter: profile.adapter ?? provider.adapter,
           model: profile.model,
           isDefault: config.defaultModel === name,
+          searchStatus: searchStatus(
+            settings.webSearch,
+            profile.adapter ?? provider.adapter,
+            { ...provider.options, ...profile.options },
+            profile.model,
+          ),
           ...(typeof reasoningEffort === "string" ? { reasoningEffort } : {}),
         };
       });
@@ -382,8 +405,31 @@ export async function openConfiguredMaybeCode(
     const applicationPlugins = createMaybeCodeSharedPlugins(resourceHost, plugins);
     workspacePlugins.set(workspace, applicationPlugins);
     application = await MaybeCodeWorkspace.open({
+      searchToolsForModel: async (info) => {
+        if (pluginModel) return [];
+        const selected = selectionFor(info?.profile ?? options.model);
+        if (
+          settings.webSearch === false ||
+          (selected.options.webSearch !== undefined && selected.options.webSearch !== false)
+        )
+          return [];
+        if (
+          (selected.adapter === "openai-chat-completions" && selected.model === "gpt-5-search-api") ||
+          selected.capabilities?.fields?.["serverTools.alwaysSearches"] === true ||
+          selected.providerConfig.capabilities?.fields?.["serverTools.alwaysSearches"] === true
+        )
+          return [];
+        if (settings.webSearch?.hostTool?.backend === "kimi-formula" && selected.adapter !== "kimi-chat") return [];
+        return (searchTools ??= configuredSearchTools(config, settings.webSearch));
+      },
       git,
-      ...omitUndefined({ execution: settings.execution, fetch: settings.fetch }),
+      ...omitUndefined({
+        execution: settings.execution,
+        fetch: settings.fetch,
+        lsp: settings.lsp,
+        webSearch: settings.webSearch,
+      }),
+      dataDirectory,
       ...(await permissionsFor(workspace)),
       configureWorkspace: async (nextWorkspace) => {
         const directories = options.skillDirectories ?? resolveMaybeCodeSkillDirectories(config, nextWorkspace);

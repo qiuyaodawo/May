@@ -6,9 +6,13 @@
 
 import { ChildProcess } from 'node:child_process';
 import { Tool } from '@sortedyuan/may/core';
+import { Usage } from '@sortedyuan/may/core';
 
 // @public
 export function assertFileExistence(path: WorkspacePath, signal?: AbortSignal): Promise<boolean>;
+
+// @public
+export function atomicWriteText(path: string, text: string, signal: AbortSignal): Promise<void>;
 
 // @public @deprecated (undocumented)
 export type BashToolInput = ShellToolInput;
@@ -25,6 +29,8 @@ export type BashToolOutput = ShellToolOutput;
 // @public (undocumented)
 export interface CodingExecutionEnvironment {
     // (undocumented)
+    readonly cachePath: string | undefined;
+    // (undocumented)
     close(): Promise<void>;
     // (undocumented)
     readonly isolation: CodingExecutionIsolation;
@@ -33,7 +39,12 @@ export interface CodingExecutionEnvironment {
         readonly cwd: string;
         readonly signal: AbortSignal;
         readonly env?: Readonly<Record<string, string>>;
+        readonly stdin?: "cancel" | "pipe";
     }): ChildProcess;
+    // (undocumented)
+    toEnvironmentPath(hostPath: string): string;
+    // (undocumented)
+    toHostPath(environmentPath: string): string | undefined;
     // (undocumented)
     readonly workspace: string;
 }
@@ -144,6 +155,8 @@ export interface CodingToolsOptions {
     readonly execution?: CodingExecutionEnvironment;
     // (undocumented)
     readonly fetch?: FetchToolOptions;
+    // (undocumented)
+    readonly fileFeedback?: WorkspaceFileFeedback;
     readonly guard?: WorkspaceFileGuard;
     // (undocumented)
     readonly read?: Omit<ReadToolOptions, "cwd">;
@@ -167,6 +180,9 @@ export function createCodingTool(name: CodingToolName, options: CodingToolsOptio
 
 // @public (undocumented)
 export function createCodingTools(options: CodingToolsOptions): Tool[];
+
+// @public (undocumented)
+export function createDeepSeekSearchBackend(options: BackendOptions): WebSearchBackend;
 
 // @public (undocumented)
 export function createDefaultShellProfile(platform?: NodeJS.Platform): ShellProfile;
@@ -199,10 +215,24 @@ export function createReadTool(options: ReadToolOptions): Tool<ReadToolInput, Re
 export function createShellTool(options: ShellToolOptions): Tool<ShellToolInput, ShellToolOutput>;
 
 // @public (undocumented)
+export function createTextChangePreview(tool: "edit" | "write", path: string, original: string | undefined, updated: string): ToolChangePreview;
+
+// @public (undocumented)
 export function createToolChangePreview(workspace: string, toolName: string, input: unknown): Promise<ToolChangePreview | undefined>;
 
 // @public (undocumented)
+export function createWebSearchTool(options: WebSearchToolOptions): Tool<{
+    query: string;
+    count?: number | undefined;
+}, WebSearchOutput>;
+
+// @public (undocumented)
 export function createWriteTool(options: WriteToolOptions): Tool<WriteToolInput, WriteToolOutput>;
+
+// @public (undocumented)
+export function createZhipuSearchBackend(options: BackendOptions & {
+    readonly searchEngine: "search_std" | "search_pro" | "search_pro_sogou" | "search_pro_quark";
+}): WebSearchBackend;
 
 // @public (undocumented)
 export function decodeToolChangePreviewPresentation(kind: string, version: number, data: unknown): ToolChangePreview | undefined;
@@ -256,6 +286,8 @@ export interface EditToolOptions {
     readonly allowHardLinks?: boolean;
     // (undocumented)
     readonly cwd: string;
+    // (undocumented)
+    readonly fileFeedback?: WorkspaceFileFeedback;
     readonly guard?: WorkspaceFileGuard;
     // (undocumented)
     readonly maxBytes?: number;
@@ -263,6 +295,8 @@ export interface EditToolOptions {
 
 // @public (undocumented)
 export interface EditToolOutput {
+    // (undocumented)
+    readonly diagnostics?: WorkspaceFileFeedbackResult["diagnostics"];
     // (undocumented)
     readonly path: string;
     // (undocumented)
@@ -387,6 +421,7 @@ export function openCodingExecutionEnvironment(options: {
     readonly workspace: string;
     readonly isolation: CodingExecutionIsolation;
     readonly signal?: AbortSignal;
+    readonly cacheDirectory?: string;
 }): Promise<CodingExecutionEnvironment>;
 
 // @public (undocumented)
@@ -559,7 +594,114 @@ export type ToolChangePreview = {
 };
 
 // @public (undocumented)
-export type WorkspaceFileGuard = <T>(operation: WorkspaceFileOperation<T>) => Promise<T>;
+export interface WebSearchBackend {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    search(query: {
+        readonly query: string;
+        readonly count: number;
+    }, signal: AbortSignal, options?: {
+        readonly maxResponseBytes: number;
+    }): Promise<{
+        readonly items: readonly WebSearchResultItem[];
+        readonly usage: Usage;
+    }>;
+}
+
+// @public (undocumented)
+export interface WebSearchOutput {
+    // (undocumented)
+    readonly items: readonly WebSearchResultItem[];
+    // (undocumented)
+    readonly usage: Usage;
+}
+
+// @public (undocumented)
+export interface WebSearchResultItem {
+    // (undocumented)
+    readonly published?: string;
+    // (undocumented)
+    readonly siteName?: string;
+    // (undocumented)
+    readonly summary: string;
+    // (undocumented)
+    readonly title: string;
+    // (undocumented)
+    readonly url: string;
+}
+
+// @public (undocumented)
+export class WebSearchToolError extends Error {
+    constructor(message: string, status?: number | undefined, code?: string | undefined);
+    // (undocumented)
+    readonly code?: string | undefined;
+    // (undocumented)
+    readonly status?: number | undefined;
+}
+
+// @public (undocumented)
+export interface WebSearchToolOptions {
+    // (undocumented)
+    readonly backend: WebSearchBackend;
+    // (undocumented)
+    readonly maxResponseBytes?: number;
+    // (undocumented)
+    readonly maxResults?: number;
+    // (undocumented)
+    readonly maxSummaryChars?: number;
+    // (undocumented)
+    readonly timeoutMs?: number;
+}
+
+// @public (undocumented)
+export interface WorkspaceDiagnostic {
+    // (undocumented)
+    readonly code?: string;
+    // (undocumented)
+    readonly column: number;
+    // (undocumented)
+    readonly endColumn: number;
+    // (undocumented)
+    readonly endLine: number;
+    // (undocumented)
+    readonly line: number;
+    // (undocumented)
+    readonly message: string;
+    // (undocumented)
+    readonly severity: "error" | "warning" | "information" | "hint";
+    // (undocumented)
+    readonly source?: string;
+}
+
+// @public (undocumented)
+export interface WorkspaceFileFeedback {
+    record(path: WorkspacePath, content: string): WorkspaceFileFeedbackTicket | undefined;
+}
+
+// @public (undocumented)
+export interface WorkspaceFileFeedbackResult {
+    // (undocumented)
+    readonly diagnostics: {
+        readonly status: "complete" | "pending" | "unknown" | "unavailable";
+        readonly reason?: string;
+        readonly receivedAt?: string;
+        readonly items: readonly WorkspaceDiagnostic[];
+        readonly truncated: boolean;
+    };
+}
+
+// @public (undocumented)
+export interface WorkspaceFileFeedbackTicket {
+    result(signal: AbortSignal): Promise<WorkspaceFileFeedbackResult>;
+}
+
+// @public (undocumented)
+export interface WorkspaceFileGuard {
+    // (undocumented)
+    <T>(operation: WorkspaceFileOperation<T>): Promise<T>;
+    runMany<T>(paths: readonly WorkspacePath[], tool: WorkspaceFileOperation<unknown>["tool"], operation: () => Promise<T>): Promise<T>;
+}
 
 // @public
 export function workspaceFileKey(path: WorkspacePath): string;
@@ -570,7 +712,7 @@ export interface WorkspaceFileOperation<T> {
     readonly path: WorkspacePath;
     run(): Promise<T>;
     // (undocumented)
-    readonly tool: "read" | "edit" | "write";
+    readonly tool: "read" | "edit" | "write" | "lsp_rename";
 }
 
 // @public (undocumented)
@@ -600,6 +742,8 @@ export interface WriteToolOptions {
     readonly allowHardLinks?: boolean;
     // (undocumented)
     readonly cwd: string;
+    // (undocumented)
+    readonly fileFeedback?: WorkspaceFileFeedback;
     readonly guard?: WorkspaceFileGuard;
     // (undocumented)
     readonly maxBytes?: number;
@@ -609,6 +753,8 @@ export interface WriteToolOptions {
 export interface WriteToolOutput {
     // (undocumented)
     readonly bytesWritten: number;
+    // (undocumented)
+    readonly diagnostics?: WorkspaceFileFeedbackResult["diagnostics"];
     // (undocumented)
     readonly path: string;
 }

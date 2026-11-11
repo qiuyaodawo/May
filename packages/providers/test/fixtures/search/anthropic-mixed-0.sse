@@ -1,0 +1,45 @@
+: keepalive
+: keepalive
+event: message_start
+data: {"message":{"content":[],"id":"msg_resp_08ad622b1fb9f0fb016aef4b33959c87d089cf003a251d8c84","model":"codex/gpt-6-luna","role":"assistant","stop_reason":null,"stop_sequence":null,"type":"message","usage":{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}},"type":"message_start"}
+
+event: ping
+data: {"type":"ping"}
+
+: keepalive
+event: content_block_start
+data: {"content_block":{"id":"srvtoolu_18e5ceaa107006d40000001a","input":{},"name":"web_search","type":"server_tool_use"},"index":0,"type":"content_block_start"}
+
+event: content_block_delta
+data: {"delta":{"partial_json":"{\"query\":\"site:nodejs.org/en/blog/release latest Node.js release official\"}","type":"input_json_delta"},"index":0,"type":"content_block_delta"}
+
+event: content_block_stop
+data: {"index":0,"type":"content_block_stop"}
+
+event: content_block_start
+data: {"content_block":{"content":[{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/download","type":"web_search_result","url":"https://nodejs.org/en/download"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/blog/release","type":"web_search_result","url":"https://nodejs.org/en/blog/release"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/about/previous-releases","type":"web_search_result","url":"https://nodejs.org/en/about/previous-releases"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/blog","type":"web_search_result","url":"https://nodejs.org/en/blog"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/download.","type":"web_search_result","url":"https://nodejs.org/en/download."},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/about/previous-releases?source=post_page---------------------------","type":"web_search_result","url":"https://nodejs.org/en/about/previous-releases?source=post_page---------------------------"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/blog/r","type":"web_search_result","url":"https://nodejs.org/en/blog/r"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/blog/release/v26.5.0","type":"web_search_result","url":"https://nodejs.org/en/blog/release/v26.5.0"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/uk/blog/release/v26.13.0","type":"web_search_result","url":"https://nodejs.org/uk/blog/release/v26.13.0"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/zh-cn/download./","type":"web_search_result","url":"https://nodejs.org/zh-cn/download./"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/blog/release/v26.5.0?trk=article-ssr-frontend-pulse_little-text-block","type":"web_search_result","url":"https://nodejs.org/en/blog/release/v26.5.0?trk=article-ssr-frontend-pulse_little-text-block"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/blog/release/v24.17.0","type":"web_search_result","url":"https://nodejs.org/en/blog/release/v24.17.0"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/static/documents/2016-survey-report.pdf","type":"web_search_result","url":"https://nodejs.org/static/documents/2016-survey-report.pdf"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/static/documents/foundation-visual-guidelines.pdf","type":"web_search_result","url":"https://nodejs.org/static/documents/foundation-visual-guidelines.pdf"}],"tool_use_id":"srvtoolu_18e5ceaa107006d40000001a","type":"web_search_tool_result"},"index":1,"type":"content_block_start"}
+
+event: content_block_stop
+data: {"index":1,"type":"content_block_stop"}
+
+event: content_block_start
+data: {"content_block":{"id":"call_lGtcevimTnT6zTOPuneK5UH2","input":{},"name":"add","type":"tool_use"},"index":2,"type":"content_block_start"}
+
+event: content_block_delta
+data: {"delta":{"partial_json":"{\"a\":124","type":"input_json_delta"},"index":2,"type":"content_block_delta"}
+
+event: content_block_delta
+data: {"delta":{"partial_json":",\"b\":219","type":"input_json_delta"},"index":2,"type":"content_block_delta"}
+
+event: content_block_delta
+data: {"delta":{"partial_json":"}","type":"input_json_delta"},"index":2,"type":"content_block_delta"}
+
+event: content_block_stop
+data: {"index":2,"type":"content_block_stop"}
+
+event: message_delta
+data: {"delta":{"stop_reason":"tool_use","stop_sequence":null},"type":"message_delta","usage":{"input_tokens":8443,"output_tokens":73,"cache_read_input_tokens":3712,"cache_creation_input_tokens":0,"output_tokens_details":{"thinking_tokens":52}}}
+
+event: message_stop
+data: {"type":"message_stop"}
+

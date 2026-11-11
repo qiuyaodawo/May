@@ -23,6 +23,7 @@ export type AnthropicThinkingConfig =
   | { type: "disabled" };
 
 export interface AnthropicTextBlock {
+  citations?: Record<string, unknown>[];
   cache_control?: AnthropicCacheControl;
   type: "text";
   text: string;
@@ -64,7 +65,16 @@ export interface AnthropicToolUseBlock {
 }
 
 export type AnthropicAssistantContentBlock =
-  AnthropicTextBlock | AnthropicThinkingBlock | AnthropicRedactedThinkingBlock | AnthropicToolUseBlock;
+  | AnthropicTextBlock
+  | AnthropicThinkingBlock
+  | AnthropicRedactedThinkingBlock
+  | AnthropicToolUseBlock
+  | AnthropicServerToolBlock;
+
+export interface AnthropicServerToolBlock {
+  type: "server_tool_use" | `${string}_tool_result`;
+  [key: string]: unknown;
+}
 
 export interface AnthropicToolResultBlock {
   type: "tool_result";
@@ -89,6 +99,8 @@ export interface AnthropicToolDefinition {
 
 /** @experimental */
 export interface AnthropicModelStateData {
+  origin?: import("../web-search.js").ServerToolOrigin;
+  container?: unknown;
   messageId: string;
   content: AnthropicAssistantContentBlock[];
 }
@@ -100,7 +112,11 @@ export interface AnthropicMessagesRequest {
   messages: AnthropicRequestMessage[];
   stream: true;
   system?: string | AnthropicTextBlock[];
-  tools?: AnthropicToolDefinition[];
+  tools?: (
+    | AnthropicToolDefinition
+    | ({ type: string; name: string; cache_control?: AnthropicCacheControl } & Record<string, unknown>)
+  )[];
+  container?: string;
   thinking?:
     | {
         type: "enabled";

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { TranscriptStore, TranscriptView } from "@sortedyuan/tui/transcript";
+import { codingChangePresentation, readCodingToolPresentation } from "@sortedyuan/tui/tool-renderers";
 
 test("projects live May and permission events into a terminal-safe transcript", () => {
   const store = new TranscriptStore();
@@ -98,7 +99,7 @@ test("restores coding change previews and renders their diff on demand", () => {
   ]);
 
   assert.equal(store.sessionId, "session-1");
-  assert.equal(store.items[0].preview.kind, "update");
+  assert.equal(readCodingToolPresentation(store.items[0]).preview.kind, "update");
   const view = new TranscriptView(store);
   assert.doesNotMatch(view.render({ width: 80, height: 20 }).lines.join("\n"), /\+new/u);
   view.setFocused(true);
@@ -109,16 +110,38 @@ test("restores coding change previews and renders their diff on demand", () => {
 test("lets applications append product notices and change previews explicitly", () => {
   const store = new TranscriptStore();
   store.appendNotice("info", "Model switched");
-  store.appendChangePreview("run-1", 1, "write-1", {
-    status: "unavailable",
-    tool: "write",
-    path: "a.ts",
-    reason: "not readable",
-  });
+  store.attachToolPresentation(
+    "run-1",
+    1,
+    "write-1",
+    codingChangePresentation({
+      status: "unavailable",
+      tool: "write",
+      path: "a.ts",
+      reason: "not readable",
+    }),
+  );
 
   assert.deepEqual(
     store.items.map((item) => item.kind),
     ["notice", "tool"],
   );
-  assert.equal(store.items[1].preview.status, "unavailable");
+  assert.equal(store.items[1].call.name, "write");
+  assert.equal(readCodingToolPresentation(store.items[1]).preview.status, "unavailable");
+});
+
+test("projects tool presentations through the configured projector", () => {
+  const presentation = { runId: "run-1", step: 1, toolCallId: "chart-1", kind: "example.chart", version: 1, data: 3 };
+  const standard = new TranscriptStore();
+  standard.appendToolPresentation(presentation);
+  assert.deepEqual(standard.items, []);
+
+  const custom = new TranscriptStore({
+    toolPresentationProjector: (value) =>
+      value.kind === "example.chart" ? { toolName: "chart", input: {}, value: { bars: value.data } } : undefined,
+  });
+  custom.appendToolPresentation(presentation);
+  assert.equal(custom.items[0].call.name, "chart");
+  assert.deepEqual(custom.items[0].presentation, { bars: 3 });
+  assert.equal(readCodingToolPresentation(custom.items[0]), undefined);
 });

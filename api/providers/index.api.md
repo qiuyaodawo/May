@@ -21,8 +21,10 @@ import { ModelRequest } from '@sortedyuan/may/core';
 import { ModelStreamOptions } from '@sortedyuan/may/core';
 import type { ProviderConfig } from '@sortedyuan/may/config';
 import { ResolveProviderOptions } from '@sortedyuan/may/config';
+import { Tool } from '@sortedyuan/may/core';
 import type { ToolDefinition } from '@sortedyuan/may/core';
-import type { Usage } from '@sortedyuan/may/core';
+import { ToolUsageError } from '@sortedyuan/may/core';
+import { Usage } from '@sortedyuan/may/core';
 import { validateStructuredModelResponse } from '@sortedyuan/may/core';
 
 // @public (undocumented)
@@ -90,14 +92,20 @@ export interface AnthropicModelOptions {
     reasoningEffort?: AnthropicReasoningEffort;
     // (undocumented)
     thinking?: Readonly<AnthropicThinkingConfig>;
+    // (undocumented)
+    webSearch?: false | WebSearchOptions;
 }
 
 // @public (undocumented)
 export interface AnthropicModelStateData {
     // (undocumented)
+    container?: unknown;
+    // (undocumented)
     content: AnthropicAssistantContentBlock[];
     // (undocumented)
     messageId: string;
+    // (undocumented)
+    origin?: ServerToolOrigin;
 }
 
 // @public (undocumented)
@@ -215,6 +223,9 @@ export function createBuiltinProviderModel(selection: ProviderModelSelection, op
 export function createCapabilityValidatedModel(model: Model, selection: ProviderModelSelection, options?: CapabilityValidatedModelOptions): CapabilityValidatedModel;
 
 // @public (undocumented)
+export function createKimiFormulaTools(options: KimiFormulaToolsOptions): Promise<Tool[]>;
+
+// @public (undocumented)
 export function createModelCapabilityResolver(options?: ModelCapabilityResolverOptions): ModelCapabilityResolver;
 
 // @public (undocumented)
@@ -238,6 +249,8 @@ export interface DeepSeekModelOptions {
     reasoningEffort?: DeepSeekReasoningEffort;
     // (undocumented)
     thinking?: "enabled" | "disabled";
+    // (undocumented)
+    webSearch?: false | WebSearchOptions;
 }
 
 // @public
@@ -297,13 +310,19 @@ export interface GeminiGenerateContentRequest {
         parts: GeminiPart[];
     };
     // (undocumented)
-    tools?: {
+    toolConfig?: {
+        includeServerSideToolInvocations: true;
+    };
+    // (undocumented)
+    tools?: ({
         functionDeclarations: {
             name: string;
             description: string;
             parametersJsonSchema: JsonSchema;
         }[];
-    }[];
+    } | {
+        googleSearch: Record<string, unknown>;
+    })[];
 }
 
 // @public (undocumented)
@@ -333,10 +352,16 @@ export interface GeminiModelOptions {
     reasoningEffort?: string;
     // (undocumented)
     thinkingBudget?: number;
+    // (undocumented)
+    webSearch?: false | WebSearchOptions;
 }
 
 // @public (undocumented)
 export interface GeminiModelStateData {
+    // (undocumented)
+    groundingMetadata?: GeminiGrounding;
+    // (undocumented)
+    origin?: ServerToolOrigin;
     // (undocumented)
     parts: GeminiPart[];
     // (undocumented)
@@ -373,6 +398,19 @@ export interface GeminiPart {
     thought?: boolean;
     // (undocumented)
     thoughtSignature?: string;
+    // (undocumented)
+    toolCall?: {
+        id?: string;
+        toolType: string;
+        toolName?: string;
+        args?: Record<string, unknown>;
+    };
+    // (undocumented)
+    toolResponse?: {
+        id?: string;
+        toolType: string;
+        response?: Record<string, unknown>;
+    };
 }
 
 // @public (undocumented)
@@ -399,6 +437,40 @@ export interface GeminiUsageMetadata {
 }
 
 // @public (undocumented)
+export class KimiFormulaError extends ToolUsageError {
+    constructor(message: string, status?: string | number | undefined, fiberId?: string | undefined, options?: ErrorOptions & {
+        readonly usage?: Usage;
+    });
+    // (undocumented)
+    readonly code = "KIMI_FORMULA_ERROR";
+    // (undocumented)
+    readonly fiberId?: string | undefined;
+    // (undocumented)
+    readonly status?: string | number | undefined;
+}
+
+// @public (undocumented)
+export class KimiFormulaRawInputError extends Error {
+    constructor();
+    // (undocumented)
+    readonly code = "KIMI_FORMULA_RAW_INPUT_REQUIRED";
+}
+
+// @public (undocumented)
+export interface KimiFormulaToolsOptions {
+    // (undocumented)
+    readonly apiKey: string;
+    // (undocumented)
+    readonly baseURL?: string;
+    // (undocumented)
+    readonly fetch?: typeof globalThis.fetch;
+    // (undocumented)
+    readonly timeoutMs?: number;
+    // (undocumented)
+    readonly uri: string;
+}
+
+// @public (undocumented)
 export class KimiModel extends OpenAICompatibleChatModel {
     constructor(options: KimiModelOptions);
 }
@@ -419,6 +491,8 @@ export interface KimiModelOptions {
     reasoningEffort?: KimiReasoningEffort;
     // (undocumented)
     thinking?: Readonly<KimiThinkingConfig>;
+    // (undocumented)
+    webSearch?: false | WebSearchOptions;
 }
 
 // @public
@@ -573,6 +647,8 @@ export interface ModelRequestValidationOptions {
     // (undocumented)
     readonly parameters?: Readonly<Record<string, unknown>>;
     // (undocumented)
+    readonly serverTools?: readonly ("webSearch" | "webSearchWithFunctions")[];
+    // (undocumented)
     readonly unknownPolicy?: UnknownCapabilityPolicy;
 }
 
@@ -617,6 +693,8 @@ export interface OpenAIChatCompletionsModelOptions {
     reasoningEffort?: OpenAIChatCompletionsReasoningEffort;
     // (undocumented)
     store?: boolean;
+    // (undocumented)
+    webSearch?: false | WebSearchOptions;
 }
 
 // @public
@@ -664,6 +742,8 @@ export interface OpenAICompatibleChatModelOptions {
     model: string;
     // (undocumented)
     reasoningEffort?: string;
+    // (undocumented)
+    webSearch?: false | WebSearchOptions;
 }
 
 // @public (undocumented)
@@ -694,6 +774,8 @@ export interface OpenAICompatibleChatRequest {
     tool_stream?: true;
     // (undocumented)
     tools?: OpenAICompatibleToolDefinition[];
+    // (undocumented)
+    web_search_options?: Readonly<Record<string, unknown>>;
 }
 
 // @public (undocumented)
@@ -702,6 +784,15 @@ export interface OpenAICompatibleChunk {
     choices?: Array<{
         index: number;
         delta?: {
+            annotations?: Array<{
+                type: string;
+                url_citation?: {
+                    url: string;
+                    title?: string;
+                    start_index: number;
+                    end_index: number;
+                };
+            }>;
             content?: string | null;
             refusal?: string | null;
             reasoning_content?: string | null;
@@ -710,6 +801,8 @@ export interface OpenAICompatibleChunk {
         finish_reason?: string | null;
     }>;
     error?: OpenAICompatibleStreamError | string | number | boolean | null;
+    // (undocumented)
+    id?: string;
     // (undocumented)
     usage?: {
         prompt_tokens?: number;
@@ -727,6 +820,15 @@ export interface OpenAICompatibleChunk {
         prompt_cache_hit_tokens?: number;
         prompt_cache_miss_tokens?: number;
     } | null;
+    // (undocumented)
+    web_search?: Array<{
+        title?: string;
+        link: string;
+        content?: string;
+        media?: string;
+        publish_date?: string;
+        refer?: string;
+    }>;
 }
 
 // @public
@@ -812,6 +914,8 @@ export interface OpenAICompatibleStreamOptions {
     // (undocumented)
     finishReasonError(finishReason: string): Error;
     // (undocumented)
+    origin?: ServerToolOrigin;
+    // (undocumented)
     protocolError(message: string, options?: ErrorOptions): Error;
     // (undocumented)
     providerName: string;
@@ -819,6 +923,10 @@ export interface OpenAICompatibleStreamOptions {
     requireDone?: boolean;
     // (undocumented)
     signal: AbortSignal;
+    // (undocumented)
+    webSearch?: boolean;
+    // (undocumented)
+    zhipu?: boolean;
 }
 
 // @public (undocumented)
@@ -847,16 +955,10 @@ export interface OpenAICompatibleToolCallDelta {
 }
 
 // @public (undocumented)
-export interface OpenAICompatibleToolDefinition {
-    // (undocumented)
-    function: {
-        name: string;
-        description: string;
-        parameters: Readonly<Record<string, unknown>>;
-    };
-    // (undocumented)
-    type: "function";
-}
+export type OpenAICompatibleToolDefinition = OpenAICompatibleFunctionDefinition | {
+    type: "web_search";
+    web_search: Readonly<Record<string, unknown>>;
+};
 
 // @public (undocumented)
 export type OpenAICompatibleUserContent = string | Array<{
@@ -932,12 +1034,16 @@ export interface OpenAIResponsesModelOptions {
     readonly serverCompactThreshold?: number;
     // (undocumented)
     readonly store?: boolean;
+    // (undocumented)
+    readonly webSearch?: false | WebSearchOptions;
 }
 
 // @public (undocumented)
 export interface OpenAIResponsesModelStateData {
     // (undocumented)
     readonly items: readonly unknown[];
+    // (undocumented)
+    readonly origin?: ServerToolOrigin;
 }
 
 // @public (undocumented)
@@ -1073,6 +1179,13 @@ export interface RetryingModelOptions {
 export function selectProviderModel(config: MayConfig, selector?: ModelProfileSelector, resolveOptions?: ResolveProviderOptions): ProviderModelSelection;
 
 // @public (undocumented)
+export class ServerToolStateMismatchError extends Error {
+    constructor();
+    // (undocumented)
+    readonly code = "SERVER_TOOL_STATE_MISMATCH";
+}
+
+// @public (undocumented)
 export function streamOpenAICompatibleResponse(response: Response, options: OpenAICompatibleStreamOptions): AsyncIterable<ModelEvent>;
 
 // @public (undocumented)
@@ -1093,6 +1206,50 @@ export type UnknownCapabilityPolicy = "allow" | "require-known";
 export function validateModelRequest(request: ModelRequest, capabilities: ModelCapabilities, options?: ModelRequestValidationOptions): ModelRequestValidationResult;
 
 export { validateStructuredModelResponse }
+
+// @public (undocumented)
+export interface WebSearchOptions {
+    // (undocumented)
+    readonly allowedCallers?: readonly string[];
+    // (undocumented)
+    readonly allowedDomains?: readonly string[];
+    // (undocumented)
+    readonly blockedDomains?: readonly string[];
+    // (undocumented)
+    readonly contentSize?: "medium" | "high";
+    // (undocumented)
+    readonly count?: number;
+    // (undocumented)
+    readonly domainFilter?: string;
+    // (undocumented)
+    readonly maxUses?: number;
+    // (undocumented)
+    readonly recencyFilter?: "oneDay" | "oneWeek" | "oneMonth" | "oneYear" | "noLimit";
+    // (undocumented)
+    readonly responseInclusion?: "full" | "none";
+    // (undocumented)
+    readonly searchContextSize?: "low" | "medium" | "high";
+    // (undocumented)
+    readonly searchEngine?: "search_std" | "search_pro" | "search_pro_sogou" | "search_pro_quark";
+    // (undocumented)
+    readonly searchPrompt?: string;
+    // (undocumented)
+    readonly searchTypes?: readonly ("web" | "image")[];
+    // (undocumented)
+    readonly timeRange?: {
+        readonly startTime: string;
+        readonly endTime: string;
+    };
+    // (undocumented)
+    readonly userLocation?: {
+        readonly city?: string;
+        readonly region?: string;
+        readonly country?: string;
+        readonly timezone?: string;
+    };
+    // (undocumented)
+    readonly version?: "web_search_20250305" | "web_search_20260209" | "web_search_20260318";
+}
 
 // @public (undocumented)
 export function withModelRetry(model: Model, options?: RetryingModelOptions): Model;
@@ -1120,6 +1277,8 @@ export interface ZhipuModelOptions {
     reasoningEffort?: ZhipuReasoningEffort;
     // (undocumented)
     thinking?: "enabled" | "disabled";
+    // (undocumented)
+    webSearch?: false | WebSearchOptions;
 }
 
 // @public

@@ -226,7 +226,42 @@ export function validateMessage(value: unknown): Message {
     nonEmpty(state.type, "modelState type");
     if (!("data" in state)) throw new TypeError("modelState requires data");
   }
+  if (data.role === "assistant") {
+    if (data.serverToolCalls !== undefined) {
+      if (!Array.isArray(data.serverToolCalls)) throw new TypeError("serverToolCalls must be an array");
+      const ids = new Set<string>();
+      for (const call of data.serverToolCalls) {
+        validateServerToolCall(call);
+        if (ids.has(call.id)) throw new TypeError("serverToolCalls must have unique identities");
+        ids.add(call.id);
+      }
+    }
+    if (data.continuation !== undefined) {
+      if (data.continuation !== "server-tool-pause") throw new TypeError("Invalid assistant continuation");
+      if (Array.isArray(data.toolCalls) && data.toolCalls.length > 0)
+        throw new TypeError("Assistant continuation cannot contain client tool calls");
+    }
+  }
   return value as Message;
+}
+
+function validateServerToolCall(value: unknown): asserts value is import("./types.js").ServerToolCall {
+  const call = record(value, "Server tool call");
+  nonEmpty(call.id, "Server tool call id");
+  nonEmpty(call.kind, "Server tool call kind");
+  nonEmpty(call.name, "Server tool call name");
+  if (!["pending", "completed", "failed"].includes(call.status as string))
+    throw new TypeError("Invalid server tool call status");
+  if (call.sources !== undefined) {
+    if (!Array.isArray(call.sources)) throw new TypeError("Server tool sources must be an array");
+    for (const source of call.sources) {
+      const data = record(source, "Server tool source");
+      nonEmpty(data.url, "Server tool source URL");
+      optionalString(data.title, "Server tool source title");
+      optionalString(data.published, "Server tool source published");
+    }
+  }
+  if (call.error !== undefined) nonEmpty(record(call.error, "Server tool error").code, "Server tool error code");
 }
 
 /** @experimental */
@@ -238,6 +273,27 @@ export function validateContent(value: unknown): asserts value is readonly Conte
       case "text":
       case "reasoning":
         if (typeof part.text !== "string") throw new TypeError("Content text must be a string");
+        if (part.type === "text" && part.citations !== undefined) {
+          if (!Array.isArray(part.citations)) throw new TypeError("citations must be an array");
+          for (const entry of part.citations) {
+            const citation = record(entry, "Citation");
+            if (citation.type !== "url") throw new TypeError("Invalid citation type");
+            nonEmpty(citation.url, "Citation URL");
+            optionalString(citation.title, "Citation title");
+            optionalString(citation.citedText, "Citation citedText");
+            if (citation.range !== undefined) {
+              const range = record(citation.range, "Citation range");
+              if (
+                !Number.isSafeInteger(range.start) ||
+                !Number.isSafeInteger(range.end) ||
+                (range.start as number) < 0 ||
+                (range.end as number) < (range.start as number) ||
+                (range.end as number) > part.text.length
+              )
+                throw new TypeError("Invalid citation range");
+            }
+          }
+        }
         break;
       case "json":
         if (!("value" in part)) throw new TypeError("JSON content requires value");
@@ -350,6 +406,8 @@ function validateModelEvent(value: unknown): ModelEvent {
   } else if (data.type === "response.completed") {
     if (validateMessage(data.message).role !== "assistant")
       throw new TypeError("Model response requires assistant message");
+  } else if (data.type === "server_tool.updated") {
+    validateServerToolCall(data.call);
   } else if (data.type === "retrying") {
     for (const name of ["attempt", "maxAttempts", "delayMs"]) {
       if (!Number.isSafeInteger(data[name]) || (data[name] as number) < 0) throw new TypeError(`Invalid ${name}`);
@@ -378,6 +436,7 @@ function validateCall(value: unknown): asserts value is ToolCall {
   nonEmpty(call.id, "Tool call id");
   nonEmpty(call.name, "Tool call name");
   if (!("input" in call)) throw new TypeError("Tool call requires input");
+  optionalString(call.rawInput, "Tool call rawInput");
 }
 
 function record(value: unknown, name: string): Record<string, unknown> {

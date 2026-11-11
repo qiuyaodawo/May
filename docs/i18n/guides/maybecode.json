@@ -12,9 +12,19 @@
       "zh": "971c7e13a45973bdd3762d9766cecf0b85484d2b50ae876b031c6081328aef30"
     },
     {
+      "heading": "Configure web search",
+      "en": "5a5049609cce0ab9e6a70f33aeef0b46f2e899d4b0e33ddd82bea8b4e8ea58a6",
+      "zh": "e536bf4559d9508d085df59c577d0c3d2322d4d0ae530a171661bb87963cd916"
+    },
+    {
+      "heading": "Configure language servers",
+      "en": "dc768d2ba209d153d7f692ad9b273075b958fc485fe5965711198b32cec92ad7",
+      "zh": "0e1759787936429c8cdcbde42a8a3699905cfa30f68c8e98510989f544e01586"
+    },
+    {
       "heading": "Start the application",
-      "en": "690cc01b0802385df935eb338aebc8dda6a6d5ea49f8d83ec0f2509f06c17316",
-      "zh": "f43c380dd9b7ab132a84106df4465017bd85c46aee151ecfeaaef29228d05352"
+      "en": "4d4d1be1e5cd263884ab6647bcd35b5e8caa9d7accf1acfeb102ef8838d7f7c8",
+      "zh": "a37bfb9c39220f7fd9824546ee3ba26ab9e216914b3752ce6d9694fd7e05e21c"
     },
     {
       "heading": "First-run setup",

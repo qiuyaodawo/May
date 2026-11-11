@@ -36,6 +36,7 @@ export type MaybeCodeSlashCommandName =
   | "/changes"
   | "/worktrees"
   | "/model"
+  | "/lsp"
   | "/effort"
   | "/retry"
   | "/recovery"
@@ -58,6 +59,7 @@ export const MAYBECODE_COMPACTION_STRATEGIES = [
 ] as const satisfies readonly MaybeCodeCompactionStrategyName[];
 
 export const MAYBECODE_SLASH_COMMANDS: readonly MaybeCodeSlashCommand[] = [
+  { name: "/lsp", usage: "/lsp [restart <id>]", description: "Inspect or restart configured language servers" },
   {
     name: "/permissions",
     usage: "/permissions [list|allow <id>|deny <id>|revoke <id>]",
@@ -654,6 +656,28 @@ export async function executeMaybeCodeSlashCommand(
       }
       await controller.resumeSession(sessionId);
       return { type: "session.resumed", sessionId };
+    }
+    case "/lsp": {
+      const manager = controller.application.lsp;
+      if (!manager)
+        return {
+          type: "display",
+          text: "Configure apps.maybecode.lsp.servers to enable LSP. Presets: typescript (typescript-language-server --stdio), python (pyright-langserver --stdio), rust (rust-analyzer), go (gopls).",
+        };
+      if (arguments_.length) {
+        if (arguments_.length !== 2 || arguments_[0] !== "restart") return usage(definition);
+        await manager.restart(arguments_[1]!);
+      }
+      return {
+        type: "display",
+        text: manager
+          .status()
+          .map(
+            (server) =>
+              `${server.id} · apps.maybecode.lsp.servers.${server.id} · ${server.state}\n${server.command ?? "Command resolves on first request"} ${(server.args ?? []).join(" ")}\n${server.progress.join("\n")}\n${server.lastError ?? ""}\n${server.stderr}\n${server.recovery ?? ""}`,
+          )
+          .join("\n\n"),
+      };
     }
     case "/model": {
       if (arguments_.length === 0) {

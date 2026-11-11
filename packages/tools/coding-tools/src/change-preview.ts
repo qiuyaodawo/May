@@ -112,7 +112,7 @@ export async function createToolChangePreview(
 
     assertTextShape(updated, "updated content");
 
-    return createFileChangePreview(toolName, file.relative, original, updated);
+    return createTextChangePreview(toolName, file.relative, original, updated);
   } catch (error) {
     return {
       status: "unavailable",
@@ -123,12 +123,19 @@ export async function createToolChangePreview(
   }
 }
 
-function createFileChangePreview(
+/** @experimental */
+export function createTextChangePreview(
   tool: "edit" | "write",
   path: string,
   original: string | undefined,
   updated: string,
 ): ToolChangePreview {
+  if (original !== undefined) {
+    assertPreviewSize(original, "original content");
+    assertTextShape(original, "original content");
+  }
+  assertPreviewSize(updated, "updated content");
+  assertTextShape(updated, "updated content");
   const before = toLines(original ?? "");
   const after = toLines(updated);
   const operations = diffLines(before, after);

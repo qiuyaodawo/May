@@ -12,6 +12,11 @@
       "zh": "85a454a183719c621c0667ac4cedee1e7f72aca94f7ee90cc5fd8e2b9ef72bfc"
     },
     {
+      "heading": "Server-tool updates and tool usage",
+      "en": "8d043c3b297de6ed683cf2280de24f08dc33e7a295f00ae38e38c8dc5a0398cb",
+      "zh": "9524f49e28a4bb2755d6c95404cbf514a60ab4e6ab0fa639f467a7711fe9a64a"
+    },
+    {
       "heading": "Event layers",
       "en": "44153dc8083559997dea815a01d7ec582c49947edb8db12f6fee52a513fa4c74",
       "zh": "7da38849ee5424ce3ceee2412329a79950097372293f29b92f4fd17b0c43ea49"
@@ -58,8 +63,8 @@
     },
     {
       "heading": "Backpressure and droppable streaming events",
-      "en": "3747d03d2e340b09a69c6f899efcda5356c98018d33d9ac7dd8d2f578a5e4939",
-      "zh": "3eb1d6fb0d593817badb37d412ecc44a6638f81b3230b0077147d2abc8aad766"
+      "en": "6f9176f7e1b03882a8779c19c466879a8b32d8c7f42352d187730a48b0058265",
+      "zh": "dd5e401ce9926579bc22dc9fef89bb6ed33e59b7dde29a777f4c1548fc85cc59"
     },
     {
       "heading": "Live events do not become durable automatically",

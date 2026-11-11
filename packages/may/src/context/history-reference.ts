@@ -1,4 +1,10 @@
-import { omitUndefined, type ContextSnapshot, type Message, type SystemMessage } from "../core/index.js";
+import {
+  pendingServerToolInteractionIndex,
+  omitUndefined,
+  type ContextSnapshot,
+  type Message,
+  type SystemMessage,
+} from "../core/index.js";
 
 import type { ContextCompactionOptions, ContextCompactionStrategy } from "./compaction.js";
 
@@ -42,7 +48,10 @@ export class HistoryReferenceStrategy implements ContextCompactionStrategy {
       .filter((index): index is number => index !== undefined);
     if (userIndexes.length <= this.keepRecentTurns) return snapshot.messages;
 
-    const boundary = userIndexes[userIndexes.length - this.keepRecentTurns]!;
+    const boundary = Math.min(
+      userIndexes[userIndexes.length - this.keepRecentTurns]!,
+      pendingServerToolInteractionIndex(snapshot.messages) ?? snapshot.messages.length,
+    );
     const reference = (
       typeof this.reference === "string"
         ? this.reference

@@ -44,6 +44,90 @@ MaybeCode 在[首次启动配置](../guides/maybecode.md#首次启动配置)中�
 `createApplicationConfigSchema(id, section, title)` 生成组合 schema，并通过
 `createApplicationConfigValidator(id, section)` 校验自己的部分。
 
+## 服务端搜索
+
+将 `providers.<name>.options.webSearch` 或 `models.<name>.options.webSearch`
+设置为对象，即授权服务端搜索。省略时关闭；`{}` 使用 adapter 默认值启用，
+智谱需要提供 `searchEngine`。模型配置整体替换 Provider 配置；`false` 关闭搜索。
+
+| Adapter                   | `webSearch` 字段                                                                                                                                                                                   |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `anthropic-messages`      | `version`（默认 `web_search_20250305`，也支持 `web_search_20260209`、`web_search_20260318`）、`maxUses`、`allowedDomains`、`blockedDomains`、`userLocation`、`allowedCallers`、`responseInclusion` |
+| `openai-responses`        | `allowedDomains`、`blockedDomains`、`userLocation`、`searchContextSize`                                                                                                                            |
+| `openai-chat-completions` | `userLocation`、`searchContextSize`；要求使用 `gpt-5-search-api`                                                                                                                                   |
+| `google-gemini`           | `timeRange: { startTime, endTime }`、`searchTypes: ["web", "image"]`                                                                                                                               |
+| `zhipu-chat`              | 必填 `searchEngine`，可选 `count`、`domainFilter`、`recencyFilter`、`contentSize`、`searchPrompt`                                                                                                  |
+
+`userLocation` 接受非空的 `city`、`region`、`country`、`timezone` 字段，至少提供一个。
+`searchContextSize` 接受 `low`、`medium`、`high`。两种域名列表互斥。
+Anthropic 的 `responseInclusion` 接受 `full`、`none`，要求
+`version: "web_search_20260318"`；`allowedCallers` 接受 `direct` 和
+`code_execution_20260120`。较新的搜索版本可以调用服务端 code execution。
+客户端 function 名称为 `web_search` 时，与 Anthropic 服务端搜索冲突，抛出 `TypeError`。
+
+Gemini 要求同时提供两个时间端点，并按照时间顺序排列。智谱搜索引擎接受
+`search_std`、`search_pro`、`search_pro_sogou`、`search_pro_quark`；
+`recencyFilter` 接受 `oneDay`、`oneWeek`、`oneMonth`、`oneYear`、`noLimit`，
+`contentSize` 接受 `medium`、`high`。无效组合抛出 `ProviderConfigurationError`。
+`deepseek-chat` 和 `kimi-chat` 拒绝 `webSearch`，包括 `false`；这些 adapter 使用宿主搜索工具。
+
+能力字段为 `serverTools.webSearch`、`serverTools.webSearchWithFunctions` 和
+`serverTools.alwaysSearches`。请求校验按照 `unknownCapabilityPolicy` 检查搜索能力及其与
+function 同时使用的能力。Anthropic 能力发现读取 Provider 的搜索能力。
+`gpt-5-search-api` 每次回复都会搜索，省略搜索选项时同样如此。
+
+## MaybeCode 搜索与语言服务器
+
+`apps.maybecode.webSearch: false` 关闭宿主搜索，并为接受该选项的 adapter 覆盖服务端搜索配置。
+此时选择每次回复都会搜索的模型将失败。其他情况下，通过 `webSearch.hostTool` 配置
+`backend`（`deepseek`、`zhipu`、`kimi-formula`）和 `provider`（`providers` 中的名称）。
+智谱还需要 `searchEngine`。凭据和 `baseURL` 使用该 Provider 的配置；
+Provider 不存在或缺少凭据时，配置加载失败。`webSearch.maxResults` 默认 10，
+DeepSeek 和智谱工具的上限为 50。
+
+```json
+{
+  "apps": {
+    "maybecode": {
+      "webSearch": {
+        "hostTool": { "backend": "deepseek", "provider": "deepseek" },
+        "maxResults": 10
+      },
+      "lsp": {
+        "servers": { "typescript": {}, "python": {} },
+        "editDiagnostics": true,
+        "diagnosticSeverities": ["error", "warning"],
+        "startTimeoutMs": 60000,
+        "requestTimeoutMs": 15000,
+        "diagnosticsTimeoutMs": 3000
+      }
+    }
+  }
+}
+```
+
+每次 Run 开始时，已启用的服务端搜索优先于配置的宿主工具。
+Kimi Formula 宿主工具仅供 `kimi-chat` 使用。`/model` 显示搜索状态。
+宿主搜索经过工具审批，并计入用量。
+
+省略 `lsp` 或设置为 `false` 时关闭 LSP。列出服务器即授权其进程执行项目程序。
+内置预设为 `typescript`、`python`、`rust`、`go`，服务器按需启动。
+每个 `servers.<id>` 接受 `command`、`args`、`languages`（languageId 到扩展名数组）、
+`settings`、`initializationOptions`、`env`。可以覆盖预设字段。
+自定义 id 必须提供 `command` 和 `languages`；扩展名重复时加载失败。
+`editDiagnostics` 默认为 true。其他管理器限制为
+`shutdownTimeoutMs: 5000`、`maxFileBytes: 1048576`、`maxResults: 200`、
+`maxHoverChars: 8000`、`maxEditDiagnostics: 20`、`maxDiagnostics: 200`、`maxServers: 4`。
+输入、诊断状态、重命名恢复和服务器安装见 [LSP 工具](../../../packages/tools/lsp/README.zh-CN.md)。
+
+库的执行环境选项 `cacheDirectory` 提供可写的服务器存储目录；`cachePath` 提供环境中的路径，
+容器中为 `/may-cache`。`toEnvironmentPath` 和 `toHostPath` 转换工作区路径，
+`spawn(..., { stdin: "pipe" })` 启用 stdio 协议通信。MaybeCode 在数据目录下为每个工作区创建缓存。
+容器镜像必须包含配置的服务器及其运行环境；工作区 npm 服务器使用镜像中的 `node`。
+容器网络保持 `none`。Go 模块、Cargo 依赖和 Rust 源码需要预先准备在工作区或镜像中。
+基于缓存目录的 `HOME`、`XDG_CACHE_HOME`、`GOCACHE` 与
+`GOFLAGS=-mod=readonly`、`GOPROXY=off`、`CARGO_NET_OFFLINE=true` 同时设置。
+
 ## 顶层字段
 
 | 字段           | 必需 | 说明                                                        |
@@ -92,15 +176,15 @@ MaybeCode 的模型选择器可以持久化新的 `defaultModel`。它会重新�
 
 `options` 由 Adapter 定义，内置注册表识别以下选项：
 
-| Adapter                   | 选项                                                                                                          |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `openai-responses`        | `maxOutputTokens`、`reasoningEffort`、`reasoningSummary`、`serverCompactThreshold`、`store`、`responseFormat` |
-| `openai-chat-completions` | `maxOutputTokens`、`reasoningEffort`、`store`、`responseFormat`                                               |
-| `deepseek-chat`           | `thinking`、`reasoningEffort`、`maxTokens`                                                                    |
-| `zhipu-chat`              | `thinking`、`clearThinking`、`reasoningEffort`、`maxTokens`                                                   |
-| `kimi-chat`               | `thinking`、`reasoningEffort`、`maxTokens`                                                                    |
-| `anthropic-messages`      | `thinking`、`reasoningEffort`、`maxTokens`、`apiVersion`、`promptCaching`                                     |
-| `google-gemini`           | `maxOutputTokens`、`reasoningEffort`、`thinkingBudget`、`includeThoughts`、`responseFormat`                   |
+| Adapter                   | 选项                                                                                                                       |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `openai-responses`        | `maxOutputTokens`、`reasoningEffort`、`reasoningSummary`、`serverCompactThreshold`、`store`、`responseFormat`、`webSearch` |
+| `openai-chat-completions` | `maxOutputTokens`、`reasoningEffort`、`store`、`responseFormat`、`webSearch`                                               |
+| `deepseek-chat`           | `thinking`、`reasoningEffort`、`maxTokens`                                                                                 |
+| `zhipu-chat`              | `thinking`、`clearThinking`、`reasoningEffort`、`maxTokens`、`webSearch`                                                   |
+| `kimi-chat`               | `thinking`、`reasoningEffort`、`maxTokens`                                                                                 |
+| `anthropic-messages`      | `thinking`、`reasoningEffort`、`maxTokens`、`apiVersion`、`promptCaching`、`webSearch`                                     |
+| `google-gemini`           | `maxOutputTokens`、`reasoningEffort`、`thinkingBudget`、`includeThoughts`、`responseFormat`、`webSearch`                   |
 
 `google-gemini` 的 `baseURL` 包含 API 版本，默认使用
 `https://generativelanguage.googleapis.com/v1beta`。兼容服务可以使用

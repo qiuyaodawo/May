@@ -264,6 +264,12 @@ test("streams thinking, text, usage, and sends Anthropic configuration", async (
     type: ANTHROPIC_MODEL_STATE_TYPE,
     data: {
       messageId: "msg_1",
+      origin: {
+        adapter: "anthropic-messages",
+        model: "test-model",
+        baseURL: "https://anthropic.test",
+        toolsHash: "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+      },
       content: [
         { type: "thinking", thinking: "Think.", signature: "signature_1" },
         { type: "text", text: "Answer." },

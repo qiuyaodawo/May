@@ -1,4 +1,10 @@
-import { HookExecutionError, jsonEqual, omitUndefined } from "../core/index.js";
+import {
+  HookExecutionError,
+  hasPendingServerToolInteraction,
+  pendingServerToolInteractionIndex,
+  jsonEqual,
+  omitUndefined,
+} from "../core/index.js";
 import type { Context, ContextSnapshot, Message, Usage } from "../core/index.js";
 
 import type {
@@ -175,6 +181,7 @@ export class SnapshotContextController implements ContextController {
     throwIfAborted(options.signal);
 
     const snapshot = await this.context.snapshot();
+    if (hasPendingServerToolInteraction(snapshot.messages)) return [];
     const inspection = inspectContextSnapshot(snapshot, this.inspectionOptions());
     if (requested === undefined && inspection.shouldCompact !== true) return [];
 
@@ -275,11 +282,13 @@ export class SnapshotContextController implements ContextController {
     let before = inspectContextSnapshot(sourceSnapshot, this.inspectionOptions());
 
     while (true) {
+      const protectedIndex = pendingServerToolInteractionIndex(sourceSnapshot.messages);
+      const protectedTail = protectedIndex === undefined ? [] : sourceSnapshot.messages.slice(protectedIndex);
       const output = normalizeCompactionOutput(
         await strategy.compact(
           {
             ...sourceSnapshot,
-            messages: [...sourceSnapshot.messages],
+            messages: sourceSnapshot.messages.slice(0, protectedIndex),
           },
           options,
         ),
@@ -300,12 +309,12 @@ export class SnapshotContextController implements ContextController {
           break;
         }
 
-        const compactedMessages = [...output.messages];
+        const compactedMessages = [...output.messages, ...protectedTail];
         const messages = [...compactedMessages, ...tail];
         const changed = !messagesEqual(messages, latestSnapshot.messages);
         if (!changed) {
           if (output.effectiveTokens !== undefined) {
-            this.applyCompactionMeasurement(output.effectiveTokens, compactedMessages.length);
+            this.applyCompactionMeasurement(output.effectiveTokens, output.messages.length);
           }
           const after = inspectContextSnapshot(latestSnapshot, this.inspectionOptions());
           return {
@@ -322,7 +331,7 @@ export class SnapshotContextController implements ContextController {
         if (replaced === false) continue;
 
         const previousMeasurement = this.measurement;
-        this.applyCompactionMeasurement(output.effectiveTokens, compactedMessages.length);
+        this.applyCompactionMeasurement(output.effectiveTokens, output.messages.length);
         const afterSnapshot = await this.context.snapshot();
         const after = inspectContextSnapshot(afterSnapshot, this.inspectionOptions());
         const result: ContextCompactionResult = {

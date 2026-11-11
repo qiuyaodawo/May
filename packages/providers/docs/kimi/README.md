@@ -4,6 +4,24 @@ Kimi model adapter for May. It is built on `OpenAICompatibleChatModel` and repor
 failures with the shared [OpenAI-compatible errors](../openai-compatible/README.md)
 whose `provider` is `"Kimi"`.
 
+## Formula host search
+
+`kimi-chat` rejects `webSearch`, including `false`. Import
+`createKimiFormulaTools` from `@sortedyuan/providers` or
+`@sortedyuan/providers/kimi` and await it with `apiKey` and
+`uri: "moonshot/web-search:latest"`. Optional `baseURL` defaults to
+`https://api.moonshot.ai/v1`; `timeoutMs` defaults to 60000.
+Creation retrieves Formula tool definitions; register the returned tools with
+May. Execution posts the original `ToolCall.rawInput` as the argument string.
+Missing raw input raises `KimiFormulaRawInputError`. Failed fibers raise
+`KimiFormulaError` with status and fiber ID. Successful nonempty output records
+one `web-search` request through `Tool.usage(output)`. `KimiFormulaError`
+extends Core's `ToolUsageError`; an unknown remote outcome records partial usage.
+Results may be encrypted for Kimi, so hosts register these tools only for
+`kimi-chat`. Normal tool permissions apply. MaybeCode selects the
+`kimi-formula` host backend. See
+[configuration](../../../../docs/en/reference/configuration.md#maybecode-search-and-language-servers).
+
 ```ts
 import { InMemoryContext, May } from "@sortedyuan/may/core";
 import { KimiModel } from "@sortedyuan/providers/kimi";

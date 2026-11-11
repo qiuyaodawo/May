@@ -53,6 +53,9 @@
     "clean": "tsc -b --clean",
     "test": "pnpm run build && node --test test/*.test.mjs test/*/*.test.mjs",
     "test:integration": "pnpm run build && node --test test/anthropic/integration/*.test.mjs test/deepseek/integration/*.test.mjs test/gemini/integration/*.test.mjs test/request-recording/integration/*.test.mjs",
+    "test:integration:search": "pnpm run build && node --test test/search/integration/*.test.mjs",
+    "test:integration:openai": "pnpm run build && node --test --test-name-pattern=\"responses|chat\" test/search/integration/*.test.mjs",
+    "test:integration:gemini": "pnpm run build && node --test --test-name-pattern=\"Gemini|gemini\" test/gemini/integration/*.test.mjs test/search/integration/*.test.mjs",
     "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs test/*/*.test.mjs"
   },
   "dependencies": {

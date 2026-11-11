@@ -20,6 +20,7 @@ import {
   type ModelRequestValidationResult,
 } from "./validation.js";
 import type { ProviderModelSelection } from "./types.js";
+import { selectionWebSearch } from "./web-search.js";
 
 /** @experimental */
 export interface CapabilityValidatedModelOptions extends ModelRequestValidationOptions {
@@ -191,6 +192,7 @@ export class CapabilityValidatedModel implements Model {
       ...this.options,
       unknownPolicy: this.unknownPolicy,
       parameters: this.options.parameters ?? parameters,
+      serverTools: this.searchCapabilities(request),
     });
   }
   async *stream(request: ModelRequest, options: ModelStreamOptions): AsyncIterable<ModelEvent> {
@@ -225,7 +227,13 @@ export class CapabilityValidatedModel implements Model {
       if (!completed) throw new ModelProtocolError("Model stream ended without a response.completed event");
       verified = true;
     } finally {
-      this.resolver.recordVerification(this.selection, request, verified, responseValidated);
+      this.resolver.recordVerification(
+        this.selection,
+        request,
+        verified,
+        responseValidated,
+        this.searchCapabilities(request).map((key) => `serverTools.${key}` as const),
+      );
     }
   }
   private validate(
@@ -240,6 +248,13 @@ export class CapabilityValidatedModel implements Model {
     return request.responseFormat === undefined && this.responseFormat !== undefined
       ? { ...request, responseFormat: this.responseFormat }
       : request;
+  }
+  private searchCapabilities(request: ModelRequest): ("webSearch" | "webSearchWithFunctions")[] {
+    const search = selectionWebSearch(this.selection);
+    const enabled =
+      (search !== undefined && search !== false) ||
+      (this.selection.adapter === "openai-chat-completions" && this.selection.model === "gpt-5-search-api");
+    return enabled ? ["webSearch", ...(request.tools.length > 0 ? ["webSearchWithFunctions" as const] : [])] : [];
   }
 }
 /** @experimental */

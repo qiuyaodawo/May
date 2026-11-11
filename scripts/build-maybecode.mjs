@@ -24,6 +24,7 @@ await build({
   external: [
     "@sortedyuan/may",
     "@sortedyuan/coding-tools",
+    "@sortedyuan/lsp-tools",
     "@sortedyuan/web-ui",
     "@sortedyuan/media",
     "@napi-rs/keyring",

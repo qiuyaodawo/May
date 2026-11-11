@@ -6,6 +6,7 @@ import { requireObject, requirePositiveIntegerOption, requireString } from "./in
 import { assertTextWithinLimit } from "./text-file.js";
 import { resolveWritableWorkspacePath } from "./workspace-path.js";
 import { assertFileExistence, type WorkspaceFileGuard } from "./guard.js";
+import type { WorkspaceFileFeedback, WorkspaceFileFeedbackResult } from "./file-feedback.js";
 
 /** @experimental */
 export const DEFAULT_WRITE_MAX_BYTES = 1024 * 1024;
@@ -17,6 +18,7 @@ export interface WriteToolOptions {
   readonly allowHardLinks?: boolean;
   /** 宿主守卫：在同一把文件锁内完成检查与写入。 */
   readonly guard?: WorkspaceFileGuard;
+  readonly fileFeedback?: WorkspaceFileFeedback;
 }
 
 /** @experimental */
@@ -29,6 +31,7 @@ export interface WriteToolInput {
 export interface WriteToolOutput {
   readonly path: string;
   readonly bytesWritten: number;
+  readonly diagnostics?: WorkspaceFileFeedbackResult["diagnostics"];
 }
 
 /** @experimental */
@@ -66,18 +69,20 @@ export function createWriteTool(options: WriteToolOptions): Tool<WriteToolInput,
         await mkdir(dirname(file.absolute), { recursive: true });
         context.signal.throwIfAborted();
         await atomicWriteText(file.absolute, input.content, context.signal);
-        return { output: { path: file.relative, bytesWritten }, content: input.content };
+        const ticket = options.fileFeedback?.record(file, input.content);
+        return { output: { path: file.relative, bytesWritten }, content: input.content, ticket };
       };
-      if (options.guard === undefined) return (await write()).output;
-      const exists = await assertFileExistence(file, context.signal);
-      return (
-        await options.guard<{ readonly output: WriteToolOutput; readonly content: string }>({
-          tool: "write",
-          path: file,
-          exists,
-          run: write,
-        })
-      ).output;
+      const result =
+        options.guard === undefined
+          ? await write()
+          : await options.guard({
+              tool: "write",
+              path: file,
+              exists: await assertFileExistence(file, context.signal),
+              run: write,
+            });
+      if (result.ticket === undefined) return result.output;
+      return { ...result.output, ...(await result.ticket.result(context.signal)) };
     },
   };
 }

@@ -14,7 +14,12 @@ import type { ContextBudget, ContextCompactionStrategy } from "@sortedyuan/may/c
 import { omitUndefined, type Model, type Tool, type TraceAttributes } from "@sortedyuan/may/core";
 import type { SkillRegistry } from "@sortedyuan/may/skills";
 import { SubagentHost } from "./subagent-host.js";
-import type { CodingExecutionEnvironment, FetchToolOptions } from "@sortedyuan/coding-tools";
+import type {
+  CodingExecutionEnvironment,
+  FetchToolOptions,
+  WorkspaceFileFeedback,
+  WorkspaceFileGuard,
+} from "@sortedyuan/coding-tools";
 import { SharedWorkspaceFileGuard } from "./subagent-files.js";
 import { withRequestBudget } from "./subagent-budget.js";
 import {
@@ -48,6 +53,8 @@ export function createWorkspaceFilesPlugin(options: {
   readonly defaultTools?: boolean;
   readonly execution?: CodingExecutionEnvironment;
   readonly fetch?: FetchToolOptions;
+  readonly fileFeedback?: WorkspaceFileFeedback;
+  readonly toolFactories?: Readonly<Record<string, (guard: WorkspaceFileGuard) => Tool>>;
 }) {
   return definePlugin({
     id: "may.workspace-files",
@@ -58,7 +65,12 @@ export function createWorkspaceFilesPlugin(options: {
     setup(context) {
       const guard = new SharedWorkspaceFileGuard(
         resolve(options.workspace),
-        omitUndefined({ execution: options.execution, fetch: options.fetch }),
+        omitUndefined({
+          execution: options.execution,
+          fetch: options.fetch,
+          fileFeedback: options.fileFeedback,
+          toolFactories: options.toolFactories,
+        }),
       );
       context.provide(workspaceFilesService, guard);
       if (options.defaultTools !== false) {

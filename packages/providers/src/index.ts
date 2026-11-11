@@ -7,6 +7,7 @@ export * from "./registry.js";
 export * from "./retrying-model.js";
 export * from "./selection.js";
 export * from "./types.js";
+export type { WebSearchOptions } from "./web-search.js";
 
 export * from "./anthropic/index.js";
 export * from "./deepseek/index.js";

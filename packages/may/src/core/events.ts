@@ -1,4 +1,4 @@
-import type { AssistantMessage, ContentPart, ToolCall, Usage, UserMessage } from "./types.js";
+import type { AssistantMessage, ContentPart, ServerToolCall, ToolCall, Usage, UserMessage } from "./types.js";
 import type { RunBudgetSnapshot } from "./budget.js";
 
 /** @public */
@@ -31,6 +31,7 @@ export type MayEventPayload =
   | { type: "input.received"; step: number; messages: readonly UserMessage[] }
   | { type: "input.generated"; step: number; messages: readonly UserMessage[]; reason: string }
   | { type: "model.started"; step: number }
+  | { type: "model.server_tool.updated"; step: number; call: ServerToolCall }
   | { type: "model.text.delta"; step: number; delta: string }
   | { type: "model.reasoning.delta"; step: number; delta: string }
   | {
@@ -70,12 +71,14 @@ export type MayEventPayload =
       output: unknown;
       /** 本次执行提供给模型的内容，供持久化和恢复使用。 */
       content: ContentPart[];
+      usage?: Usage;
     }
   | {
       type: "tool.failed";
       step: number;
       call: ToolCall;
       error: SerializedError;
+      usage?: Usage;
     }
   | { type: "run.completed"; result: RunResult }
   | { type: "run.yielded"; result: RunResult }
@@ -115,6 +118,7 @@ export function isStreamingMayEvent(event: MayEvent): boolean {
   return (
     event.type === "model.text.delta" ||
     event.type === "model.reasoning.delta" ||
+    event.type === "model.server_tool.updated" ||
     event.type === "tool.output.delta" ||
     event.type === "tool.progress"
   );

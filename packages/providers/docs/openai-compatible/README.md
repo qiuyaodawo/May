@@ -2,6 +2,18 @@
 
 An OpenAI-compatible Chat Completions model adapter and shared protocol helpers.
 
+## Web search
+
+`OpenAIChatCompletionsModel` accepts `webSearch` with `searchContextSize` and
+`userLocation`, serialized as `web_search_options`. Enabling it requires the
+exact model `gpt-5-search-api`; that model searches on every reply even when
+options are omitted and rejects `webSearch: false`. Other models leave search
+disabled by default. Streamed URL annotations become text `citations` with
+UTF-16 ranges. Search call records are unavailable through this protocol;
+usage is marked partial with `web-search-usage-unreported` for the search model.
+Function calls preserve original arguments in `ToolCall.rawInput`. See
+[configuration](../../../../docs/en/reference/configuration.md#server-search).
+
 The package provides `OpenAIChatCompletionsModel` plus:
 
 - May message and tool conversion;

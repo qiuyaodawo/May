@@ -10,6 +10,52 @@
 通过 `MaybeCodeApplicationOptions.tools` 提供的自定义工具注册到应用工具目录。
 运行指令使用同一个目录描述当前环境。
 
+## 配置网页搜索
+
+通过 Provider 或模型的 `options.webSearch: {}` 启用服务端搜索；智谱需要
+`{ "searchEngine": "search_std" }`。支持的字段和 adapter 限制见
+[配置参考](../reference/configuration.md#服务端搜索)。该配置授权服务端执行，
+包括由 `allowedCallers` 或搜索版本默认值选择的 Anthropic code execution。
+`/model` 显示当前搜索方式。
+
+宿主搜索通过 `apps.maybecode.webSearch.hostTool` 设置
+`{ "backend": "deepseek", "provider": "deepseek" }`，引用已配置凭据的 Provider。
+支持 `deepseek`、`zhipu`（需要 `searchEngine`）和 `kimi-formula` 后端。
+每次 Run 开始时，服务端搜索优先；其他情况下 MaybeCode 提供宿主工具。
+Formula 工具要求使用 `kimi-chat`。宿主搜索请求审批并记录用量。
+设置 `apps.maybecode.webSearch: false` 可以关闭搜索，此时选择每次回复都会搜索的模型将失败。
+
+## 配置语言服务器
+
+将 `apps.maybecode.lsp.servers` 设置为 `{ "typescript": {}, "python": {} }`，
+即授权这些服务器进程。使用工具前，在项目内或 PATH 中安装对应程序：
+
+```sh
+npm install -g typescript-language-server typescript
+npm install -g pyright
+rustup component add rust-analyzer rust-src
+go install golang.org/x/tools/gopls@latest
+```
+
+根据配置的 `typescript`、`python`、`rust` 或 `go` 预设选择对应命令。
+May 要求 Node.js 22.16.0 或更高版本；安装的语言服务器还有各自的运行环境要求。
+服务器在首次使用时启动。容器执行要求镜像或工作区包含服务器命令、运行环境和
+缓存的项目依赖。参阅 [LSP 工具](../../../packages/tools/lsp/README.zh-CN.md)。
+
+`/lsp` 显示解析后的命令、状态、进度、最近错误和 stderr。
+`/lsp restart <id>` 停止服务器并清除连续退出造成的失败状态，下一次请求再次启动服务器。
+省略 `lsp` 或设置为 `false` 时关闭相关工具。配置的服务器提供诊断、定义、引用、
+hover、文档符号、工作区符号和重命名功能。位置使用从 1 开始的行号和 UTF-16 列号，
+也可以提供准确的符号和可选的出现次数。重命名审批显示所有修改文件；
+计划生成后文件发生变化时，在写入之前报告冲突。
+
+edit 和 write 默认返回诊断；`lsp.editDiagnostics: false` 关闭该反馈。
+只有 `complete` 且列表为空时，才能确认当前版本没有报告问题。
+`pending` 表示等待诊断，`unknown` 表示诊断没有版本号，
+`unavailable` 表示文件已经写入成功，随后诊断反馈发生错误。
+`lsp_diagnostics` 可以请求更新结果。子 Agent 角色可以选择已注册的 `lsp_*`
+和宿主 `web_search` 工厂；team 的各个 worktree 使用独立执行环境和语言服务器管理器。
+
 ## 启动应用
 
 对于 `anthropic-messages` adapter，MaybeCode 默认使用
@@ -18,7 +64,7 @@
 1.25 倍，一小时写入为 2 倍，读取通常为 0.1 倍。最小缓存长度取决于模型，参阅
 [配置说明](../reference/configuration.md)。兼容端点拒绝 `cache_control` 时需要关闭缓存。
 
-MaybeCode 要求 Node.js 22 或更新版本。
+MaybeCode 要求 Node.js 22.16.0 或更新版本。
 
 在 May 仓库根目录执行：
 

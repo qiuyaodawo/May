@@ -8,8 +8,8 @@
     },
     {
       "heading": "Package reference",
-      "en": "7fd8288156d4eddc6ea62f5d8febf48cd88964356613854216fa644bbaa25d4c",
-      "zh": "00d7fd095784360c1b874aa6bd921c58c4678504be321d6725649476eea87c2a"
+      "en": "8ecfaf03cdac6bd825c6f52ea0caf0744a8937271fc5088329bf244cc1600021",
+      "zh": "41d711c92dea192fe905bdef1a1ec7506bba3fd8c2fa8c4ec2089ad8aa4b8ede"
     },
     {
       "heading": "Choose a package for your task",
@@ -38,8 +38,8 @@
     },
     {
       "heading": "@sortedyuan/coordination",
-      "en": "d692047d292d2c90b21d79ba630fa852422de6cb392d777578ba62ec1cb7f676",
-      "zh": "6b0a4f91a9599e494a5251eab30623b100a97a1a3c1d0e918661ddee85aed9c0"
+      "en": "8ab50f3734143d478442153b2468e08ba08c0a2034d79bd89e4bf183ea35af32",
+      "zh": "a8187ed8da97cb040df7bdb2cb54e1cd19fd59af7703da9bebd928c675da09ac"
     },
     {
       "heading": "@sortedyuan/may/goals",
@@ -132,6 +132,11 @@
       "zh": "52e8cec2dc31bface270b06f916037412f6648a33208abe3b7d512e7b2025302"
     },
     {
+      "heading": "@sortedyuan/lsp-tools",
+      "en": "7292335b621007c31bfaf777fddba5f92d8885d8dd6cf9fc4790b3781fe6b787",
+      "zh": "3c77054994cf5ba64842cf8391b8818502a20d1fe820ee96a65261a9609a7879"
+    },
+    {
       "heading": "@sortedyuan/may/session/tools",
       "en": "c774fb95fe22f9938b1f068d734eea1608a20e52327c0de1dc17ed92b9e638e2",
       "zh": "9ae41d3847b2ca1c7d93c4f52e5eb5fa80e35e2af84725076ab0518b4cca81d1"
@@ -163,8 +168,8 @@
     },
     {
       "heading": "Reference products",
-      "en": "4865fe4ece45cf96e0e7f3a867d0acd1531326e62609e8ebc178b7b136980e8d",
-      "zh": "dea56f553cdb165c41a687705287531e2d7a1a6ff3867589dcb51bf547ef27f2"
+      "en": "81fdcc75da54d191485e8d38ba01c2c791885bb824060b5a2cd35e52dd43f0b2",
+      "zh": "eb87ac0fccfe21c35bb69811a5dda044e4052204336f67f61609518b8336b41c"
     }
   ]
 }

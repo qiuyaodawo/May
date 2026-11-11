@@ -5,12 +5,31 @@
 ```ts
 
 import type { ContentPart } from '@sortedyuan/may/core';
+import { SessionToolPresentation } from '@sortedyuan/may/session';
 import { SessionToolStatus } from '@sortedyuan/may/session';
 import type { ToolCall } from '@sortedyuan/may/core';
 import { ToolChangePreview } from '@sortedyuan/coding-tools/change-preview';
 
 // @public
+export function codingChangePresentation(preview: ToolChangePreview): ToolPresentationProjection;
+
+// @public
+export type CodingToolPresentation = {
+    readonly type: "change";
+    readonly preview: ToolChangePreview;
+} | {
+    readonly type: "rename";
+    readonly previews: readonly ToolChangePreview[];
+};
+
+// @public
+export function createCodingToolPresentationProjector(): ToolPresentationProjector;
+
+// @public
 export function createCodingToolRendererRegistry(): ToolRendererRegistry;
+
+// @public
+export function readCodingToolPresentation(item: ToolTranscriptItem): CodingToolPresentation | undefined;
 
 // @public (undocumented)
 export function renderDiff(diff: string, theme: TuiTheme): TextDocumentLine[];

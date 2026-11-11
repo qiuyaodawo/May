@@ -8,6 +8,7 @@ import { createGlobTool } from "./glob.js";
 import { createGrepTool } from "./grep.js";
 import { createFetchTool, type FetchToolOptions } from "./fetch.js";
 import type { CodingExecutionEnvironment } from "./execution.js";
+import type { WorkspaceFileFeedback } from "./file-feedback.js";
 
 /** @experimental */
 export type CodingToolName = "read" | "shell" | "edit" | "write" | "glob" | "grep" | "fetch";
@@ -23,6 +24,7 @@ export interface CodingToolsOptions {
   readonly write?: Omit<WriteToolOptions, "cwd">;
   /** 宿主守卫：读取、修改与写入都在同一把文件锁内完成。 */
   readonly guard?: WorkspaceFileGuard;
+  readonly fileFeedback?: WorkspaceFileFeedback;
 }
 
 /** @experimental */
@@ -43,9 +45,19 @@ export function createCodingTool(name: CodingToolName, options: CodingToolsOptio
     case "fetch":
       return createFetchTool(options.fetch ?? {});
     case "edit":
-      return createEditTool({ cwd: options.cwd, ...options.edit, ...guardOf(options) });
+      return createEditTool({
+        cwd: options.cwd,
+        ...omitUndefined({ fileFeedback: options.fileFeedback }),
+        ...options.edit,
+        ...guardOf(options),
+      });
     case "write":
-      return createWriteTool({ cwd: options.cwd, ...options.write, ...guardOf(options) });
+      return createWriteTool({
+        cwd: options.cwd,
+        ...omitUndefined({ fileFeedback: options.fileFeedback }),
+        ...options.write,
+        ...guardOf(options),
+      });
   }
 }
 

@@ -13,3 +13,12 @@ export class ProviderConfigurationError extends ProviderAdapterRegistryError {
     this.name = "ProviderConfigurationError";
   }
 }
+
+/** @experimental */
+export class ServerToolStateMismatchError extends Error {
+  readonly code = "SERVER_TOOL_STATE_MISMATCH";
+  constructor() {
+    super("Continue unfinished server tools with the same adapter, model, baseURL and server tool configuration");
+    this.name = "ServerToolStateMismatchError";
+  }
+}

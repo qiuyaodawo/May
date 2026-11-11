@@ -31,7 +31,10 @@ import { GoalBudget } from '@sortedyuan/may/goals';
 import type { GoalController } from '@sortedyuan/may/goals';
 import { GoalEvent } from '@sortedyuan/may/goals';
 import { GoalState } from '@sortedyuan/may/goals';
-import { loadMayConfig } from '@sortedyuan/may/config';
+import type { LanguageServerDefinition } from '@sortedyuan/lsp-tools';
+import { LanguageServerManager } from '@sortedyuan/lsp-tools';
+import type { LanguageServerManagerOptions } from '@sortedyuan/lsp-tools';
+import type { loadMayConfig } from '@sortedyuan/may/config';
 import { LoadMayConfigOptions } from '@sortedyuan/may/config';
 import { MaybeCodeConfigError } from '@sortedyuan/coordination/delegation';
 import type { MaybeCodeDelegationEvent } from '@sortedyuan/coordination/delegation/types';
@@ -295,6 +298,8 @@ export interface MaybeCodeModelInfo {
     readonly profile?: string;
     // (undocumented)
     readonly provider: string;
+    // (undocumented)
+    readonly searchStatus?: string;
 }
 
 // @public (undocumented)
@@ -310,6 +315,8 @@ export interface MaybeCodeModelProfile {
     // (undocumented)
     readonly provider: string;
     readonly reasoningEffort?: string;
+    // (undocumented)
+    readonly searchStatus?: string;
 }
 
 // @public (undocumented)
@@ -348,9 +355,7 @@ export { MaybeCodeRun }
 export type MaybeCodeSessionEvent = {
     type: "workspace.git.changed";
     checkpoint: GitCheckpoint;
-} | GoalEvent | MaybeCodeDelegationEvent | Exclude<AgentApplicationEvent, {
-    type: "tool.presentation";
-}> | {
+} | GoalEvent | MaybeCodeDelegationEvent | AgentApplicationEvent | {
     type: "change.preview";
     runId: string;
     step: number;

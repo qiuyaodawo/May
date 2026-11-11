@@ -2,6 +2,24 @@
 
 [English](../../en/architecture/runtime-session.md) | **简体中文**
 
+## 服务端工具继续请求
+
+assistant 消息携带 `continuation: "server-tool-pause"` 时，完成当前 Step，
+随后发起下一次模型请求。每次继续请求计入 `maxSteps` 和 `maxModelCalls`。
+`maxServerToolContinuations` 默认为连续暂停 8 次，超过时抛出
+`ServerToolContinuationLimitError`。Session 保留暂停的 assistant 消息，
+后续 `continue()` 可以继续处理。
+
+暂停边界跳过 steering 输入读取和结束 hook。客户端工具完成后，存在 pending
+`serverToolCalls` 的 Step 同样保留 steering 输入。宿主 `shouldYield` 可以在
+Step 完成边界交还控制。`model.completed` 为继续请求和回放提供持久化检查点。
+
+Context 压缩和裁剪保留从未完成交互的 assistant 消息开始的全部消息；自动压缩等待交互完成。
+adapter 回传 pending 状态前检查原始 adapter、模型、端点和服务端工具配置，
+发生变化时抛出 `ServerToolStateMismatchError`。MaybeCode 要求完成该交互后才能切换模型。
+
+## 资源管理
+
 本文说明 Agent 执行、对话状态和应用资源分别由哪些模块管理。
 设计扩展或检查可复用包与产品之间的依赖时，可以依据这些职责选择位置。
 
@@ -58,15 +76,25 @@ flowchart LR
   MCP --> Core
   Apps --> TUI["@sortedyuan/tui"]
   TUI --> Core
-  TUI --> Terminal[coding-tools / media]
+  TUI --> CodingTools["@sortedyuan/coding-tools"]
+  TUI --> Media["@sortedyuan/media"]
   Apps --> Providers["@sortedyuan/providers"]
   Providers --> Core
   Apps --> Gateway["@sortedyuan/gateway"]
   Gateway --> Application
+  Apps --> Coordination["@sortedyuan/coordination"]
+  Coordination --> Application
+  Coordination --> CodingTools
+  Coordination --> MCP
+  Eval["@sortedyuan/eval"] --> Coordination
+  Eval --> Observability
 ```
 
 图中显示部分模块的依赖方向，完整安装依赖以各包的 `package.json` 为准。
 可复用模块依赖公开框架接口，产品组合位于 `apps`。
+`@sortedyuan/coordination` 只在 `delegation` 系列子路径中引入 `@sortedyuan/coding-tools`
+和 `@sortedyuan/mcp`。这两个包是 `@sortedyuan/coordination` 的安装依赖，
+安装 `@sortedyuan/eval` 时也会一同安装。
 
 ### `@sortedyuan/may/core`
 
@@ -218,6 +246,12 @@ Application 包提供位于 Session 与 Core 之上的独立于 UI 的编排。
 摘要和 FIFO 状态迁移队列。产品可以通过 `transitionApplication` 在同一 Session 上
 重建活动 Application，或用 `runStateTransition` 串行化产品自有配置操作。
 
+`git-workspace.ts` 通过 `@sortedyuan/may/application/git-workspace` 子路径提供
+`ProjectGitWorkspace`，为 Node.js 宿主管理项目的 Git 检查点、diff、恢复预览和已登记的
+worktree。该文件只引入 `core` 和 `storage`；其他 application 模块的运行与它无关，
+何时提交、何时创建 worktree 由宿主决定。
+参阅 [Git 工作区与文件检查点](../guides/git-workspaces.md)。
+
 这些类提供排序和依赖注入接口。进程级 Agent-definition 注册表、Provider
 注册表、Definition 序列化、系统提示内容、编码权限策略、模型配置、UI 命令和终端渲染由产品提供。
 Definition 会保存工具集合快照，不会克隆调用方拥有的模型、Context 工厂、
@@ -238,6 +272,12 @@ Agent 层消费 Core、权限与 Session 事件并构建保留式对话视图，
 `@sortedyuan/tui/transcript` 和 `@sortedyuan/tui/tool-renderers` 暴露。产品标签、提示、布局、命令
 和控制器调用仍由应用提供。图形或远程 UI 可以直接消费与 UI 无关的控制器。
 
+`TranscriptStore` 把每条 `tool.presentation` 记录交给 `ToolPresentationProjector`，
+并把返回值保存到工具条目的 `presentation` 字段，由工具渲染器解释这个值。
+`@sortedyuan/tui/tool-renderers` 中的标准编码 projector 和编码渲染器使用
+`@sortedyuan/coding-tools/change-preview` 解码变更预览；它们是 `TranscriptStore` 和
+`TranscriptView` 的默认配置。需要显示其他格式的应用提供自己的 projector 和渲染器注册表。
+
 ### `apps/maybecode`
 
 MaybeCode 负责产品组合。它选择和配置可复用包，使用
@@ -254,7 +294,9 @@ Workspace 生命周期交给 `@sortedyuan/may/application`，使用 `@sortedyuan
 - 可选的本地追踪配置，以及共享处理器的生命周期管理；
 - 可选的 stdio / Streamable HTTP MCP 配置，以及共享客户端池的生命周期管理；
 - 斜杠命令、产品事件、主题、页面布局、模型与 Session 选择流程，以及 `retained`
-  终端行为。
+  终端行为；
+- `team` 命令：基于 `@sortedyuan/coordination` 的计划、相互独立的任务工作区、验证、
+  补丁审查和恢复。
 
 `MaybeCodeApplication` 围绕一个 `AgentApplication` 提供产品组合，并通过 `agent` 字段
 公开它。它增加 Goal、子 Agent 请求、Git 检查点、模型更新和输入串行处理，并将通用
@@ -273,6 +315,15 @@ MaybeCode 渲染和命令策略由相应前端提供。
 和已保存的身份，`session-navigation.ts` 生成分支位置视图，`workspace-state.ts`
 定义内部共享状态类型。
 
+`team.ts` 是 `team` 命令的入口。它读取已保存的 manifest 版本，为版本 2 的 team 加载
+`team-v2.ts`，为版本 1 的 team 加载 `team-v1.ts`。`team-v1.ts` 保留版本 1 的
+`resume`、`status` 和 `cancel` 操作。`team-v2.ts` 运行版本 2 的 team：`team-plan.ts`
+负责计划和预设，`team-verification.ts` 负责报告、检查和验收，`team-patches.ts` 负责
+补丁的创建、审查和应用，`team-recovery.ts` 负责检查状态和重试决定。
+`team-execution.ts` 管理任务工作区的执行环境和语言服务器。`team-common.ts` 保存命令
+依赖和两个版本共用的 `list_files` 工具。
+参阅 [MaybeCode 团队](../guides/maybecode-team.md)。
+
 ### `apps/maybeclaw`
 
 `gateway.ts` 组合渠道 Gateway，继续管理执行队列、取消、关闭、恢复和通知顺序。
@@ -284,6 +335,13 @@ MaybeCode 渲染和命令策略由相应前端提供。
 和会话，`gateway/maintenance.ts` 执行维护和 adapter 清理。`gateway/permissions.ts` 管理
 权限规则，`gateway/adapters.ts` 解析 adapter 并准备 binding。这些模块使用内部所有者接口，
 可变状态继续由 `AgentGateway` 持有。
+
+`gateway-run.ts` 解析命令行，启动 Gateway 或者调用已运行的 Gateway。`gateway-host.ts`
+定义 `GatewayHost`，负责启动渠道 adapter 和插件宿主并运行交付循环。
+`gateway-repository.ts` 定义 `GatewayRepository`，在同一个 SQLite 事务中写入相关的
+Gateway 记录和渠道记录。`gateway-ui.ts` 定义 `GatewayUiHost`，它是向
+`@sortedyuan/ui-client` 提供 Gateway 会话的 `UiHost`。`gateway-browser.ts` 包含基于
+`@sortedyuan/web-ui` 的浏览器登录和管理界面。
 
 ## 事件与持久化
 

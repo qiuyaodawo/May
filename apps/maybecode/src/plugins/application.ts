@@ -1,8 +1,9 @@
 import type { AnyPlugin } from "@sortedyuan/may/plugin";
-import type { CodingExecutionEnvironment } from "@sortedyuan/coding-tools";
+import type { CodingExecutionEnvironment, WorkspaceFileGuard } from "@sortedyuan/coding-tools";
+import { createLspTools, type LanguageServerManager } from "@sortedyuan/lsp-tools";
 import type { ContextBudget } from "@sortedyuan/may/context";
 import { InMemoryContextFactory } from "@sortedyuan/may/context";
-import { omitUndefined, type UserMessage } from "@sortedyuan/may/core";
+import { omitUndefined, type Context, type Tool, type UserMessage } from "@sortedyuan/may/core";
 import type { McpClientPool } from "@sortedyuan/mcp";
 import { applicationHooks, contextBudgetFromModel, withDefaultCompactionThreshold } from "@sortedyuan/may";
 import { services, type ModelInfo } from "@sortedyuan/may/services";
@@ -10,13 +11,14 @@ import { mcpService } from "@sortedyuan/mcp/plugin";
 import { createModelPlugin } from "@sortedyuan/may/services/models";
 import { createPermissionPlugin } from "@sortedyuan/may/services/permissions";
 import { createSkillsPlugin } from "@sortedyuan/may/services/skills";
-import { createContextPlugin, createToolsPlugin } from "@sortedyuan/may/services/runtime";
+import { createContextPlugin, createContextWrapperPlugin, createToolsPlugin } from "@sortedyuan/may/services/runtime";
 import { createGoalsPlugin, goalsService } from "@sortedyuan/may/goals/plugin";
 import { createHistoryMemoryPlugin, historyMemoryService } from "@sortedyuan/may/history-memory";
 import {
   createDelegationPlugin,
   createWorkspaceFilesPlugin,
   delegationService,
+  workspaceFilesService,
 } from "@sortedyuan/coordination/delegation";
 import { SkillRegistry } from "@sortedyuan/may/skills";
 import type { MaybeCodeApplicationOptions } from "../application.js";
@@ -42,6 +44,8 @@ export function createMaybeCodePlugins(
   environment: {
     readonly workspace: string;
     readonly execution: CodingExecutionEnvironment;
+    readonly lsp?: LanguageServerManager;
+    readonly onContext?: (context: Context) => void;
     readonly gitRequest: GitRequestController;
     readonly instructions: string;
     readonly contextBudget?: ContextBudget;
@@ -52,6 +56,19 @@ export function createMaybeCodePlugins(
 ): MaybeCodePluginComposition {
   const { workspace, instructions, contextBudget } = environment;
   const autoMode = options.autoCompactionMode ?? "prune-summary";
+  let searchTools: readonly Tool[] = [];
+  const lsp = environment.lsp;
+  const lspNames = lsp ? createLspTools(lsp).map((tool) => tool.name) : [];
+  const toolFactories: Record<string, (guard: WorkspaceFileGuard) => Tool> = {};
+  if (lsp)
+    for (const name of lspNames)
+      toolFactories[name] = (guard) => createLspTools(lsp, { guard }).find((tool) => tool.name === name)!;
+  if (options.toolSource || options.searchToolsForModel)
+    toolFactories.web_search = () => {
+      const tool = [...searchTools, ...(options.toolSource?.() ?? [])].find((item) => item.name === "web_search");
+      if (!tool) throw new Error("Host web_search is unavailable for the current model");
+      return tool;
+    };
   let hasDelegation = false;
   let modelInfo: ModelInfo | undefined;
   let mcp: McpClientPool | undefined;
@@ -75,11 +92,25 @@ export function createMaybeCodePlugins(
         }),
     }),
     createContextPlugin({ create: () => options.contextFactory ?? new InMemoryContextFactory() }),
+    createContextWrapperPlugin({
+      id: "maybecode.context-protection",
+      create: () => (factory) => ({
+        async create(input) {
+          const managed = await factory.create(input);
+          environment.onContext?.(managed.context);
+          return managed;
+        },
+      }),
+    }),
     createWorkspaceFilesPlugin({
       workspace,
       defaultTools: options.tools === undefined,
       execution: environment.execution,
-      ...omitUndefined({ fetch: options.fetch }),
+      toolFactories,
+      ...omitUndefined({
+        fetch: options.fetch,
+        fileFeedback: options.lsp && options.lsp.editDiagnostics !== false ? lsp?.fileFeedback : undefined,
+      }),
     }),
     createHistoryMemoryPlugin({
       mode: autoMode,
@@ -91,6 +122,28 @@ export function createMaybeCodePlugins(
       }),
     }),
   ];
+  const createSearchTools = options.searchToolsForModel;
+  if (createSearchTools)
+    defaults.push(
+      createToolsPlugin({
+        id: "maybecode.search",
+        create: async () => {
+          searchTools = await createSearchTools(options.modelInfo);
+          return () => searchTools;
+        },
+      }),
+    );
+  if (lsp)
+    defaults.push(
+      createToolsPlugin({
+        id: "maybecode.lsp",
+        requires: [{ service: workspaceFilesService }],
+        create: (context) => {
+          const tools = context.get(workspaceFilesService).create({ names: lspNames, requireRead: false }).tools;
+          return () => tools;
+        },
+      }),
+    );
   if (options.skills !== false)
     defaults.push(
       createSkillsPlugin({
@@ -183,7 +236,10 @@ export function createMaybeCodePlugins(
         ...(options.subagents ?? {}),
         beforeToolExecute: environment.gitRequest.beforeToolExecute,
         ...omitUndefined({
-          toolSource: options.toolSource,
+          toolSource:
+            options.toolSource === undefined
+              ? undefined
+              : () => [...options.toolSource!()].filter((tool) => tool.name !== "web_search"),
           contextBudget,
           compactionStrategy: options.compactionStrategy,
           maxSteps: options.maxSteps,

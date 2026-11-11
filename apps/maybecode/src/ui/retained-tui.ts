@@ -9,6 +9,7 @@ import {
   type RuntimeTerminal,
 } from "@sortedyuan/tui";
 import { TranscriptStore } from "@sortedyuan/tui/transcript";
+import { codingChangePresentation } from "@sortedyuan/tui/tool-renderers";
 import { omitUndefined } from "@sortedyuan/may/core";
 import type { ApprovalRequest } from "@sortedyuan/may/permissions";
 import { userInfo } from "node:os";
@@ -56,6 +57,7 @@ export async function runRetainedTerminalUI(
     for (const event of history)
       if (event.type === "tool.completed" && event.content) await images.prepare(event.content);
     store.loadHistory(history);
+    if (app.application.modelInfo?.searchStatus) store.appendNotice("info", app.application.modelInfo.searchStatus);
     for (const event of history) {
       if (event.type === "input.submitted" && event.inputId) displayedSteering.add(event.inputId);
       if (event.type === "input.steering.delivered")
@@ -427,7 +429,10 @@ function applyMaybeCodeEvent(store: TranscriptStore, event: MaybeCodeEvent): voi
       store.applyPermissionEvent(event.event);
       break;
     case "change.preview":
-      store.appendChangePreview(event.runId, event.step, event.toolCallId, event.preview);
+      store.attachToolPresentation(event.runId, event.step, event.toolCallId, codingChangePresentation(event.preview));
+      break;
+    case "tool.presentation":
+      store.appendToolPresentation(event.presentation);
       break;
     case "session.changed":
       store.reset(event.sessionId);
@@ -709,7 +714,7 @@ function modelLabel(app: MaybeCodeController, effort: MaybeCodeReasoningEffortSt
   if (info === undefined) return "unknown · effort: unknown";
   const endpoint = `${info.provider}/${info.model}`;
   const model = info.profile === undefined ? endpoint : `${info.profile} (${endpoint})`;
-  return `${model} · effort: ${reasoningEffortLabel(effort)}`;
+  return `${model} · effort: ${reasoningEffortLabel(effort)}${info.searchStatus ? ` · ${info.searchStatus}` : ""}`;
 }
 
 function reasoningEffortLabel(state: MaybeCodeReasoningEffortState | "loading"): string {

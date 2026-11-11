@@ -1,4 +1,5 @@
 import type { ContextSnapshot, Message, ModelContextCompactor } from "../core/index.js";
+import { pendingServerToolInteractionIndex } from "../core/index.js";
 
 import type { ContextInspection } from "./controller.js";
 
@@ -91,10 +92,19 @@ export class ModelContextCompactionStrategy implements ContextCompactionStrategy
     snapshot: Readonly<ContextSnapshot>,
     options: ContextCompactionOptions = {},
   ): Promise<ContextCompactionDetails> {
-    const result = await this.compactor.compact(snapshot, options);
+    const protectedIndex = pendingServerToolInteractionIndex(snapshot.messages);
+    const result = await this.compactor.compact(
+      {
+        ...snapshot,
+        messages: snapshot.messages.slice(0, protectedIndex),
+      },
+      options,
+    );
     return {
-      messages: result.messages,
-      ...(result.effectiveTokens === undefined ? {} : { effectiveTokens: result.effectiveTokens }),
+      messages: [...result.messages, ...(protectedIndex === undefined ? [] : snapshot.messages.slice(protectedIndex))],
+      ...(result.effectiveTokens === undefined || protectedIndex !== undefined
+        ? {}
+        : { effectiveTokens: result.effectiveTokens }),
       terminal: true,
     };
   }

@@ -11,6 +11,24 @@ See [Session, run, and step](./session-run-step.md) for lifecycle boundaries,
 [Runtime and session boundaries](../architecture/runtime-session.md) for the
 overall package design.
 
+## Server-tool updates and tool usage
+
+An adapter's `server_tool.updated` becomes
+`{ type: "model.server_tool.updated", step, call }` with the usual Run identity.
+It is a droppable streaming event. `model.completed.message.serverToolCalls`
+contains final call states, and text parts carry final `citations`. Reconcile
+calls by ID across messages, taking the latest state. Session persists the
+complete assistant message for replay.
+
+`tool.completed` and `tool.failed` may carry `usage`. Core obtains successful
+usage through `Tool.usage(output)` and failed usage through `ToolUsageError`,
+includes it in Run totals and budget checks, and Session
+retains it with the durable outcome. Search counts use `Usage.items` with
+`id: "web-search"`, `unit: "requests"`, and `includedIn: "none"`. Missing search
+counts or an unknown host-request outcome make usage partial. Configure an item
+price to include search in `maxCostUsd`; absent prices report
+`item-web-search-price-missing`.
+
 ## Event layers
 
 ### `ModelEvent`
@@ -135,6 +153,7 @@ are classified as streaming and may be discarded when a consumer falls behind:
 
 - `model.text.delta`;
 - `model.reasoning.delta`;
+- `model.server_tool.updated`;
 - `tool.output.delta`; and
 - `tool.progress`.
 
@@ -145,8 +164,8 @@ non-droppable event is retained even if that temporarily exceeds the target.
 
 Consequences for consumers:
 
-- gaps in a live Run's `seq` are expected under pressure and do not imply a
-  missing durable fact;
+- gaps in a live Run's `seq` are expected under pressure; read durable facts
+  from Session history;
 - deltas are suitable for responsive display, not exact transcript storage;
 - finalized assistant messages and tool terminal events should reconcile any
   partial UI state; and

@@ -32,6 +32,8 @@ export interface OpenAIChatCompletionsModelOptions {
     reasoningEffort?: OpenAIChatCompletionsReasoningEffort;
     // (undocumented)
     store?: boolean;
+    // (undocumented)
+    webSearch?: false | WebSearchOptions;
 }
 
 // @public
@@ -79,6 +81,8 @@ export interface OpenAICompatibleChatModelOptions {
     model: string;
     // (undocumented)
     reasoningEffort?: string;
+    // (undocumented)
+    webSearch?: false | WebSearchOptions;
 }
 
 // @public (undocumented)
@@ -109,6 +113,8 @@ export interface OpenAICompatibleChatRequest {
     tool_stream?: true;
     // (undocumented)
     tools?: OpenAICompatibleToolDefinition[];
+    // (undocumented)
+    web_search_options?: Readonly<Record<string, unknown>>;
 }
 
 // @public (undocumented)
@@ -117,6 +123,15 @@ export interface OpenAICompatibleChunk {
     choices?: Array<{
         index: number;
         delta?: {
+            annotations?: Array<{
+                type: string;
+                url_citation?: {
+                    url: string;
+                    title?: string;
+                    start_index: number;
+                    end_index: number;
+                };
+            }>;
             content?: string | null;
             refusal?: string | null;
             reasoning_content?: string | null;
@@ -125,6 +140,8 @@ export interface OpenAICompatibleChunk {
         finish_reason?: string | null;
     }>;
     error?: OpenAICompatibleStreamError | string | number | boolean | null;
+    // (undocumented)
+    id?: string;
     // (undocumented)
     usage?: {
         prompt_tokens?: number;
@@ -142,6 +159,15 @@ export interface OpenAICompatibleChunk {
         prompt_cache_hit_tokens?: number;
         prompt_cache_miss_tokens?: number;
     } | null;
+    // (undocumented)
+    web_search?: Array<{
+        title?: string;
+        link: string;
+        content?: string;
+        media?: string;
+        publish_date?: string;
+        refer?: string;
+    }>;
 }
 
 // @public
@@ -227,6 +253,8 @@ export interface OpenAICompatibleStreamOptions {
     // (undocumented)
     finishReasonError(finishReason: string): Error;
     // (undocumented)
+    origin?: ServerToolOrigin;
+    // (undocumented)
     protocolError(message: string, options?: ErrorOptions): Error;
     // (undocumented)
     providerName: string;
@@ -234,6 +262,10 @@ export interface OpenAICompatibleStreamOptions {
     requireDone?: boolean;
     // (undocumented)
     signal: AbortSignal;
+    // (undocumented)
+    webSearch?: boolean;
+    // (undocumented)
+    zhipu?: boolean;
 }
 
 // @public (undocumented)
@@ -262,16 +294,10 @@ export interface OpenAICompatibleToolCallDelta {
 }
 
 // @public (undocumented)
-export interface OpenAICompatibleToolDefinition {
-    // (undocumented)
-    function: {
-        name: string;
-        description: string;
-        parameters: Readonly<Record<string, unknown>>;
-    };
-    // (undocumented)
-    type: "function";
-}
+export type OpenAICompatibleToolDefinition = OpenAICompatibleFunctionDefinition | {
+    type: "web_search";
+    web_search: Readonly<Record<string, unknown>>;
+};
 
 // @public (undocumented)
 export type OpenAICompatibleUserContent = string | Array<{

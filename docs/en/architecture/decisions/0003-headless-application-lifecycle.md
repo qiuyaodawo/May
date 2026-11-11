@@ -33,7 +33,8 @@ composition is described in [ADR 0004](0004-agent-definitions-and-tool-registrie
 - Applications share ordering, cancellation, persistence and shutdown logic.
 - UIs can target `AgentController`-style headless contracts.
 - Core remains usable for ephemeral and fully custom runtimes.
-- Products still need a small composition wrapper when they map generic events
-  or expose named product strategies.
+- Products add their own composition classes around `AgentApplication` and
+  `AgentWorkspace` for product state and policy. MaybeCode's classes add goals,
+  sub-agent requests, Git checkpoints, model updates, worktrees and MCP operations.
 - `AgentDefinition` composes behavior separately from an application's Session
   storage and identity. See [building an Agent](../../guides/building-an-agent.md).

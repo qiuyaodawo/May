@@ -15,7 +15,7 @@ and release scope are governed by the repository's release configuration.
 
 `@sortedyuan/may` contains the framework modules listed below; install the package
 once and import the required subpaths. Providers, Gateway, integrations and UI
-retain their own packages. The release list contains 14 packages.
+retain their own packages. The release list contains 15 packages.
 
 ## Choose a package for your task
 
@@ -129,11 +129,18 @@ Delegation, messaging and handoff policies default to denial. Recovery reconcile
 unknown effects before scheduling more work. `resolveRecovery()` also accepts
 queued and waiting tasks before the runtime starts, when no execution is active.
 
-| Import path                           | Purpose                                                                   |
-| ------------------------------------- | ------------------------------------------------------------------------- |
-| `@sortedyuan/coordination`            | Runtime, graph builders, Agent adapters, policies and resource interfaces |
-| `@sortedyuan/coordination/file-store` | `FileCoordinationStore` local single-writer coordination journal          |
-| `@sortedyuan/coordination/remote`     | Remote leaf Worker, durable receipts and authenticated transport          |
+| Import path                           | Purpose                                                                                        |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `@sortedyuan/coordination`            | Runtime, graph builders, Agent adapters, policies and resource interfaces                      |
+| `@sortedyuan/coordination/file-store` | `FileCoordinationStore` local single-writer coordination journal                               |
+| `@sortedyuan/coordination/remote`     | Remote leaf Worker, durable receipts and authenticated transport                               |
+| `@sortedyuan/coordination/plugin`     | `createCoordinationPlugin` for task graph creation, restoration and release                    |
+| `@sortedyuan/coordination/delegation` | `createDelegationPlugin` and `createWorkspaceFilesPlugin` for child Agents and workspace files |
+
+The `delegation` entry also exposes the `host`, `budget`, `files`, `configuration`,
+`instructions` and `types` subpaths. Only the `delegation` entries import
+`@sortedyuan/coding-tools` and `@sortedyuan/mcp`; both are install dependencies of
+`@sortedyuan/coordination`. See [reusable plugin packages](../guides/plugins.md#reusable-plugin-packages).
 
 The main `@sortedyuan/coordination` entry exports `FileSharedBudget` for shared usage
 reservations and `FileArtifactStore` for
@@ -363,6 +370,27 @@ returns `N`. Earlier non-terminating errors remain in `stderr` when a later comm
 succeeds. See [Custom tools](../guides/custom-tool.md) for permission and isolation
 requirements.
 
+### `@sortedyuan/lsp-tools`
+
+`openLanguageServerManager` manages stdio servers for explicitly enabled
+TypeScript/JavaScript, Python, Rust, Go, and custom language definitions.
+`createLspTools` provides six read-only queries and `lsp_rename`.
+`createRenamePreview` prepares approval data. Managers own process shutdown,
+document synchronization, diagnostics, and durable rename recovery; close them
+before their execution environment. See the [package README](../../../packages/tools/lsp/README.md).
+
+Coding hosts can pass `manager.fileFeedback` to coding-tools edit/write options.
+Those tools return optional `diagnostics` after writing. `WorkspaceFileGuard.runMany`
+protects multi-file changes; `atomicWriteText` and `createTextChangePreview` are
+public helpers. Execution environments expose `cachePath`, `toEnvironmentPath`,
+`toHostPath`, and `spawn` with `stdin: "pipe"`; opening accepts `cacheDirectory`.
+
+For host web search, coding-tools exports `createWebSearchTool`,
+`createDeepSeekSearchBackend`, and `createZhipuSearchBackend`. These are separate
+from the seven default coding tools. Providers exports `createKimiFormulaTools`
+from its root and `/kimi`, using original `ToolCall.rawInput` for Formula calls.
+See [search and LSP configuration](configuration.md#maybecode-search-and-language-servers).
+
 ### `@sortedyuan/may/session/tools`
 
 The bounded, read-only `session_history` tool queries durable Session history.
@@ -436,7 +464,7 @@ terminal rendering and product commands.
 
 ## Reference products
 
-MaybeCode is included in the [14-package release list](../../../scripts/release-packages.json).
+MaybeCode is included in the [15-package release list](../../../scripts/release-packages.json).
 MaybeClaw, CLI and Eval CLI remain private workspace packages. See the
 [release guide](../guides/npm-release.md) for verification and publication steps.
 

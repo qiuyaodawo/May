@@ -1,5 +1,17 @@
 # `@sortedyuan/providers/openai`
 
+## Web search
+
+Set constructor `webSearch` or provider/model `options.webSearch` to `{}` to
+enable server search. It defaults to disabled and accepts `allowedDomains` or
+`blockedDomains` (mutually exclusive), `userLocation`, and `searchContextSize`.
+The request includes native `web_search` and source inclusion. Completed search
+calls become `serverToolCalls`; URL annotations become text `citations` with
+UTF-16 ranges. Native output remains in `modelState` for continuation. Search
+actions contribute `Usage.items` with `id: "web-search"` and `unit: "requests"`.
+This setting authorizes provider-side execution. See
+[configuration](../../../../docs/en/reference/configuration.md#server-search).
+
 Generated image output is represented as ordered `ContentPart` image entries.
 `openAIResponseContent(message)` reads presentation content from native output
 state when required. See [Image replies](../../../../docs/en/guides/images.md) /

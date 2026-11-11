@@ -9,6 +9,21 @@
 [Context 与持久化历史](context-and-history.md)，整体包结构见
 [Runtime 与 Session 边界](../architecture/runtime-session.md)。
 
+## 服务端工具更新与工具用量
+
+adapter 的 `server_tool.updated` 转换为
+`{ type: "model.server_tool.updated", step, call }`，并包含常规 Run 身份字段。
+该事件属于可以丢弃的流式事件。`model.completed.message.serverToolCalls`
+包含最终调用状态，text part 包含最终 `citations`。跨消息按照 ID 合并调用，
+使用最新状态。Session 保存完整 assistant 消息供回放使用。
+
+`tool.completed` 和 `tool.failed` 可以包含 `usage`。Core 通过 `Tool.usage(output)`
+读取成功用量，通过 `ToolUsageError` 读取失败用量，
+计入 Run 总用量和预算检查；Session 将其与持久化结果共同保存。
+搜索次数使用 `Usage.items`，其中 `id: "web-search"`、`unit: "requests"`、
+`includedIn: "none"`。搜索次数缺失或宿主请求结果未知时，用量标记为 partial。
+配置项目单价后，搜索计入 `maxCostUsd`；缺少价格时报告 `item-web-search-price-missing`。
+
 ## 事件层
 
 ### `ModelEvent`
@@ -114,6 +129,7 @@ Core、Session、AgentApplication 与 AgentWorkspace 使用有界事件转发队
 
 - `model.text.delta`；
 - `model.reasoning.delta`；
+- `model.server_tool.updated`；
 - `tool.output.delta`；
 - `tool.progress`。
 
@@ -123,7 +139,7 @@ Core、Session、AgentApplication 与 AgentWorkspace 使用有界事件转发队
 
 对消费者的影响：
 
-- 压力下实时 Run 的 `seq` 出现缺口是预期行为，不代表缺少持久化事实；
+- 压力下实时 Run 的 `seq` 可以出现缺口，持久化事实通过 Session 历史读取；
 - 增量内容适合响应式展示，精确对话记录应使用完整消息；
 - 完整助手消息和工具结束事件应校正任何部分 UI 状态；
 - 持久化历史与 UI 是否消费每个实时值无关。

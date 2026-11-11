@@ -1,4 +1,4 @@
-import type { ContentPart, JsonSchema, ToolCall } from "./types.js";
+import type { ContentPart, JsonSchema, ToolCall, Usage } from "./types.js";
 import type { TraceContext } from "./tracing.js";
 
 /** @experimental */
@@ -22,6 +22,7 @@ export interface ToolExecutionContext {
   runId: string;
   step: number;
   toolCallId: string;
+  rawInput?: string;
   idempotencyKey: string;
   signal: AbortSignal;
   /** Current tool-call span for explicitly propagated instrumentation. */
@@ -44,6 +45,9 @@ export interface Tool<TInput = unknown, TOutput = unknown> {
   parse?(input: unknown): TInput | Promise<TInput>;
 
   execute(input: TInput, context: ToolExecutionContext): Promise<TOutput>;
+
+  /** Reports successful execution usage charged to the Run. */
+  usage?(output: TOutput): Usage | undefined;
 
   /** Optional model-visible projection; raw output remains in tool events. */
   resultContent?(output: TOutput): ContentPart[];

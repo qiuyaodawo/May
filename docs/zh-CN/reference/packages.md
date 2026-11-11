@@ -12,7 +12,7 @@ pnpm `12.4.2`。公开 API 和持久化格式的稳定性见
 安装和发布范围由仓库的发布配置管理。
 
 `@sortedyuan/may` 包含下列框架模块；安装一次即可通过公开子路径导入所需能力。
-Providers、Gateway、外部集成与 UI 使用各自的包。发布清单包含 14 个包。
+Providers、Gateway、外部集成与 UI 使用各自的包。发布清单包含 15 个包。
 
 ## 根据任务选择 package
 
@@ -116,11 +116,18 @@ restore 和 worktree 类型，用于宿主控制的 Git 操作。参阅
 Runtime 尚未启动且没有活动执行时，`resolveRecovery()` 也接受 queued 和 waiting
 任务。
 
-| 导入路径                              | 用途                                               |
-| ------------------------------------- | -------------------------------------------------- |
-| `@sortedyuan/coordination`            | Runtime、任务图构造、Agent adapter、策略和资源接口 |
-| `@sortedyuan/coordination/file-store` | `FileCoordinationStore` 本地单写入者协作日志       |
-| `@sortedyuan/coordination/remote`     | 远程叶子 Worker、持久化回执和鉴权传输              |
+| 导入路径                              | 用途                                                                                |
+| ------------------------------------- | ----------------------------------------------------------------------------------- |
+| `@sortedyuan/coordination`            | Runtime、任务图构造、Agent adapter、策略和资源接口                                  |
+| `@sortedyuan/coordination/file-store` | `FileCoordinationStore` 本地单写入者协作日志                                        |
+| `@sortedyuan/coordination/remote`     | 远程叶子 Worker、持久化回执和鉴权传输                                               |
+| `@sortedyuan/coordination/plugin`     | `createCoordinationPlugin`，负责任务图的创建、恢复和释放                            |
+| `@sortedyuan/coordination/delegation` | `createDelegationPlugin` 和 `createWorkspaceFilesPlugin`，提供子 Agent 和工作区文件 |
+
+`delegation` 入口还提供 `host`、`budget`、`files`、`configuration`、`instructions` 和
+`types` 子路径。只有 `delegation` 系列入口引入 `@sortedyuan/coding-tools` 和
+`@sortedyuan/mcp`；这两个包是 `@sortedyuan/coordination` 的安装依赖。
+参阅[可复用插件 package](../guides/plugins.md#可复用插件-package)。
 
 主入口 `@sortedyuan/coordination` 导出的 `FileSharedBudget` 管理共享用量预留，
 `FileArtifactStore` 保存不可变且限定作用域的文本产物。
@@ -324,6 +331,26 @@ Shell 命令以宿主进程权限执行。PowerShell 最后一条命令成功时
 返回 `1`。`exit N` 返回 `N`。后续命令成功时，之前的 non-terminating error
 仍保留在 `stderr` 中。权限和隔离要求见[自定义工具](../guides/custom-tool.md)。
 
+### `@sortedyuan/lsp-tools`
+
+`openLanguageServerManager` 管理显式启用的 TypeScript/JavaScript、Python、Rust、Go
+及自定义语言 stdio 服务器。`createLspTools` 提供六个只读查询和 `lsp_rename`。
+`createRenamePreview` 准备审批数据。管理器负责进程关闭、文档同步、诊断和
+持久化重命名恢复；关闭执行环境前需要关闭管理器。
+参阅 [package README](../../../packages/tools/lsp/README.zh-CN.md)。
+
+编码宿主可以将 `manager.fileFeedback` 传入 coding-tools 的 edit/write 选项，
+工具在写入后返回可选的 `diagnostics`。`WorkspaceFileGuard.runMany` 保护多个文件的修改；
+`atomicWriteText` 和 `createTextChangePreview` 是公开辅助函数。
+执行环境提供 `cachePath`、`toEnvironmentPath`、`toHostPath`，以及支持
+`stdin: "pipe"` 的 `spawn`；打开环境时接受 `cacheDirectory`。
+
+宿主网页搜索使用 coding-tools 导出的 `createWebSearchTool`、
+`createDeepSeekSearchBackend`、`createZhipuSearchBackend`，需要单独注册这些工具。
+Providers 从根入口和 `/kimi` 导出 `createKimiFormulaTools`，
+通过原始 `ToolCall.rawInput` 调用 Formula。
+参阅[搜索与 LSP 配置](configuration.md#maybecode-搜索与语言服务器)。
+
 ### `@sortedyuan/may/session/tools`
 
 有界、只读 `session_history` 工具查询持久化 Session 历史。
@@ -391,7 +418,7 @@ workspace UI 和 navigation 的 `dispose()` 方法也返回 Promise。界面清�
 
 ## 参考产品
 
-MaybeCode 包含在 [14 个包的发布清单](../../../scripts/release-packages.json)中。
+MaybeCode 包含在 [15 个包的发布清单](../../../scripts/release-packages.json)中。
 MaybeClaw、CLI 和 Eval CLI 保持 workspace 私有包。验证与发布步骤见
 [发布指南](../guides/npm-release.md)。
 

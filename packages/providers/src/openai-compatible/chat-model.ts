@@ -18,9 +18,11 @@ import {
 import { parseRetryAfterMs } from "./http.js";
 import type { OpenAICompatibleMessage, OpenAICompatibleToolDefinition } from "./protocol.js";
 import { streamOpenAICompatibleResponse } from "./stream.js";
+import { assertServerToolOrigin, serverToolOrigin, validateWebSearch, type WebSearchOptions } from "../web-search.js";
 
 /** @experimental */
 export interface OpenAICompatibleChatRequest {
+  web_search_options?: Readonly<Record<string, unknown>>;
   model: string;
   messages: OpenAICompatibleMessage[];
   stream: true;
@@ -58,6 +60,7 @@ export interface OpenAICompatibleDialect {
 
 /** @experimental */
 export interface OpenAICompatibleChatModelOptions {
+  webSearch?: false | WebSearchOptions;
   apiKey: string;
   model: string;
   baseURL?: string;
@@ -75,6 +78,7 @@ export class OpenAICompatibleChatModel implements Model {
   private readonly maxOutputTokens: number | undefined;
   private readonly reasoningEffort: string | undefined;
   private readonly fetchImplementation: typeof globalThis.fetch;
+  private readonly webSearch: false | WebSearchOptions | undefined;
 
   constructor(
     options: OpenAICompatibleChatModelOptions,
@@ -89,6 +93,7 @@ export class OpenAICompatibleChatModel implements Model {
       throw new RangeError("Maximum output tokens must be a positive safe integer");
     }
     this.apiKey = options.apiKey;
+    this.webSearch = validateWebSearch(dialect.adapter, options.webSearch);
     this.model = options.model;
     this.baseURL = (options.baseURL ?? dialect.defaultBaseURL).replace(/\/+$/, "");
     this.maxOutputTokens = options.maxOutputTokens;
@@ -100,6 +105,7 @@ export class OpenAICompatibleChatModel implements Model {
     if (this.dialect.supportsResponseFormat) assertModelResponseFormat(request);
     else if (request.responseFormat !== undefined)
       throw new TypeError(`${this.dialect.provider} adapter does not support responseFormat`);
+    assertServerToolOrigin(request, serverToolOrigin(this.dialect.adapter, this.model, this.baseURL, this.webSearch));
     yield* executeRecordedRequest(
       {
         version: 1,
@@ -127,6 +133,11 @@ export class OpenAICompatibleChatModel implements Model {
     for await (const event of streamOpenAICompatibleResponse(response, {
       signal: options.signal,
       providerName: provider,
+      webSearch:
+        Boolean(this.webSearch) ||
+        (this.dialect.adapter === "openai-chat-completions" && this.model === "gpt-5-search-api"),
+      zhipu: this.dialect.adapter === "zhipu-chat",
+      origin: serverToolOrigin(this.dialect.adapter, this.model, this.baseURL, this.webSearch),
       requireDone: this.dialect.requireDone,
       protocolError: (message, errorOptions) =>
         new OpenAICompatibleProtocolError(provider, errorCodePrefix, message, errorOptions),

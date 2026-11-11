@@ -195,7 +195,14 @@ headless controller and events directly.
 `TuiTheme` deliberately contains presentation tokens rather than product-domain
 types. Applications own their concrete palette and may pass it into components.
 Product events and labels stay outside the transcript projection: applications
-use `reset`, `appendNotice`, and `appendChangePreview` to bridge that state.
+use `reset`, `appendNotice`, `appendToolPresentation`, and `attachToolPresentation`
+to bridge that state.
+
+`TranscriptStore` decodes `tool.presentation` records through a
+`ToolPresentationProjector`. The default, `createCodingToolPresentationProjector()`
+from `@sortedyuan/tui/tool-renderers`, decodes coding change previews;
+`readCodingToolPresentation(item)` returns them to a renderer. Pass
+`toolPresentationProjector` to `new TranscriptStore()` to display another format.
 
 Approval transcript items retain `scopeDescription` and `scopeId` for persistent
 requests, displaying the full host-supplied range beside the approval status.

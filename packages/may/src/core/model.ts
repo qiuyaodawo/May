@@ -1,4 +1,4 @@
-import type { AssistantMessage, JsonSchema, Message, Usage } from "./types.js";
+import type { AssistantMessage, JsonSchema, Message, ServerToolCall, Usage } from "./types.js";
 import type { ContextSnapshot } from "./context.js";
 import type { SerializedError } from "./events.js";
 import type { TraceContext } from "./tracing.js";
@@ -54,6 +54,7 @@ export interface ModelContextCompactor {
 
 /** @experimental */
 export type ModelEvent =
+  | { type: "server_tool.updated"; call: ServerToolCall }
   | { type: "text.delta"; delta: string }
   | { type: "reasoning.delta"; delta: string }
   | {

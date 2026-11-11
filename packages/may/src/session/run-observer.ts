@@ -1,7 +1,12 @@
 import { omitUndefined, type MayEvent, type ToolCall } from "../core/index.js";
 import type { RecordablePermissionEvent, SessionApprovalRequest, SessionEventPayload } from "./events.js";
 
-export function checkpointKey(event: { type: string; runId: string; step?: number; call?: ToolCall }): string {
+export function checkpointKey(event: {
+  type: string;
+  runId: string;
+  step?: number;
+  call?: Pick<ToolCall, "id">;
+}): string {
   return JSON.stringify([event.type, event.runId, event.step, event.call?.id]);
 }
 
@@ -90,6 +95,7 @@ export function toSessionEvent(event: MayEvent): SessionEventPayload | undefined
         call: event.call,
         output: event.output,
         content: event.content,
+        ...(event.usage === undefined ? {} : { usage: event.usage }),
       };
     case "tool.failed":
       return {
@@ -98,6 +104,7 @@ export function toSessionEvent(event: MayEvent): SessionEventPayload | undefined
         step: event.step,
         call: event.call,
         error: event.error,
+        ...(event.usage === undefined ? {} : { usage: event.usage }),
       };
     case "run.completed":
       return {

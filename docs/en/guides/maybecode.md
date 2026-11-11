@@ -12,6 +12,60 @@ Applications that provide custom tools through `MaybeCodeApplicationOptions.tool
 register those tools in the application catalog. Runtime instructions use the same
 catalog to describe the current environment.
 
+## Configure web search
+
+Enable server search with provider or model `options.webSearch: {}`; Zhipu
+requires `{ "searchEngine": "search_std" }`. Supported fields and adapter
+restrictions are in [configuration](../reference/configuration.md#server-search).
+This configuration authorizes server execution, including Anthropic code
+execution when selected by `allowedCallers` or the search version's defaults.
+`/model` displays the active search mode.
+
+For host search, set `apps.maybecode.webSearch.hostTool` to
+`{ "backend": "deepseek", "provider": "deepseek" }`, referencing a configured
+provider with credentials. Supported backends are `deepseek`, `zhipu` (requires
+`searchEngine`), and `kimi-formula`. At Run start, server search takes priority;
+otherwise MaybeCode supplies the host tool. Formula tools require `kimi-chat`.
+Host search requests approval and records usage. Set
+`apps.maybecode.webSearch: false` to disable search; models that always search
+then fail selection.
+
+## Configure language servers
+
+Set `apps.maybecode.lsp.servers` to `{ "typescript": {}, "python": {} }` to
+authorize those server processes. Install the corresponding programs in the
+project or on PATH before using a tool:
+
+```sh
+npm install -g typescript-language-server typescript
+npm install -g pyright
+rustup component add rust-analyzer rust-src
+go install golang.org/x/tools/gopls@latest
+```
+
+Select only the commands for the configured `typescript`, `python`, `rust`, or
+`go` presets. May requires Node.js 22.16.0 or later; check the installed
+language server's own runtime requirements. Servers start on first use.
+Container execution requires the server commands, runtimes, and cached project
+dependencies in the image or workspace. See [LSP tools](../../../packages/tools/lsp/README.md).
+
+`/lsp` shows resolved commands, state, progress, recent errors, and stderr.
+`/lsp restart <id>` stops the server and clears repeated-exit failure; the next
+request starts it again.
+Omitting `lsp` or setting it to `false` disables its tools. Configured servers
+provide diagnostics, definition, references, hover, document symbols, workspace
+symbols, and rename. Positions use one-based lines and UTF-16 columns, or an
+exact symbol with an optional occurrence. Rename approval displays all changed
+files; changes after approval planning cause a conflict before writing.
+
+Edit and write return diagnostics by default; `lsp.editDiagnostics: false`
+disables that feedback. Only `complete` with no items confirms no reported
+problems for the current version. `pending` awaits diagnostics, `unknown` has
+unversioned diagnostics, and `unavailable` reports a feedback error after the
+file write succeeded. `lsp_diagnostics` requests updated results. Sub-Agent roles
+can select registered `lsp_*` and host `web_search` factories; team worktrees
+have independent execution environments and language-server managers.
+
 ## Start the application
 
 For the `anthropic-messages` adapter, MaybeCode defaults `promptCaching` to
@@ -20,7 +74,7 @@ to `false` to disable it. Five-minute writes cost 1.25x base input price, one-ho
 and reads normally 0.1x. Minimum cacheable length depends on the model; see
 [configuration](../reference/configuration.md). Compatible endpoints that reject `cache_control` require disabling it.
 
-MaybeCode requires Node.js 22 or newer.
+MaybeCode requires Node.js 22.16.0 or newer.
 
 From the May repository root, run:
 

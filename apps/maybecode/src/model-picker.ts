@@ -128,7 +128,7 @@ function renderModelPicker(
     const defaultModel = model.isDefault ? " [default]" : "";
     output +=
       `${selected} ${model.name}${current}${defaultModel}\n` +
-      `    ${model.provider}/${model.model} · ${model.adapter}\n`;
+      `    ${model.provider}/${model.model} · ${model.adapter}${model.searchStatus ? ` · ${model.searchStatus}` : ""}\n`;
   }
   return output + "\n↑↓ move · Enter select · D set default · Esc close\n";
 }
@@ -139,7 +139,7 @@ function renderLineModelList(models: readonly MaybeCodeModelProfile[], currentPr
     const defaultModel = model.isDefault ? " [default]" : "";
     return (
       `  ${index + 1}. ${model.name}${current}${defaultModel}\n` +
-      `     ${model.provider}/${model.model} · ${model.adapter}`
+      `     ${model.provider}/${model.model} · ${model.adapter}${model.searchStatus ? ` · ${model.searchStatus}` : ""}`
     );
   });
   return `Models:\n${lines.join("\n")}\n`;

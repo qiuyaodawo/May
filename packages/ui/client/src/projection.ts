@@ -1,4 +1,12 @@
-import type { ContentPart, MediaSource, MayEvent, SerializedError, UserMessage } from "@sortedyuan/may/core";
+import type {
+  AssistantMessage,
+  ContentPart,
+  MediaSource,
+  MayEvent,
+  SerializedError,
+  ServerToolCall,
+  UserMessage,
+} from "@sortedyuan/may/core";
 import { displayParts, imageAttachment } from "@sortedyuan/media";
 import type { AgentApplicationEvent } from "@sortedyuan/may";
 import type { PermissionEvent } from "@sortedyuan/may/permissions";
@@ -9,6 +17,7 @@ import {
   type SessionEvent,
 } from "@sortedyuan/may/session";
 import type { UiBlock, UiBlockStatus, UiDiagnostic, UiInteraction } from "./protocol.js";
+import { assistantDisplayContent, lspRenamePreviewText } from "./display-content.js";
 
 const LIMIT = 65_536;
 function bounded(text: string): string {
@@ -102,8 +111,7 @@ export class UiProjection {
         const input = this.blocks.get(inputId);
         if (input) this.set({ ...input, runId: event.runId });
         inputId = undefined;
-      } else if (event.type === "assistant.completed")
-        this.assistantCompleted(event.runId, event.step, event.message.content);
+      } else if (event.type === "assistant.completed") this.assistantCompleted(event.runId, event.step, event.message);
       else if (event.type === "tool.presentation") this.presentation(event);
       else if (event.type.startsWith("approval.")) this.permission(event as ApprovalEvent, false);
       else if (event.type === "run.interrupted") {
@@ -162,13 +170,27 @@ export class UiProjection {
     for (const [id, request] of this.interactions)
       if (runId === undefined || request.runId === runId) this.interactions.delete(id);
   }
-  private assistantCompleted(runId: string, step: number, content: readonly ContentPart[]): void {
+  private assistantCompleted(runId: string, step: number, message: AssistantMessage): void {
+    for (const call of message.serverToolCalls ?? []) this.serverTool(runId, call);
+    const content = assistantDisplayContent(message);
     const id = `assistant:${runId}:${step}`,
       text = contentText(content),
       reasoning = contentText(content, "reasoning");
     if (!text && !reasoning) this.blocks.delete(id);
     else
       this.set({ id, kind: "assistant", runId, text, reasoning, content: this.content(content), status: "completed" });
+  }
+  private serverTool(runId: string, call: ServerToolCall): void {
+    this.set({
+      id: `server-tool:${call.id}`,
+      kind: "tool",
+      runId,
+      title: call.name,
+      ...(call.input === undefined ? {} : { input: displayValue(call.input) }),
+      text: (call.sources ?? []).map((source) => `${source.title ?? source.url} · ${source.url}`).join("\n"),
+      status: call.status === "pending" ? "running" : call.status === "failed" ? "failed" : "completed",
+      ...(call.error ? { diagnostic: { code: call.error.code, message: call.error.code } } : {}),
+    });
   }
   private steered(runId: string, step: number, messages: readonly UserMessage[]): void {
     for (const [index, message] of messages.entries())
@@ -273,7 +295,14 @@ export class UiProjection {
       toolCallId: event.toolCallId,
       text: "",
       ...this.blocks.get(id),
-      presentation: { kind: event.kind, version: event.version, text: displayValue(event.data) },
+      presentation: {
+        kind: event.kind,
+        version: event.version,
+        text:
+          event.kind === "maybecode.lsp-rename-preview" && event.version === 1
+            ? bounded(lspRenamePreviewText(event.data))
+            : displayValue(event.data),
+      },
     });
   }
   private run(
@@ -307,11 +336,13 @@ export class UiProjection {
         this.set({ ...previous, text: (previous.text + event.delta).slice(0, LIMIT) });
       else if (event.type === "model.reasoning.delta")
         this.set({ ...previous, reasoning: ((previous.reasoning ?? "") + event.delta).slice(0, LIMIT) });
-      else if (event.type === "model.completed")
-        this.assistantCompleted(event.runId, event.step, event.message.content);
+      else if (event.type === "model.completed") this.assistantCompleted(event.runId, event.step, event.message);
       else if (event.type === "model.started") this.set(previous);
     }
-    if ("call" in event) {
+    if (event.type === "model.server_tool.updated") {
+      this.serverTool(event.runId, event.call);
+    }
+    if ("call" in event && event.type !== "model.server_tool.updated") {
       const id = `tool:${event.runId}:${event.call.id}`,
         previous = this.blocks.get(id);
       let status: UiBlockStatus = event.type === "tool.completed" ? "completed" : "running";

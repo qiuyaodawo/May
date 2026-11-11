@@ -74,14 +74,20 @@ export interface AnthropicModelOptions {
     reasoningEffort?: AnthropicReasoningEffort;
     // (undocumented)
     thinking?: Readonly<AnthropicThinkingConfig>;
+    // (undocumented)
+    webSearch?: false | WebSearchOptions;
 }
 
 // @public (undocumented)
 export interface AnthropicModelStateData {
     // (undocumented)
+    container?: unknown;
+    // (undocumented)
     content: AnthropicAssistantContentBlock[];
     // (undocumented)
     messageId: string;
+    // (undocumented)
+    origin?: ServerToolOrigin;
 }
 
 // @public (undocumented)

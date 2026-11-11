@@ -1,4 +1,6 @@
 export * from "./bash.js";
+export * from "./atomic-write.js";
+export * from "./file-feedback.js";
 export * from "./change-preview.js";
 export * from "./coding-tools.js";
 export * from "./edit.js";
@@ -14,3 +16,4 @@ export * from "./grep.js";
 export * from "./fetch.js";
 export * from "./execution.js";
 export * from "./search.js";
+export * from "./web-search.js";

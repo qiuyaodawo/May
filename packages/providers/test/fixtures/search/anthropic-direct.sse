@@ -1,0 +1,52 @@
+: keepalive
+: keepalive
+event: message_start
+data: {"message":{"content":[],"id":"msg_resp_0367ea4e57308c00016aef483aa23087d09cbf965cd52b9622","model":"codex/gpt-6-luna","role":"assistant","stop_reason":null,"stop_sequence":null,"type":"message","usage":{"input_tokens":0,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}},"type":"message_start"}
+
+event: ping
+data: {"type":"ping"}
+
+: keepalive
+event: content_block_start
+data: {"content_block":{"id":"srvtoolu_18e5cdf8eaf5a3840000000f","input":{},"name":"web_search","type":"server_tool_use"},"index":0,"type":"content_block_start"}
+
+event: content_block_delta
+data: {"delta":{"partial_json":"{\"query\":\"site:nodejs.org/en/blog/release latest Node.js release official\"}","type":"input_json_delta"},"index":0,"type":"content_block_delta"}
+
+event: content_block_stop
+data: {"index":0,"type":"content_block_stop"}
+
+event: content_block_start
+data: {"content_block":{"content":[{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/download","type":"web_search_result","url":"https://nodejs.org/en/download"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/blog/release","type":"web_search_result","url":"https://nodejs.org/en/blog/release"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/about/previous-releases","type":"web_search_result","url":"https://nodejs.org/en/about/previous-releases"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/blog","type":"web_search_result","url":"https://nodejs.org/en/blog"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/download.","type":"web_search_result","url":"https://nodejs.org/en/download."},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/about/previous-releases?source=post_page---------------------------","type":"web_search_result","url":"https://nodejs.org/en/about/previous-releases?source=post_page---------------------------"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/zh-cn/download./","type":"web_search_result","url":"https://nodejs.org/zh-cn/download./"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/uk/blog/release/v24.22.0","type":"web_search_result","url":"https://nodejs.org/uk/blog/release/v24.22.0"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/blog/ann","type":"web_search_result","url":"https://nodejs.org/en/blog/ann"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/blog/release/v26.5.0?trk=article-ssr-frontend-pulse_little-text-block","type":"web_search_result","url":"https://nodejs.org/en/blog/release/v26.5.0?trk=article-ssr-frontend-pulse_little-text-block"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/blog/release/v24.17.0","type":"web_search_result","url":"https://nodejs.org/en/blog/release/v24.17.0"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/en/blog/release/v22.23.4","type":"web_search_result","url":"https://nodejs.org/en/blog/release/v22.23.4"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/static/documents/2016-survey-report.pdf","type":"web_search_result","url":"https://nodejs.org/static/documents/2016-survey-report.pdf"},{"encrypted_content":"","page_age":null,"title":"https://nodejs.org/static/documents/foundation-visual-guidelines.pdf","type":"web_search_result","url":"https://nodejs.org/static/documents/foundation-visual-guidelines.pdf"}],"tool_use_id":"srvtoolu_18e5cdf8eaf5a3840000000f","type":"web_search_tool_result"},"index":1,"type":"content_block_start"}
+
+event: content_block_stop
+data: {"index":1,"type":"content_block_stop"}
+
+: keepalive
+event: content_block_start
+data: {"content_block":{"text":"","type":"text"},"index":2,"type":"content_block_start"}
+
+event: content_block_delta
+data: {"delta":{"text":"截至 **2026 年 11 月 7 日**，Node.js 官方下载页列出的最新发布版本是 **v27.0.0-alpha.0.0.0（Alpha）**；最新的 **LTS 稳定版**是 **v26.13.0**。([nodejs.org](https://nodejs.org/en/download?utm_source=openai))\n","type":"text_delta"},"index":2,"type":"content_block_delta"}
+
+event: content_block_stop
+data: {"index":2,"type":"content_block_stop"}
+
+event: content_block_start
+data: {"content_block":{"text":"","type":"text"},"index":3,"type":"content_block_start"}
+
+event: content_block_delta
+data: {"delta":{"citation":{"cited_text":"","encrypted_index":"","title":"https://nodejs.org/en/download","type":"web_search_result_location","url":"https://nodejs.org/en/download"},"type":"citations_delta"},"index":3,"type":"content_block_delta"}
+
+event: content_block_delta
+data: {"delta":{"text":"\n官方来源：[Node.js 下载页](https://nodejs.org/en/download) 🎉","type":"text_delta"},"index":3,"type":"content_block_delta"}
+
+event: content_block_stop
+data: {"index":3,"type":"content_block_stop"}
+
+event: message_delta
+data: {"delta":{"stop_reason":"end_turn","stop_sequence":null},"type":"message_delta","usage":{"input_tokens":4200,"output_tokens":161,"cache_read_input_tokens":7808,"cache_creation_input_tokens":0,"output_tokens_details":{"thinking_tokens":52}}}
+
+event: message_stop
+data: {"type":"message_stop"}
+

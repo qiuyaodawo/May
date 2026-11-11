@@ -8,7 +8,7 @@
 ## 发布范围
 
 [明确的发布清单](../../../scripts/release-packages.json)包含 `@sortedyuan` 下的
-14 个包：13 个库和 MaybeCode。`pnpm release:check` 检查清单与 workspace
+15 个包：14 个库（包含 `@sortedyuan/lsp-tools`）和 MaybeCode。`pnpm release:check` 检查清单与 workspace
 公开包完全一致，并检查它们完整的运行时依赖均可发布。
 
 MaybeClaw、CLI、Eval CLI 和示例保持私有，Telegram 和 Feishu 渠道属于 MaybeClaw 内部模块。

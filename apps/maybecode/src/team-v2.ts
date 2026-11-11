@@ -11,6 +11,7 @@ import {
   createFetchTool,
 } from "@sortedyuan/coding-tools";
 import { TeamExecutionEnvironments } from "./team-execution.js";
+import { createLspTools } from "@sortedyuan/lsp-tools";
 import { loadMayConfig, type MayConfig } from "@sortedyuan/may/config";
 import {
   CoordinationRuntime,
@@ -31,7 +32,7 @@ import type { MaybeCodeTeamCommand } from "./args.js";
 import { getDefaultMaybeCodeDataDirectory, resolveMaybeCodeRecording, type MaybeCodeRecording } from "./configured.js";
 import { readMaybeCodeSettings, type MaybeCodeSettings } from "./settings.js";
 import { createMaybeCodeModel, selectMaybeCodeModel, type SelectedMaybeCodeModel } from "./model.js";
-import { createListTool, type RunMaybeCodeTeamDependencies } from "./team.js";
+import { createListTool, type RunMaybeCodeTeamDependencies } from "./team-common.js";
 import {
   createTeamPreset,
   loadTeamPlan,
@@ -48,6 +49,7 @@ const VERSION = "maybecode-team-v2";
 const RESERVATION = 32_768;
 const DEFAULT_RUN_BUDGET: RunBudget = { maxSteps: 10, maxModelCalls: 10, maxToolCalls: 24, maxDurationMs: 180_000 };
 interface Manifest {
+  readonly lsp?: MaybeCodeSettings["lsp"];
   readonly execution?: MaybeCodeSettings["execution"];
   readonly fetch?: MaybeCodeSettings["fetch"];
   readonly format: 1;
@@ -114,6 +116,7 @@ export async function runTeamV2Command(
     manifest = {
       execution: readMaybeCodeSettings(config).execution ?? { mode: "host" },
       fetch: readMaybeCodeSettings(config).fetch ?? {},
+      lsp: readMaybeCodeSettings(config).lsp ?? false,
       format: 1,
       version: VERSION,
       id,
@@ -178,9 +181,15 @@ export async function runTeamV2Command(
     providers: {},
     models: {},
     path: manifest.configPath,
-    apps: { maybecode: { execution: manifest.execution ?? { mode: "host" }, fetch: manifest.fetch ?? {} } },
+    apps: {
+      maybecode: {
+        execution: manifest.execution ?? { mode: "host" },
+        fetch: manifest.fetch ?? {},
+        lsp: manifest.lsp ?? false,
+      },
+    },
   });
-  const executionEnvironments = new TeamExecutionEnvironments(settings.execution);
+  const executionEnvironments = new TeamExecutionEnvironments(settings.execution, settings.lsp, directory);
   let workspaces: TaskWorkspaceManager | undefined;
   let artifacts: FileArtifactStore | undefined;
   let verification: TeamVerificationStore | undefined;
@@ -262,6 +271,9 @@ export async function runTeamV2Command(
     for (const [name, role] of Object.entries(manifest.plan.roles)) {
       const scoped = async (execution: TaskExecution, workspace: string) => {
         const environment = await executionEnvironments.get(workspace);
+        const lsp = await executionEnvironments.languageServers(workspace);
+        const feedback =
+          lsp && settings.lsp && settings.lsp.editDiagnostics !== false ? { fileFeedback: lsp.fileFeedback } : {};
         return createApplicationAgent({
           version: authorityVersion,
           store: sessionStore,
@@ -274,19 +286,20 @@ export async function runTeamV2Command(
               createGrepTool({ cwd: workspace, execution: environment }),
               createFetchTool(settings?.fetch ?? {}),
               createListTool(workspace),
+              ...(lsp ? createLspTools(lsp) : []),
               ...artifacts!.forTask(execution.task.id).tools(),
               ...verification!.forTask(execution, workspace, { allowCommands: manifest.allowChecks }).tools(),
               ...(manifest.mode === "coding"
                 ? [
-                    createWriteTool({ cwd: workspace, maxBytes: 262_144 }),
-                    createEditTool({ cwd: workspace, maxBytes: 262_144 }),
+                    createWriteTool({ cwd: workspace, maxBytes: 262_144, ...feedback }),
+                    createEditTool({ cwd: workspace, maxBytes: 262_144, ...feedback }),
                   ]
                 : []),
             ];
             const selectedTools = available
               .filter((tool) => role.tools.includes(tool.name as (typeof role.tools)[number]))
               .map((tool): Tool => {
-                if (!["write", "edit"].includes(tool.name)) return tool;
+                if (!["write", "edit", "lsp_rename"].includes(tool.name)) return tool;
                 return {
                   ...tool,
                   async execute(input, context) {

@@ -2,7 +2,8 @@ import { sanitizeTerminalText } from "../text.js";
 import { stripVTControlCharacters } from "node:util";
 import type { TextDocumentLine } from "../text-selection.js";
 import { styleText, type TuiTheme } from "../theme.js";
-import type { ToolTranscriptItem } from "./transcript-store.js";
+import { decodeToolChangePreviewPresentation, type ToolChangePreview } from "@sortedyuan/coding-tools/change-preview";
+import type { ToolPresentationProjection, ToolPresentationProjector, ToolTranscriptItem } from "./transcript-store.js";
 
 /** @experimental */
 export interface ToolTranscriptRenderOptions {
@@ -68,7 +69,68 @@ export function createCodingToolRendererRegistry(): ToolRendererRegistry {
     .register("bash", shellRenderer)
     .register("read", readRenderer)
     .register("edit", fileChangeRenderer)
-    .register("write", fileChangeRenderer);
+    .register("write", fileChangeRenderer)
+    .register("lsp_rename", renameRenderer);
+}
+
+/**
+ * Display data that the standard coding renderers read from a tool transcript item.
+ * @experimental
+ */
+export type CodingToolPresentation =
+  | { readonly type: "change"; readonly preview: ToolChangePreview }
+  | { readonly type: "rename"; readonly previews: readonly ToolChangePreview[] };
+
+const codingToolPresentations = new WeakSet<CodingToolPresentation>();
+
+/**
+ * Create the presentation projector for the standard May coding tools.
+ * @experimental
+ */
+export function createCodingToolPresentationProjector(): ToolPresentationProjector {
+  return (presentation) => {
+    if (presentation.kind === "maybecode.lsp-rename-preview" && presentation.version === 1) {
+      const data = presentation.data;
+      if (!data || typeof data !== "object" || !("files" in data) || !Array.isArray(data.files))
+        throw new TypeError("Invalid LSP rename preview");
+      const previews = data.files.map((file: unknown) => {
+        const preview = decodeToolChangePreviewPresentation("maybecode.change-preview", 1, file);
+        if (!preview) throw new TypeError("Invalid LSP rename file preview");
+        return preview;
+      });
+      return codingToolProjection("lsp_rename", {}, { type: "rename", previews });
+    }
+    const preview = decodeToolChangePreviewPresentation(presentation.kind, presentation.version, presentation.data);
+    return preview ? codingChangePresentation(preview) : undefined;
+  };
+}
+
+/**
+ * Wrap a decoded change preview for `TranscriptStore.attachToolPresentation()`.
+ * @experimental
+ */
+export function codingChangePresentation(preview: ToolChangePreview): ToolPresentationProjection {
+  return codingToolProjection(preview.tool, { path: preview.path }, { type: "change", preview });
+}
+
+/**
+ * Read the display data attached by the standard coding projector.
+ * @experimental
+ */
+export function readCodingToolPresentation(item: ToolTranscriptItem): CodingToolPresentation | undefined {
+  const value = item.presentation;
+  return typeof value === "object" && value !== null && codingToolPresentations.has(value as CodingToolPresentation)
+    ? (value as CodingToolPresentation)
+    : undefined;
+}
+
+function codingToolProjection(
+  toolName: string,
+  input: unknown,
+  value: CodingToolPresentation,
+): ToolPresentationProjection {
+  codingToolPresentations.add(value);
+  return { toolName, input, value };
 }
 
 const shellRenderer = documentRenderer((item, options) => {
@@ -137,7 +199,8 @@ const readRenderer = documentRenderer((item, options) => {
 
 const fileChangeRenderer = documentRenderer((item, options) => {
   const inputPath = stringField(item.call.input, "path") ?? "<unknown>";
-  const preview = item.preview;
+  const presentation = readCodingToolPresentation(item);
+  const preview = presentation?.type === "change" ? presentation.preview : undefined;
   const detail =
     preview?.status === "ready" ? `${preview.path}  +${preview.additions} -${preview.deletions}` : inputPath;
   const lines = [header(item, options, detail)];
@@ -168,6 +231,22 @@ const genericRenderer = documentRenderer((item, options) => {
   const output =
     item.streamedOutput !== "" ? item.streamedOutput : item.status === "completed" ? stringify(item.output) : "";
   if (output !== "") appendOutput(lines, output, options);
+  appendFailure(lines, item, options);
+  return lines;
+});
+
+const renameRenderer = documentRenderer((item, options) => {
+  const lines = [header(item, options, inputSummary(item.call.input))];
+  appendProgress(lines, item, options);
+  const presentation = readCodingToolPresentation(item);
+  for (const preview of presentation?.type === "rename" ? presentation.previews : []) {
+    lines.push(copyLine(styleText(`  ${sanitizeTerminalText(preview.path)}`, options.theme.toolTitle), 2));
+    if (preview.status === "ready") {
+      if (options.expanded) lines.push(...renderDiff(preview.diff, options.theme));
+      else lines.push(copyLine(styleText(`  +${preview.additions} -${preview.deletions}`, options.theme.muted), 2));
+    } else lines.push(copyLine(styleText(`  ${sanitizeTerminalText(preview.reason)}`, options.theme.warning), 2));
+  }
+  if (item.status === "completed") appendOutput(lines, stringify(item.output), options);
   appendFailure(lines, item, options);
   return lines;
 });

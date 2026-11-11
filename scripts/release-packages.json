@@ -3,6 +3,7 @@
   "@sortedyuan/coordination",
   "@sortedyuan/eval",
   "@sortedyuan/gateway",
+  "@sortedyuan/lsp-tools",
   "@sortedyuan/may",
   "@sortedyuan/maybecode",
   "@sortedyuan/mcp",

@@ -9,7 +9,7 @@ import { stat } from "node:fs/promises";
  * @experimental
  */
 export interface WorkspaceFileOperation<T> {
-  readonly tool: "read" | "edit" | "write";
+  readonly tool: "read" | "edit" | "write" | "lsp_rename";
   /** 已经过工作区路径保护解析的路径；软链接与别名指向同一份内容。 */
   readonly path: WorkspacePath;
   /** 目标文件当前是否存在。 */
@@ -19,7 +19,15 @@ export interface WorkspaceFileOperation<T> {
 }
 
 /** @experimental */
-export type WorkspaceFileGuard = <T>(operation: WorkspaceFileOperation<T>) => Promise<T>;
+export interface WorkspaceFileGuard {
+  <T>(operation: WorkspaceFileOperation<T>): Promise<T>;
+  /** Acquire all file locks in workspaceFileKey order; release in reverse order. */
+  runMany<T>(
+    paths: readonly WorkspacePath[],
+    tool: WorkspaceFileOperation<unknown>["tool"],
+    operation: () => Promise<T>,
+  ): Promise<T>;
+}
 
 /**
  * 目标文件当前是否存在；软链接、目录与路径不存在都视为不可用。

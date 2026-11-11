@@ -25,6 +25,7 @@ export interface ModelRequestValidationResult {
 }
 /** @experimental */
 export interface ModelRequestValidationOptions {
+  readonly serverTools?: readonly ("webSearch" | "webSearchWithFunctions")[];
   readonly unknownPolicy?: UnknownCapabilityPolicy;
   readonly parameters?: Readonly<Record<string, unknown>>;
   readonly estimatedInputTokens?: number;
@@ -128,6 +129,7 @@ export function validateModelRequest(
   limit("maxImages", images, "messages");
   limit("maxAttachments", attachments, "messages");
   if (request.tools.length > 0) requireCapability("tools", "tools");
+  for (const tool of options.serverTools ?? []) requireCapability(`serverTools.${tool}`, "webSearch");
   const parameters = options.parameters ?? {};
   if (Object.keys(parameters).length > 0) requireCapability("parameters", "parameters");
   const effort = parameters.reasoningEffort;

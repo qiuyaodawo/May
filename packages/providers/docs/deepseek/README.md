@@ -2,6 +2,18 @@
 
 DeepSeek model adapter for May.
 
+## Host web search
+
+`deepseek-chat` rejects `webSearch`, including `false`, with
+`ProviderConfigurationError`. To search, create a `web_search` tool with
+`createDeepSeekSearchBackend` and `createWebSearchTool` from
+`@sortedyuan/coding-tools`, then register it with the runtime. The backend
+calls `/v1/tools/search` using the configured API key and base URL; successful
+requests contribute `web-search` usage. MaybeCode configures this through
+`apps.maybecode.webSearch.hostTool: { backend: "deepseek", provider: "deepseek" }`.
+Host search passes through tool permissions. See
+[configuration](../../../../docs/en/reference/configuration.md#maybecode-search-and-language-servers).
+
 ```ts
 import { May, InMemoryContext } from "@sortedyuan/may/core";
 import { DeepSeekModel } from "@sortedyuan/providers/deepseek";

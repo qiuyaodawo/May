@@ -25,6 +25,27 @@ identifiers. Its return value selects the authorization behavior:
 Permission is separate from the tool itself so the same capability can be used
 under different product policies.
 
+## Search and LSP permissions in MaybeCode
+
+Setting provider or model `options.webSearch` authorizes provider-side search
+within those settings. Server tools execute during the model request. Configure
+domains, `maxUses`, and Anthropic `allowedCallers` before enabling them; callers
+that include code execution authorize that server capability too.
+
+Host `web_search` uses normal tool approval. The default grant key is
+`web-search:<permissionVersion>`, where the tool's permission version identifies
+the backend or Kimi Formula URI. MaybeCode can persist this grant within the
+current permission scope. `apps.maybecode.webSearch: false` disables search and
+rejects models declared to always search.
+
+Listing an LSP server authorizes starting its process and executing project
+programs. The six queries `lsp_diagnostics`, `lsp_definition`, `lsp_references`,
+`lsp_hover`, `lsp_document_symbols`, and `lsp_workspace_symbols` are allowed by
+the default policy and read-only mode. `lsp_rename` requires approval with a
+multi-file preview, is denied in read-only mode, and is allowed in yolo mode.
+Host `web_search` is denied in read-only mode. Shared file guards check every
+rename target against a sub-Agent's authorized file scope before taking locks.
+
 ## Default-deny policy
 
 Create a policy module and allow only the operation ranges your product

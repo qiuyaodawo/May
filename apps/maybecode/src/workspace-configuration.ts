@@ -1,5 +1,6 @@
 import { isAbsolute, relative, resolve } from "node:path";
 import { AgentWorkspace } from "@sortedyuan/may";
+import { jsonEqual } from "@sortedyuan/may/core";
 import { ProjectGitWorkspace } from "@sortedyuan/may/application/git-workspace";
 import { MaybeCodeApplication, type MaybeCodeApplicationOptions } from "./application.js";
 import type { MaybeCodeCompactionSelection } from "./controller.js";
@@ -48,6 +49,7 @@ export async function openWorkspaceConfiguration(
         ],
       }),
     );
+  let currentApplication: MaybeCodeApplication | undefined;
   const manager = await AgentWorkspace.open<
     MaybeCodeSessionEvent,
     MaybeCodeProductEvent,
@@ -108,6 +110,18 @@ export async function openWorkspaceConfiguration(
           );
         if (event?.type === "state.updated") {
           const saved = readHistoricalModel(event.value);
+          if (
+            saved.profile !== state.options.modelInfo?.profile ||
+            saved.model !== state.options.modelInfo?.model ||
+            saved.provider !== state.options.modelInfo?.provider ||
+            saved.adapter !== state.options.modelInfo?.adapter ||
+            !jsonEqual(
+              saved.runtimeOptions,
+              state.options.modelRuntimeOptions ??
+                configuredModelOptions(state.options, state.options.modelInfo?.profile),
+            )
+          )
+            await currentApplication?.assertModelChangeSafe();
           if (saved.profile && nextOptions.createModelConfiguration) {
             const configuration = await nextOptions.createModelConfiguration(saved.profile, saved.runtimeOptions);
             assertHistoricalModel(saved, configuration.modelInfo);
@@ -127,6 +141,7 @@ export async function openWorkspaceConfiguration(
         resume: selection.resume,
       });
       state.options = nextOptions;
+      currentApplication = app;
       if (!selection.resume && !selection.fork) state.createdSessions.set(app.sessionId, workspace);
       return app;
     },

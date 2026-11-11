@@ -7,6 +7,7 @@ import {
   type CodingToolName,
   type CodingToolsOptions,
   type WorkspaceFileOperation,
+  type WorkspaceFileGuard,
 } from "@sortedyuan/coding-tools";
 import type { SubagentToolName } from "./subagents.js";
 
@@ -37,7 +38,9 @@ export class SharedWorkspaceFileGuard {
 
   constructor(
     workspace: string,
-    private readonly options: Pick<CodingToolsOptions, "execution" | "fetch"> = {},
+    private readonly options: Pick<CodingToolsOptions, "execution" | "fetch" | "fileFeedback"> & {
+      readonly toolFactories?: Readonly<Record<string, (guard: WorkspaceFileGuard) => Tool>>;
+    } = {},
   ) {
     this.workspace = workspace;
   }
@@ -73,11 +76,10 @@ export class SharedWorkspaceFileGuard {
       });
     };
 
-    const guard = async <T>(operation: WorkspaceFileOperation<T>): Promise<T> => {
-      const key = workspaceFileKey(operation.path);
-      const relative = normalizeRelative(operation.path.relative);
+    const checkScope = (path: { readonly relative: string }, tool: WorkspaceFileOperation<unknown>["tool"]) => {
+      const relative = normalizeRelative(path.relative);
       // 声明的文件只约束修改；读取在工作区内不受限制。
-      if (operation.tool !== "read" && scope !== undefined && !scope.has(relative)) {
+      if (tool !== "read" && scope !== undefined && !scope.has(relative)) {
         throw new Error(
           (scope.size === 0
             ? "File conflict: this task may not modify files; "
@@ -85,6 +87,29 @@ export class SharedWorkspaceFileGuard {
             `${relative} is outside its assigned files. Ask the main agent for a different assignment.`,
         );
       }
+    };
+
+    const checkVersion = async (key: string, relative: string) => {
+      const current = await version(key);
+      const known = versions.get(key);
+      if (options.requireRead && known === undefined && current !== MISSING) {
+        throw new Error(
+          `File conflict: ${relative} exists and this task has not read it. ` +
+            "Read it first, then decide whether to change it.",
+        );
+      }
+      if (known !== undefined && known !== current) {
+        throw new Error(
+          `File conflict: ${relative} changed after this task read it. ` +
+            "Re-read the file and redo the change against the current content.",
+        );
+      }
+    };
+
+    const guard: WorkspaceFileGuard = async <T>(operation: WorkspaceFileOperation<T>): Promise<T> => {
+      const key = workspaceFileKey(operation.path);
+      const relative = normalizeRelative(operation.path.relative);
+      checkScope(operation.path, operation.tool);
       return serialize(key, async () => {
         if (operation.tool === "read") {
           const value = await operation.run();
@@ -92,20 +117,7 @@ export class SharedWorkspaceFileGuard {
           return value;
         }
         // 在锁内读取当前版本，避免使用进入锁之前的状态。
-        const current = await version(key);
-        const known = versions.get(key);
-        if (options.requireRead && known === undefined && current !== MISSING) {
-          throw new Error(
-            `File conflict: ${relative} exists and this task has not read it. ` +
-              "Read it first, then decide whether to change it.",
-          );
-        }
-        if (known !== undefined && known !== current) {
-          throw new Error(
-            `File conflict: ${relative} changed after this task read it. ` +
-              "Re-read the file and redo the change against the current content.",
-          );
-        }
+        await checkVersion(key, relative);
         const value = await operation.run();
         versions.set(key, digest(contentOf(value)));
         changed.add(relative);
@@ -113,10 +125,40 @@ export class SharedWorkspaceFileGuard {
       });
     };
 
+    guard.runMany = async (paths, tool, operation) => {
+      for (const path of paths) checkScope(path, tool);
+      const entries = [...new Map(paths.map((path) => [workspaceFileKey(path), path])).entries()].sort(
+        ([left], [right]) => (left < right ? -1 : left > right ? 1 : 0),
+      );
+      const runLocked = async (index: number): Promise<Awaited<ReturnType<typeof operation>>> => {
+        const entry = entries[index];
+        if (entry !== undefined) return serialize(entry[0], () => runLocked(index + 1));
+        if (tool !== "read") {
+          for (const [key, path] of entries) await checkVersion(key, normalizeRelative(path.relative));
+        }
+        const value = await operation();
+        for (const [key, path] of entries) {
+          versions.set(key, await version(key));
+          if (tool !== "read") changed.add(normalizeRelative(path.relative));
+        }
+        return value;
+      };
+      return runLocked(0);
+    };
+
     return {
-      tools: options.names.map((name) =>
-        createCodingTool(name as CodingToolName, { cwd: this.workspace, ...this.options, guard }),
-      ),
+      tools: options.names.map((name) => {
+        if (["read", "shell", "edit", "write", "glob", "grep", "fetch"].includes(name)) {
+          return createCodingTool(name as CodingToolName, { cwd: this.workspace, ...this.options, guard });
+        }
+        const factory = Object.hasOwn(this.options.toolFactories ?? {}, name)
+          ? this.options.toolFactories![name]
+          : undefined;
+        if (factory === undefined) throw new Error(`Unknown sub-agent tool: ${name}`);
+        const tool = factory(guard);
+        if (tool.name !== name) throw new Error(`Tool factory ${name} returned tool ${tool.name}`);
+        return tool;
+      }),
       changedFiles: () => [...changed],
       note: () =>
         changed.size === 0

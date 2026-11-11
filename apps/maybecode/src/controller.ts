@@ -15,6 +15,7 @@ export interface MaybeCodeSkillInfo extends SkillDescriptor {
 
 /** @experimental */
 export interface MaybeCodeModelInfo {
+  readonly searchStatus?: string;
   readonly profile?: string;
   readonly provider: string;
   readonly adapter?: string;
@@ -23,6 +24,7 @@ export interface MaybeCodeModelInfo {
 
 /** @experimental */
 export interface MaybeCodeModelProfile {
+  readonly searchStatus?: string;
   readonly name: string;
   readonly provider: string;
   readonly adapter: string;

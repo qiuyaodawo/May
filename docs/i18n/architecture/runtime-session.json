@@ -8,8 +8,18 @@
     },
     {
       "heading": "Runtime and session boundaries",
-      "en": "59e4f1bbc2768d4733d5d12a02a7f15798dc344472082c8435de81ab6251bbad",
-      "zh": "62c152814fb7f2eb58b89143e5e147fde8a753f3ef7eed114ef6c14e934b0e80"
+      "en": "64d085c0b063ff25f54792917e6b4fede532df76a0d5f84d28541427e1d63167",
+      "zh": "ac83c55da1705dc36b0964fde28db291441dbc26b458ada49df549e99a9d7514"
+    },
+    {
+      "heading": "Server-tool continuation",
+      "en": "32e751025cab1b3ad974ef10aeabad8fa2f5af42d8d42ddddb5f9678617db544",
+      "zh": "d7311ae058ffd8db029bcf5680df56066c9192d5af3309a1b7b3c526a1241629"
+    },
+    {
+      "heading": "Resource ownership",
+      "en": "671321a0f457c6a639c948e248047ffe6e23938064e602c92ccce9ae67124e08",
+      "zh": "dc06a314b4491c4ec0bf010fbfc7a542c5211809bea75e51cdacc815ed3487e4"
     },
     {
       "heading": "Lifecycle ownership",
@@ -18,8 +28,8 @@
     },
     {
       "heading": "Package responsibilities",
-      "en": "095fd0ecfc5c7a36378ab6f240a4721abcde3b10ee2b5b17e35bdb8fc22efe3f",
-      "zh": "a88d71eaf9af03afd75c2727989d910090b5b5e7ef482dbfeab8beadd929e33e"
+      "en": "def7fe762a04378cae2237f945b6c85453e3904bae3b8294758a44730723bb99",
+      "zh": "1c1fd32a1c3fc9a9c88b90b7ba18406b1de545a2a170e885ad29dbd23b48324e"
     },
     {
       "heading": "@sortedyuan/may/core",
@@ -58,23 +68,23 @@
     },
     {
       "heading": "@sortedyuan/may/application",
-      "en": "8662d0c0994d876b438bf39e609a4d63de37a1402a64ec7bd3eb8277ce3ba6ec",
-      "zh": "e38033c2d8fa155f2d94a2491c85434f8f0417cb34cdd7eac81010d8673735a9"
+      "en": "016cbb9ed3a7f56298baf5a6a64ae323310f0209f94aeb96be1e73b023fc40c4",
+      "zh": "27d9ea2b21b3567fa4bf306cf7b79c4d647ac26349abb6cbb1544c36f85f31b0"
     },
     {
       "heading": "@sortedyuan/tui",
-      "en": "207945556c6d0f5e88d919a6f73ae39a48efa8a01a6e0e3f7cf72619a05d17bc",
-      "zh": "279e7f21e0343776a5682dd7ddf55448e185da55c8b43ee164deabe96bb9b00f"
+      "en": "d00d39bf27dd93e54b0fbbb9dc1a806b3337fc15c890c453dc9923f8b1238b11",
+      "zh": "795cc29610aad217cf120b7e0bf118e1d18ad17783e68773577023535e49da75"
     },
     {
       "heading": "apps/maybecode",
-      "en": "9d08b3ba1d6d339c7fb35312539c9e76408c57d0d697e1b6ee323f772594feda",
-      "zh": "f099a829d663443ec4c272d9e0e890ed0708abe9569e993b6407e3884a58a1b2"
+      "en": "3bea20c4fd649e8d37401a6316658b4ed35b23e57a2ee465e0950fe0665a2b94",
+      "zh": "a117d789835dcee756390658c2c705d8202e911716817428ed3cede458eaf9f8"
     },
     {
       "heading": "apps/maybeclaw",
-      "en": "492a92931b2dbc5cfa4c2ad0b08bb3b2b40194201fa8888ae1558894dbada030",
-      "zh": "54cf7f0f700ff9a1c0713c8c5b7903b3fa4b3ef85fa70cbcc5b5845427e793b0"
+      "en": "3501193d61d610d4d3799091fbd7bcb936d38efbdc1db5017f3b7ffa7f4e960a",
+      "zh": "1b974900f6881fe73b7db992d561b1df5f9ac1a7e662b3308e8038ef0777363c"
     },
     {
       "heading": "Events and persistence",

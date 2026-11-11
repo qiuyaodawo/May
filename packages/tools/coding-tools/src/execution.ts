@@ -1,7 +1,8 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { mkdir } from "node:fs/promises";
+import { isAbsolute, relative, resolve, sep, posix, join } from "node:path";
 import { omitUndefined } from "@sortedyuan/may/core";
 import { CodingToolError } from "./errors.js";
 import { resolveExistingWorkspacePath } from "./workspace-path.js";
@@ -21,6 +22,7 @@ export type CodingExecutionIsolation =
 export interface CodingExecutionEnvironment {
   readonly workspace: string;
   readonly isolation: CodingExecutionIsolation;
+  readonly cachePath: string | undefined;
   spawn(
     command: string,
     args: readonly string[],
@@ -28,8 +30,11 @@ export interface CodingExecutionEnvironment {
       readonly cwd: string;
       readonly signal: AbortSignal;
       readonly env?: Readonly<Record<string, string>>;
+      readonly stdin?: "cancel" | "pipe";
     },
   ): ChildProcess;
+  toEnvironmentPath(hostPath: string): string;
+  toHostPath(environmentPath: string): string | undefined;
   close(): Promise<void>;
 }
 
@@ -49,10 +54,18 @@ export async function openCodingExecutionEnvironment(options: {
   readonly workspace: string;
   readonly isolation: CodingExecutionIsolation;
   readonly signal?: AbortSignal;
+  readonly cacheDirectory?: string;
 }): Promise<CodingExecutionEnvironment> {
   options.signal?.throwIfAborted();
   const workspace = (await resolveExistingWorkspacePath(options.workspace, ".")).absolute;
   const isolation = Object.freeze({ ...options.isolation });
+  const cacheDirectory = options.cacheDirectory === undefined ? undefined : resolve(options.cacheDirectory);
+  if (cacheDirectory !== undefined) {
+    await Promise.all(
+      ["home", "xdg", "go-build", "run"].map((path) => mkdir(join(cacheDirectory, path), { recursive: true })),
+    );
+  }
+  const cachePath = isolation.mode === "container" && cacheDirectory !== undefined ? "/may-cache" : cacheDirectory;
   const name = `may-${randomUUID()}`;
   if (isolation.mode === "container") {
     if (
@@ -98,6 +111,7 @@ export async function openCodingExecutionEnvironment(options: {
       "no-new-privileges",
       "--mount",
       `type=bind,source=${workspace},target=${containerWorkspace}`,
+      ...(cacheDirectory === undefined ? [] : ["--mount", `type=bind,source=${cacheDirectory},target=/may-cache`]),
       "--workdir",
       containerWorkspace,
       "--entrypoint",
@@ -124,15 +138,19 @@ export async function openCodingExecutionEnvironment(options: {
     closed = true;
     options.signal?.removeEventListener("abort", abort);
     closePromise = (async () => {
-      for (const record of records) record.stop();
-      if (isolation.mode === "container") await docker(["rm", "--force", name]);
+      const active = [...records];
+      for (const record of active) record.stop();
+      await Promise.all(active.flatMap((record) => record.stopping));
+      const removeBeforeWait = isolation.mode === "container" && terminationFailure !== undefined;
+      if (removeBeforeWait) await docker(["rm", "--force", name]);
       await Promise.all(
-        [...records].map(async (record) => {
+        active.map(async (record) => {
           await record.done;
           await Promise.all(record.stopping);
         }),
       );
       await Promise.all(terminations);
+      if (isolation.mode === "container" && !removeBeforeWait) await docker(["rm", "--force", name]);
       if (terminationFailure !== undefined) throw terminationFailure;
     })();
     return closePromise;
@@ -146,6 +164,25 @@ export async function openCodingExecutionEnvironment(options: {
   const environment: CodingExecutionEnvironment = {
     workspace,
     isolation,
+    cachePath,
+    toEnvironmentPath(hostPath) {
+      const path = relative(workspace, resolve(hostPath));
+      if (path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path)) {
+        throw new CodingToolError("CODING_TOOL_PATH_OUTSIDE_WORKSPACE", "Path is outside the workspace");
+      }
+      return isolation.mode === "host" ? hostPath : posix.join(containerWorkspace, path.split(sep).join("/"));
+    },
+    toHostPath(environmentPath) {
+      if (isolation.mode === "host") {
+        if (!isAbsolute(environmentPath)) return undefined;
+        const path = relative(workspace, environmentPath);
+        return path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path) ? undefined : environmentPath;
+      }
+      if (!posix.isAbsolute(environmentPath)) return undefined;
+      const path = posix.relative(containerWorkspace, posix.normalize(environmentPath));
+      if (path === ".." || path.startsWith("../") || posix.isAbsolute(path)) return undefined;
+      return resolve(workspace, ...path.split("/"));
+    },
     spawn(command, args, spawnOptions) {
       if (closed) throw new CodingToolError("CODING_EXECUTION_CLOSED", "Execution environment is closed");
       spawnOptions.signal.throwIfAborted();
@@ -155,8 +192,26 @@ export async function openCodingExecutionEnvironment(options: {
       }
       const containerCwd = path === "" ? containerWorkspace : `${containerWorkspace}/${path.split(sep).join("/")}`;
       const dockerArgs = ["exec", "--interactive", "--workdir", containerCwd];
-      for (const [key, value] of Object.entries(spawnOptions.env ?? {})) dockerArgs.push("--env", `${key}=${value}`);
-      dockerArgs.push(name, "bash", "-c", supervisor, "may-exec", command, ...args);
+      const containerEnv = {
+        ...(cachePath === undefined
+          ? {}
+          : { HOME: `${cachePath}/home`, XDG_CACHE_HOME: `${cachePath}/xdg`, GOCACHE: `${cachePath}/go-build` }),
+        GOFLAGS: "-mod=readonly",
+        GOPROXY: "off",
+        CARGO_NET_OFFLINE: "true",
+        ...spawnOptions.env,
+      };
+      for (const [key, value] of Object.entries(containerEnv)) dockerArgs.push("--env", `${key}=${value}`);
+      const pipe = spawnOptions.stdin === "pipe";
+      if (isolation.mode === "container" && pipe && cachePath === undefined) {
+        throw new CodingToolError("CODING_EXECUTION_INVALID_OPTIONS", "Container stdin pipe requires cacheDirectory");
+      }
+      const pidfile = `${cachePath}/run/${randomUUID()}.pid`;
+      if (pipe) {
+        dockerArgs.push(name, "setsid", "sh", "-c", 'echo $$ > "$0"; exec "$@"', pidfile, command, ...args);
+      } else {
+        dockerArgs.push(name, "bash", "-c", supervisor, "may-exec", command, ...args);
+      }
       const child =
         isolation.mode === "host"
           ? spawn(
@@ -180,7 +235,24 @@ export async function openCodingExecutionEnvironment(options: {
         if (stopped || child.exitCode !== null || child.signalCode !== null) return;
         stopped = true;
         if (isolation.mode === "container") {
-          child.stdin?.end("cancel\n");
+          if (pipe) {
+            const termination = docker(
+              [
+                "exec",
+                name,
+                "sh",
+                "-c",
+                'f=$1; count=0; while [ ! -s "$f" ]; do count=$((count+1)); [ "$count" -lt 100 ] || exit 1; sleep 0.05; done; kill -KILL -- -"$(cat "$f")"',
+                "may-stop",
+                pidfile,
+              ],
+              5000,
+            ).catch((error: unknown) => {
+              terminationFailure = error;
+            });
+            stopping.push(termination);
+            terminations.add(termination);
+          } else child.stdin?.end("cancel\n");
         } else if (child.pid !== undefined) {
           const killer =
             process.platform === "win32"
@@ -203,7 +275,14 @@ export async function openCodingExecutionEnvironment(options: {
         child.once("close", () => {
           spawnOptions.signal.removeEventListener("abort", stop);
           records.delete(record);
-          resolveDone();
+          if (isolation.mode === "container" && pipe) {
+            const cleanup = Promise.all(stopping).then(() => docker(["exec", name, "rm", "-f", pidfile]));
+            const completion = cleanup.catch((error: unknown) => {
+              terminationFailure = error;
+            });
+            terminations.add(completion);
+            completion.then(resolveDone, resolveDone);
+          } else resolveDone();
         });
       });
       const record = { child, done, stop, stopping };
@@ -245,9 +324,13 @@ export async function openCodingExecutionEnvironment(options: {
   return environment;
 }
 
-async function docker(args: readonly string[]): Promise<void> {
+async function docker(args: readonly string[], timeout?: number): Promise<void> {
   const result = await processResult(
-    spawn("docker", [...args], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] }),
+    spawn("docker", [...args], {
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      ...omitUndefined({ timeout }),
+    }),
   );
   if (result.code !== 0)
     throw new CodingToolError("CODING_EXECUTION_DOCKER_FAILED", `docker ${args[0]} failed: ${result.stderr}`);

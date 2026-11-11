@@ -5,6 +5,8 @@ export const GEMINI_MODEL_STATE_TYPE = "google-gemini.content.v1";
 
 /** @experimental */
 export interface GeminiPart {
+  toolCall?: { id?: string; toolType: string; toolName?: string; args?: Record<string, unknown> };
+  toolResponse?: { id?: string; toolType: string; response?: Record<string, unknown> };
   text?: string;
   thought?: boolean;
   thoughtSignature?: string;
@@ -22,6 +24,8 @@ export interface GeminiContent {
 
 /** @experimental */
 export interface GeminiModelStateData {
+  origin?: import("../web-search.js").ServerToolOrigin;
+  groundingMetadata?: import("./grounding.js").GeminiGrounding;
   parts: GeminiPart[];
   toolCallIds: string[];
 }
@@ -40,7 +44,11 @@ export interface GeminiUsageMetadata {
 export interface GeminiGenerateContentRequest {
   contents: GeminiContent[];
   systemInstruction?: { parts: GeminiPart[] };
-  tools?: { functionDeclarations: { name: string; description: string; parametersJsonSchema: JsonSchema }[] }[];
+  tools?: (
+    | { functionDeclarations: { name: string; description: string; parametersJsonSchema: JsonSchema }[] }
+    | { googleSearch: Record<string, unknown> }
+  )[];
+  toolConfig?: { includeServerSideToolInvocations: true };
   generationConfig?: {
     maxOutputTokens?: number;
     thinkingConfig?: { thinkingLevel?: string; thinkingBudget?: number; includeThoughts?: boolean };

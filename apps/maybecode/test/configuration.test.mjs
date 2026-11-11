@@ -114,6 +114,7 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
     provider: "deepseek",
     adapter: "deepseek-chat",
     model: "deepseek-chat",
+    searchStatus: "Search disabled",
   });
   assert.equal((await (await app.submit({ input: "hello" })).result).message.content[0].text, "ok");
   assert.match(request.messages[0].content[0].text, /^custom system\n\n# Current environment\n\n/u);

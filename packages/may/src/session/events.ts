@@ -187,6 +187,7 @@ export type SessionEventPayload =
       step: number;
       call: ToolCall;
       output: unknown;
+      usage?: Usage;
       /** 旧记录可能缺少本次执行的模型可见内容。 */
       content?: ContentPart[];
     }
@@ -196,6 +197,7 @@ export type SessionEventPayload =
       step: number;
       call: ToolCall;
       error: SerializedError;
+      usage?: Usage;
     }
   | ({ type: "tool.presentation" } & SessionToolPresentation)
   | { type: "approval.requested"; request: SessionApprovalRequest }

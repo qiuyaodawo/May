@@ -33,6 +33,7 @@ export function configuredModelOptions(
   profile: string | undefined,
 ): Readonly<Record<string, unknown>> {
   return omitUndefined({
+    webSearch: options.webSearch === false ? false : undefined,
     reasoningEffort: options.modelProfiles?.find((item) => item.name === profile)?.reasoningEffort,
   });
 }

@@ -4,6 +4,25 @@ import type { PluginModuleSelection } from "@sortedyuan/may/plugin";
 import type { MaybeCodeSubagentSettings } from "@sortedyuan/coordination/delegation/configuration";
 import section from "./config-schema.json" with { type: "json" };
 import type { CodingExecutionIsolation, FetchToolOptions } from "@sortedyuan/coding-tools";
+import type { LanguageServerDefinition, LanguageServerManagerOptions } from "@sortedyuan/lsp-tools";
+import { LANGUAGE_SERVER_PRESETS } from "@sortedyuan/lsp-tools";
+
+export interface MaybeCodeLspSettings extends Omit<
+  LanguageServerManagerOptions,
+  "execution" | "servers" | "dataDirectory" | "guard"
+> {
+  readonly servers: Readonly<Record<string, Omit<LanguageServerDefinition, "id">>>;
+  readonly editDiagnostics?: boolean;
+}
+
+export interface MaybeCodeWebSearchSettings {
+  readonly hostTool?: {
+    readonly backend: "deepseek" | "zhipu" | "kimi-formula";
+    readonly provider: string;
+    readonly searchEngine?: "search_std" | "search_pro" | "search_pro_sogou" | "search_pro_quark";
+  };
+  readonly maxResults?: number;
+}
 
 export const MAYBECODE_APPLICATION_ID = "maybecode";
 
@@ -83,6 +102,8 @@ export interface MaybeCodeRetrySettings {
 
 /** The `apps.maybecode` entry of a May configuration file, validated against `config-schema.json`. */
 export interface MaybeCodeSettings {
+  readonly lsp?: false | MaybeCodeLspSettings;
+  readonly webSearch?: false | MaybeCodeWebSearchSettings;
   readonly execution?: CodingExecutionIsolation;
   readonly fetch?: FetchToolOptions;
   readonly requestRecording?: "off" | "required";
@@ -108,6 +129,74 @@ const validate = createApplicationConfigValidator<MaybeCodeSettings>(MAYBECODE_A
 
 export function readMaybeCodeSettings(config: MayConfig): MaybeCodeSettings {
   const settings = validate(config.apps?.[MAYBECODE_APPLICATION_ID] ?? {}, config.path);
+  if (settings.webSearch && settings.webSearch.hostTool) {
+    const host = settings.webSearch.hostTool;
+    const provider = config.providers[host.provider];
+    if (!provider)
+      throw new MayConfigValidationError(
+        config.path,
+        "apps.maybecode.webSearch.hostTool.provider",
+        `unknown provider ${host.provider}`,
+      );
+    const apiKey = provider.apiKey ?? (provider.apiKeyEnv ? process.env[provider.apiKeyEnv] : undefined);
+    if (!apiKey?.trim())
+      throw new MayConfigValidationError(
+        config.path,
+        "apps.maybecode.webSearch.hostTool.provider",
+        "provider requires an API key",
+      );
+    if (host.backend === "zhipu" && !host.searchEngine)
+      throw new MayConfigValidationError(
+        config.path,
+        "apps.maybecode.webSearch.hostTool.searchEngine",
+        "Zhipu requires searchEngine",
+      );
+  }
+  const names = new Set(["read", "shell", "edit", "write", "glob", "grep", "fetch"]);
+  if (settings.webSearch && settings.webSearch.hostTool) names.add("web_search");
+  if (settings.lsp) {
+    for (const name of [
+      "lsp_diagnostics",
+      "lsp_definition",
+      "lsp_references",
+      "lsp_hover",
+      "lsp_document_symbols",
+      "lsp_workspace_symbols",
+      "lsp_rename",
+    ])
+      names.add(name);
+    const extensions = new Set<string>();
+    for (const [id, server] of Object.entries(settings.lsp.servers)) {
+      const preset = Object.entries(LANGUAGE_SERVER_PRESETS).find(([name]) => name === id)?.[1];
+      if (!preset && (!server.command || !server.languages))
+        throw new MayConfigValidationError(
+          config.path,
+          `apps.maybecode.lsp.servers.${id}`,
+          "custom servers require command and languages",
+        );
+      for (const values of Object.values(server.languages ?? preset?.languages ?? {}))
+        for (const value of values) {
+          const extension = value.toLowerCase();
+          if (extensions.has(extension))
+            throw new MayConfigValidationError(
+              config.path,
+              "apps.maybecode.lsp.servers",
+              `duplicate extension ${extension}`,
+            );
+          extensions.add(extension);
+        }
+    }
+  }
+  if (settings.subagents && settings.subagents.roles)
+    for (const [role, options] of Object.entries(settings.subagents.roles))
+      for (const name of options.tools ?? []) {
+        if (!names.has(name))
+          throw new MayConfigValidationError(
+            config.path,
+            `apps.maybecode.subagents.roles.${role}.tools`,
+            `unregistered tool ${name}`,
+          );
+      }
   for (const [index, origin] of (settings.fetch?.allowedOrigins ?? []).entries()) {
     if (!URL.canParse(origin) || new URL(origin).origin !== origin)
       throw new MayConfigValidationError(

@@ -9,6 +9,30 @@ Session 与产品行为由应用管理。
 已经支持的 Provider 可以使用 `@sortedyuan/providers` 的内置适配器。
 新协议和本地协议演示可以实现 `Model`。
 
+## 服务端工具与引用
+
+通过 adapter 选项声明 Provider 服务端工具。在 `AssistantMessage.serverToolCalls`
+中返回每次调用的完整状态：必填 `id`、`kind`、`name`、`status`（`pending`、
+`completed`、`failed`），可选 `input`、`sources`、`error: { code }`。
+同一消息中的 ID 必须唯一。adapter 生成的 ID 使用 `may:` 前缀。
+后续响应完成 pending 调用时，保留其 ID、kind、name 和 input。消费者按照 ID 合并更新。
+
+发送 `{ type: "server_tool.updated", call }` 提供实时更新，并在
+`response.completed.message` 中包含最终状态。text part 可以包含 `citations`：
+`type: "url"`、`url`，以及可选的 `title`、`citedText`、`range: { start, end }`。
+范围使用所属 text part 内的 UTF-16 代码单元，结束位置不包含在内；
+整个 text part 的引用省略范围。
+
+Provider 需要自动继续请求时，使用 `continuation: "server-tool-pause"`，
+该字段与非空客户端 `toolCalls` 互斥。使用具有命名空间的 `modelState` 保存原生内容块，
+继续未完成交互之前检查 adapter、模型、端点和服务端工具配置。
+Core 完成 Step，并在继续请求次数和 Run 限制内发送下一次模型请求。
+参阅[运行行为](../architecture/runtime-session.md#服务端工具继续请求)。
+
+客户端调用提供原始参数字符串时，保存在 `ToolCall.rawInput`。
+hook 执行后的输入与原输入等价时，Core 将其传入 `ToolExecutionContext.rawInput`。
+Kimi Formula 要求提供该字符串。
+
 ## 最小实现
 
 以下本地文字转换器展示必需的流式协议，只执行大写转换，不调用外部模型服务。

@@ -2,6 +2,25 @@
 
 Anthropic Messages API adapter for May.
 
+## Web search
+
+Set constructor `webSearch` or provider/model `options.webSearch` to `{}` to
+enable server search; omission and `false` disable it. Fields are `version`
+(default `web_search_20250305`, also `web_search_20260209` and `web_search_20260318`),
+`maxUses`, `allowedDomains`, `blockedDomains`, `userLocation`, `allowedCallers`,
+and `responseInclusion`. Domain lists are mutually exclusive. `responseInclusion`
+requires `web_search_20260318`. Newer versions can use server code execution;
+set `allowedCallers: ["direct"]` for direct search. Configuration authorizes
+server execution. A client function named `web_search` conflicts with it.
+
+Responses expose `serverToolCalls` and text `citations`, retain native blocks
+and container state, and translate `pause_turn` to
+`continuation: "server-tool-pause"`. May automatically continues within Run
+limits; `maxServerToolContinuations` defaults to 8. Changing model, endpoint,
+adapter, or search configuration during unfinished interaction raises
+`ServerToolStateMismatchError`. Search usage appears as `web-search` requests.
+See [configuration](../../../../docs/en/reference/configuration.md#server-search).
+
 `promptCaching` defaults to disabled. Enable automatic caching with
 `{ ttl: "5m", cacheInstructions: true }` or choose `ttl: "1h"`.
 Instruction caching marks the last system block and tool with the same TTL as the

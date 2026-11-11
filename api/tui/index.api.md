@@ -11,6 +11,7 @@ import type { MayEvent } from '@sortedyuan/may/core';
 import { MediaSource as MediaSource_2 } from '@sortedyuan/may/core';
 import type { PermissionEvent } from '@sortedyuan/may/permissions';
 import { SessionEvent } from '@sortedyuan/may/session';
+import { SessionToolPresentation } from '@sortedyuan/may/session';
 import { SessionToolStatus } from '@sortedyuan/may/session';
 import type { ToolCall } from '@sortedyuan/may/core';
 import { ToolChangePreview } from '@sortedyuan/coding-tools/change-preview';
@@ -88,6 +89,18 @@ export class ClipboardUnavailableError extends Error {
 }
 
 // @public
+export function codingChangePresentation(preview: ToolChangePreview): ToolPresentationProjection;
+
+// @public
+export type CodingToolPresentation = {
+    readonly type: "change";
+    readonly preview: ToolChangePreview;
+} | {
+    readonly type: "rename";
+    readonly previews: readonly ToolChangePreview[];
+};
+
+// @public
 export class Column implements Component {
     constructor(items: readonly ColumnItem[], options?: ColumnOptions);
     // (undocumented)
@@ -125,6 +138,9 @@ export interface Component {
     // (undocumented)
     render(size: RenderSize): RenderResult;
 }
+
+// @public
+export function createCodingToolPresentationProjector(): ToolPresentationProjector;
 
 // @public
 export function createCodingToolRendererRegistry(): ToolRendererRegistry;
@@ -623,6 +639,9 @@ export { PointerEvent_2 as PointerEvent }
 
 // @public (undocumented)
 export function printableKeyText(stroke: KeyStroke): string | undefined;
+
+// @public
+export function readCodingToolPresentation(item: ToolTranscriptItem): CodingToolPresentation | undefined;
 
 // @public (undocumented)
 export function removeLastCodePoint(value: string): string;
@@ -1246,6 +1265,18 @@ export interface TextStyle {
 }
 
 // @public
+export interface ToolPresentationProjection {
+    // (undocumented)
+    readonly input: unknown;
+    readonly toolName: string;
+    // (undocumented)
+    readonly value: unknown;
+}
+
+// @public
+export type ToolPresentationProjector = (presentation: SessionToolPresentation) => ToolPresentationProjection | undefined;
+
+// @public
 export class ToolRendererRegistry {
     constructor(fallback?: ToolTranscriptRenderer);
     // (undocumented)
@@ -1272,8 +1303,7 @@ export interface ToolTranscriptItem {
     readonly kind: "tool";
     // (undocumented)
     readonly output?: unknown;
-    // (undocumented)
-    readonly preview?: ToolChangePreview;
+    readonly presentation?: unknown;
     // (undocumented)
     readonly progress: readonly string[];
     // (undocumented)
@@ -1328,9 +1358,11 @@ export type TranscriptListener = (store: TranscriptStore) => void;
 
 // @public
 export class TranscriptStore {
-    appendChangePreview(runId: string, step: number, toolCallId: string, preview: ToolChangePreview, timestamp?: number): void;
+    constructor(options?: TranscriptStoreOptions);
     // (undocumented)
     appendNotice(level: NoticeTranscriptItem["level"], text: string, timestamp?: number): void;
+    // (undocumented)
+    appendToolPresentation(presentation: SessionToolPresentation, timestamp?: number): void;
     // (undocumented)
     appendUser(message: string | UserMessage, timestamp?: number): void;
     // (undocumented)
@@ -1339,6 +1371,7 @@ export class TranscriptStore {
     applyPermissionEvent(event: PermissionEvent): void;
     // (undocumented)
     applySessionEvent(event: SessionEvent): void;
+    attachToolPresentation(runId: string, step: number, toolCallId: string, projection: ToolPresentationProjection, timestamp?: number): void;
     // (undocumented)
     get items(): readonly TranscriptItem[];
     get latestReply(): AssistantTranscriptItem | undefined;
@@ -1350,6 +1383,11 @@ export class TranscriptStore {
     get sessionId(): string | undefined;
     // (undocumented)
     subscribe(listener: TranscriptListener): () => void;
+}
+
+// @public (undocumented)
+export interface TranscriptStoreOptions {
+    readonly toolPresentationProjector?: ToolPresentationProjector;
 }
 
 // @public (undocumented)

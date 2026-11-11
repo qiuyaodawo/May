@@ -95,7 +95,7 @@ export class MayConfigWriteError extends MayConfigError {
 }
 
 // @public (undocumented)
-export const MODEL_CAPABILITY_KEYS: readonly ["input.text", "input.image", "input.audio", "input.file", "input.resource", "input.image.sources", "input.audio.sources", "input.file.sources", "output.text", "output.image", "output.audio", "tools", "tools.maxCalls", "structuredOutput.json", "structuredOutput.jsonSchema", "structuredOutput.schemaDialects", "structuredOutput.schemaConstraint", "contextWindowTokens", "maxOutputTokens", "maxImages", "maxAttachments", "maxAttachmentBytes", "fileTypes", "parameters", "contextCompaction", "reasoning.modes"];
+export const MODEL_CAPABILITY_KEYS: readonly ["input.text", "input.image", "input.audio", "input.file", "input.resource", "input.image.sources", "input.audio.sources", "input.file.sources", "output.text", "output.image", "output.audio", "tools", "tools.maxCalls", "serverTools.webSearch", "serverTools.webSearchWithFunctions", "serverTools.alwaysSearches", "structuredOutput.json", "structuredOutput.jsonSchema", "structuredOutput.schemaDialects", "structuredOutput.schemaConstraint", "contextWindowTokens", "maxOutputTokens", "maxImages", "maxAttachments", "maxAttachmentBytes", "fileTypes", "parameters", "contextCompaction", "reasoning.modes"];
 
 // @public (undocumented)
 export interface ModelCapabilitiesOverride {

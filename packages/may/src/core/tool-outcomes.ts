@@ -1,12 +1,13 @@
 import { FatalToolExecutionError, RunCancelledError } from "./errors.js";
 import { serializeError, type MayEventPayload, type SerializedError } from "./events.js";
 import type { ToolProgressUpdate } from "./tool.js";
-import { toolCancellationMessage, type ToolCall, type ToolMessage } from "./types.js";
+import { toolCancellationMessage, type ToolCall, type ToolMessage, type Usage } from "./types.js";
 
 interface CompletedToolExecution {
   readonly type: "completed";
   readonly call: ToolCall;
   readonly output: unknown;
+  readonly usage?: Usage;
   readonly message: ToolMessage;
   readonly fatal?: FatalToolExecutionError;
 }
@@ -15,6 +16,7 @@ export interface FailedToolExecution {
   readonly type: "failed";
   readonly call: ToolCall;
   readonly error: SerializedError;
+  readonly usage?: Usage;
   readonly message: ToolMessage;
   fatal?: FatalToolExecutionError;
 }
@@ -58,9 +60,16 @@ export function emitToolOutcomes(
         call: outcome.call,
         output: outcome.output,
         content: outcome.message.content,
+        ...(outcome.usage === undefined ? {} : { usage: outcome.usage }),
       });
     } else {
-      emit({ type: "tool.failed", step, call: outcome.call, error: outcome.error });
+      emit({
+        type: "tool.failed",
+        step,
+        call: outcome.call,
+        error: outcome.error,
+        ...(outcome.usage === undefined ? {} : { usage: outcome.usage }),
+      });
     }
   }
 }

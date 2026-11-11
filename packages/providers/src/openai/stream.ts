@@ -1,4 +1,4 @@
-import type { AssistantMessage, ContentPart, ModelEvent, ToolCall, Usage } from "@sortedyuan/may/core";
+import type { AssistantMessage, ContentPart, ModelEvent, ServerToolCall, ToolCall, Usage } from "@sortedyuan/may/core";
 import { omitUndefined } from "@sortedyuan/may/core";
 import { readSseData } from "../openai-compatible/http.js";
 
@@ -47,6 +47,7 @@ export async function* streamOpenAIResponse(response: Response, signal: AbortSig
     throw new OpenAIResponsesProtocolError("OpenAI Responses stream ended without response.completed");
   }
   const parsed = parseCompletedOpenAIResponse(completed);
+  for (const call of parsed.message.serverToolCalls ?? []) yield { type: "server_tool.updated", call };
   yield omitUndefined({ type: "response.completed", message: parsed.message, usage: parsed.usage });
 }
 
@@ -58,10 +59,36 @@ export function parseCompletedOpenAIResponse(value: unknown): {
   const output = requireArray(response.output, "response.output");
   const content: ContentPart[] = [];
   const toolCalls: ToolCall[] = [];
+  const serverToolCalls: ServerToolCall[] = [];
+  let searches = 0;
 
   for (const raw of output) {
     const item = requireRecord(raw, "response.output item");
     const type = requireString(item.type, "response.output item.type");
+    if (type === "web_search_call") {
+      const action = requireRecord(item.action, "web_search_call.action");
+      const actionType = requireString(action.type, "web_search_call.action.type");
+      if (actionType === "search") searches += 1;
+      const sources = (optionalArray(action.sources) ?? []).map((raw) => {
+        const source = requireRecord(raw, "web_search_call source");
+        return {
+          url: requireString(source.url, "source.url"),
+          ...(typeof source.title === "string" ? { title: source.title } : {}),
+        };
+      });
+      serverToolCalls.push({
+        id: requireString(item.id, "web_search_call.id"),
+        kind: "web_search",
+        name: "web_search",
+        input:
+          actionType === "search"
+            ? { queries: action.queries ?? (typeof action.query === "string" ? [action.query] : []) }
+            : action,
+        status: item.status === "failed" ? "failed" : item.status === "completed" ? "completed" : "pending",
+        ...(sources.length ? { sources } : {}),
+      });
+      continue;
+    }
     if (type === "image_generation_call" && item.result != null) {
       const format = item.output_format ?? "png";
       if (format !== "png" && format !== "jpeg" && format !== "webp")
@@ -87,7 +114,29 @@ export function parseCompletedOpenAIResponse(value: unknown): {
         const part = requireRecord(rawPart, "message content part");
         if (part.type === "output_text") {
           const text = requireString(part.text, "output_text.text");
-          if (text !== "") content.push({ type: "text", text });
+          const citations = (optionalArray(part.annotations) ?? []).flatMap((raw) => {
+            const annotation = requireRecord(raw, "annotation");
+            if (annotation.type !== "url_citation") return [];
+            const start = annotation.start_index;
+            const end = annotation.end_index;
+            if (
+              !Number.isSafeInteger(start) ||
+              !Number.isSafeInteger(end) ||
+              (start as number) < 0 ||
+              (end as number) < (start as number) ||
+              (end as number) > text.length
+            )
+              throw new OpenAIResponsesProtocolError("Invalid url_citation range");
+            return [
+              {
+                type: "url" as const,
+                url: requireString(annotation.url, "citation.url"),
+                ...(typeof annotation.title === "string" ? { title: annotation.title } : {}),
+                range: { start: start as number, end: end as number },
+              },
+            ];
+          });
+          if (text !== "") content.push({ type: "text", text, ...(citations.length ? { citations } : {}) });
         }
         if (part.type === "refusal") {
           const refusal = requireString(part.refusal, "refusal.refusal");
@@ -100,7 +149,7 @@ export function parseCompletedOpenAIResponse(value: unknown): {
       const id = requireString(item.call_id, "function_call.call_id");
       const name = requireString(item.name, "function_call.name");
       const argumentsJson = requireString(item.arguments, "function_call.arguments");
-      toolCalls.push({ id, name, input: parseArguments(argumentsJson, id) });
+      toolCalls.push({ id, name, input: parseArguments(argumentsJson, id), rawInput: argumentsJson });
     }
   }
 
@@ -108,12 +157,21 @@ export function parseCompletedOpenAIResponse(value: unknown): {
     role: "assistant",
     content,
     ...(toolCalls.length === 0 ? {} : { toolCalls }),
+    ...(serverToolCalls.length === 0 ? {} : { serverToolCalls }),
     modelState: {
       type: OPENAI_RESPONSES_MODEL_STATE_TYPE,
       data: { items: output },
     },
   };
-  const usage = parseUsage(response.usage);
+  let usage = parseUsage(response.usage);
+  if (searches > 0)
+    usage = {
+      ...usage,
+      ...(usage === undefined
+        ? { completeness: { status: "partial" as const, reason: "provider-token-components-missing" } }
+        : {}),
+      items: [...(usage?.items ?? []), { id: "web-search", quantity: searches, unit: "requests", includedIn: "none" }],
+    };
   return omitUndefined({ message, usage });
 }
 

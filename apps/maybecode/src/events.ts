@@ -10,7 +10,7 @@ export type MaybeCodeSessionEvent =
   | { type: "workspace.git.changed"; checkpoint: import("@sortedyuan/may/application/git-workspace").GitCheckpoint }
   | import("@sortedyuan/may/goals").GoalEvent
   | MaybeCodeDelegationEvent
-  | Exclude<AgentApplicationEvent, { type: "tool.presentation" }>
+  | AgentApplicationEvent
   | {
       type: "change.preview";
       runId: string;

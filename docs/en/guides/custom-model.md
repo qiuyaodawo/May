@@ -11,6 +11,33 @@ Use a built-in adapter from `@sortedyuan/providers` when the provider is already
 supported. Implement `Model` when integrating a new protocol or when creating a
 local protocol demonstration.
 
+## Server tools and citations
+
+Declare provider server tools in adapter options. Return each call's complete
+state in `AssistantMessage.serverToolCalls`: required `id`, `kind`, `name`, and
+`status` (`pending`, `completed`, or `failed`), with optional `input`, `sources`,
+and `error: { code }`. IDs must be unique within a message. Use a `may:` prefix
+for adapter-generated IDs. When a later response completes a pending call,
+preserve its ID, kind, name, and input. Consumers merge updates by ID.
+
+Emit `{ type: "server_tool.updated", call }` for live updates and include final
+states in `response.completed.message`. Text parts may carry `citations` with
+`type: "url"`, `url`, optional `title`, `citedText`, and `range: { start, end }`.
+Ranges use UTF-16 code units within that text part, with an exclusive end;
+omit the range for a whole-part citation.
+
+Use `continuation: "server-tool-pause"` when the provider needs an automatic
+continuation. It is mutually exclusive with nonempty client `toolCalls`.
+Preserve native blocks in namespaced `modelState` and verify the adapter,
+model, endpoint, and server-tool configuration before continuing unfinished
+interactions. Core completes the Step and makes the next model call within
+the configured continuation and Run limits. See
+[runtime behavior](../architecture/runtime-session.md#server-tool-continuation).
+
+For client calls, preserve the original argument string in `ToolCall.rawInput`
+when available. Core forwards it to `ToolExecutionContext.rawInput` while the
+input remains equivalent after hooks. Kimi Formula requires this string.
+
 ## Minimal implementation
 
 The following local text transformer demonstrates the required stream protocol.

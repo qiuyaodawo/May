@@ -266,7 +266,7 @@ test("assembles fragmented reasoning, text, tools, and usage", async () => {
           { type: "reasoning", text: "Think." },
           { type: "text", text: "Calling tool." },
         ],
-        toolCalls: [{ id: "call_1", name: "lookup", input: { id: 1 } }],
+        toolCalls: [{ id: "call_1", name: "lookup", input: { id: 1 }, rawInput: '{"id":1}' }],
       },
       usage: { inputTokens: 4, outputTokens: 6, totalTokens: 10 },
     },

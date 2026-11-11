@@ -53,9 +53,13 @@ export function assertModelResponseFormat(request: ModelRequest): void;
 export interface AssistantMessage {
     // (undocumented)
     content: ContentPart[];
+    // (undocumented)
+    continuation?: "server-tool-pause";
     modelState?: ModelState;
     // (undocumented)
     role: "assistant";
+    // (undocumented)
+    serverToolCalls?: ServerToolCall[];
     // (undocumented)
     toolCalls?: ToolCall[];
 }
@@ -86,6 +90,22 @@ export class AsyncStateSerializer {
 }
 
 // @public (undocumented)
+export interface Citation {
+    // (undocumented)
+    readonly citedText?: string;
+    readonly range?: {
+        readonly start: number;
+        readonly end: number;
+    };
+    // (undocumented)
+    readonly title?: string;
+    // (undocumented)
+    readonly type: "url";
+    // (undocumented)
+    readonly url: string;
+}
+
+// @public (undocumented)
 export function compileModelSchema(schema: JsonSchema): ValidateFunction;
 
 // @public (undocumented)
@@ -97,6 +117,7 @@ export class ConcurrentRunError extends MayError {
 export type ContentPart = {
     type: "text";
     text: string;
+    citations?: Citation[];
 } | {
     type: "reasoning";
     text: string;
@@ -143,6 +164,8 @@ export interface ContextSnapshot {
 export interface ContinueOptions {
     // (undocumented)
     checkpoint?: RunCheckpoint;
+    // (undocumented)
+    maxServerToolContinuations?: number;
     // (undocumented)
     readonly recordRequest?: ModelRequestSink;
     // (undocumented)
@@ -215,6 +238,9 @@ export class FatalToolExecutionError extends MayError {
 
 // @public (undocumented)
 export function freezeToolInput<T>(input: T): T;
+
+// @public (undocumented)
+export function hasPendingServerToolInteraction(messages: readonly Message[]): boolean;
 
 // @public (undocumented)
 export interface HookContext {
@@ -354,6 +380,10 @@ export type MayEventPayload = {
     type: "model.started";
     step: number;
 } | {
+    type: "model.server_tool.updated";
+    step: number;
+    call: ServerToolCall;
+} | {
     type: "model.text.delta";
     step: number;
     delta: string;
@@ -397,11 +427,13 @@ export type MayEventPayload = {
     call: ToolCall;
     output: unknown;
     content: ContentPart[];
+    usage?: Usage;
 } | {
     type: "tool.failed";
     step: number;
     call: ToolCall;
     error: SerializedError;
+    usage?: Usage;
 } | {
     type: "run.completed";
     result: RunResult;
@@ -548,6 +580,9 @@ export interface ModelContextCompactor {
 
 // @public (undocumented)
 export type ModelEvent = {
+    type: "server_tool.updated";
+    call: ServerToolCall;
+} | {
     type: "text.delta";
     delta: string;
 } | {
@@ -712,6 +747,9 @@ export function omitUndefined<const T extends object>(value: T): OmitUndefined<T
 // @public
 export const parallelToolScheduler: ToolScheduler;
 
+// @public
+export function pendingServerToolInteractionIndex(messages: readonly Message[]): number | undefined;
+
 // @public (undocumented)
 export function priceUsage(usage?: Usage, prices?: TokenPriceSchedule | TokenPrices, pricer?: UsagePricer): UsageCost;
 
@@ -847,6 +885,8 @@ export interface RunOptions {
     // (undocumented)
     input: string | UserMessage;
     // (undocumented)
+    maxServerToolContinuations?: number;
+    // (undocumented)
     readonly recordRequest?: ModelRequestSink;
     // (undocumented)
     runBudget?: RunBudget;
@@ -957,6 +997,43 @@ export interface SerializedError {
 // @public (undocumented)
 export function serializeError(error: unknown): SerializedError;
 
+// @public (undocumented)
+export interface ServerToolCall {
+    // (undocumented)
+    readonly error?: {
+        readonly code: string;
+    };
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly input?: unknown;
+    // (undocumented)
+    readonly kind: string;
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly sources?: readonly ServerToolSource[];
+    // (undocumented)
+    readonly status: "pending" | "completed" | "failed";
+}
+
+// @public (undocumented)
+export class ServerToolContinuationLimitError extends MayError {
+    constructor(continuations: number);
+    // (undocumented)
+    readonly continuations: number;
+}
+
+// @public (undocumented)
+export interface ServerToolSource {
+    // (undocumented)
+    readonly published?: string;
+    // (undocumented)
+    readonly title?: string;
+    // (undocumented)
+    readonly url: string;
+}
+
 // @public
 export function setTraceAttributes(span: TraceSpan | undefined, attributes: TraceAttributes): void;
 
@@ -1061,6 +1138,7 @@ export interface Tool<TInput = unknown, TOutput = unknown> {
     parse?(input: unknown): TInput | Promise<TInput>;
     readonly permissionVersion?: string;
     resultContent?(output: TOutput): ContentPart[];
+    usage?(output: TOutput): Usage | undefined;
     readonly workspaceEffect?: "read" | "write";
 }
 
@@ -1072,6 +1150,8 @@ export interface ToolCall {
     input: unknown;
     // (undocumented)
     name: string;
+    // (undocumented)
+    rawInput?: string;
 }
 
 // @public
@@ -1101,6 +1181,8 @@ export interface ToolExecution<TInput = unknown, TOutput = unknown> {
 export interface ToolExecutionContext {
     // (undocumented)
     idempotencyKey: string;
+    // (undocumented)
+    rawInput?: string;
     report(update: ToolProgressUpdate): void;
     // (undocumented)
     runId: string;
@@ -1261,6 +1343,13 @@ export interface ToolSchedulingContext {
 
 // @public (undocumented)
 export type ToolSchema<I, O> = StandardSchemaV1<I, O> & StandardJSONSchemaV1<I, O>;
+
+// @public (undocumented)
+export class ToolUsageError extends MayError {
+    constructor(message: string, usage: Usage, options?: ErrorOptions);
+    // (undocumented)
+    readonly usage: Usage;
+}
 
 // @public (undocumented)
 export type TraceAttributes = Readonly<Record<string, TraceAttributeValue>>;

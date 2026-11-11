@@ -211,6 +211,7 @@ test("maps Responses requests, streaming deltas, output, tools, and usage", asyn
       id: "call_lookup",
       name: "lookup",
       input: { q: 1 },
+      rawInput: '{"q":1}',
     },
   ]);
   assert.deepEqual(events[2].message.modelState.data.items, output);

@@ -30,6 +30,8 @@ export interface DeepSeekModelOptions {
     reasoningEffort?: DeepSeekReasoningEffort;
     // (undocumented)
     thinking?: "enabled" | "disabled";
+    // (undocumented)
+    webSearch?: false | WebSearchOptions;
 }
 
 // @public

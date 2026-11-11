@@ -36,6 +36,8 @@ import { Tracer } from '@sortedyuan/may/core';
 import type { Usage } from '@sortedyuan/may/core';
 import { UsageCost } from '@sortedyuan/may/core';
 import { UserMessage } from '@sortedyuan/may/core';
+import type { WorkspaceFileFeedback } from '@sortedyuan/coding-tools';
+import { WorkspaceFileGuard } from '@sortedyuan/coding-tools';
 
 // @public (undocumented)
 export function createDelegationPlugin(options: DelegationPluginOptions): PluginDefinition<unknown>;
@@ -46,6 +48,8 @@ export function createWorkspaceFilesPlugin(options: {
     readonly defaultTools?: boolean;
     readonly execution?: CodingExecutionEnvironment;
     readonly fetch?: FetchToolOptions;
+    readonly fileFeedback?: WorkspaceFileFeedback;
+    readonly toolFactories?: Readonly<Record<string, (guard: WorkspaceFileGuard) => Tool>>;
 }): PluginDefinition<unknown>;
 
 // @public (undocumented)
@@ -328,7 +332,9 @@ export function resolveSubagentConfiguration(settings: false | MaybeCodeSubagent
 
 // @public
 export class SharedWorkspaceFileGuard {
-    constructor(workspace: string, options?: Pick<CodingToolsOptions, "execution" | "fetch">);
+    constructor(workspace: string, options?: Pick<CodingToolsOptions, "execution" | "fetch" | "fileFeedback"> & {
+        readonly toolFactories?: Readonly<Record<string, (guard: WorkspaceFileGuard) => Tool>>;
+    });
     create(options: {
         readonly names: readonly SubagentToolName[];
         readonly files?: readonly string[];
@@ -520,7 +526,7 @@ export interface SubagentRequestPlan {
 }
 
 // @public
-export type SubagentToolName = "read" | "shell" | "edit" | "write" | "glob" | "grep" | "fetch";
+export type SubagentToolName = string;
 
 // @public
 export function withRequestBudget(model: Model, ledger: () => SubagentRequestLedger | undefined): Model;

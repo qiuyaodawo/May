@@ -13,6 +13,8 @@ import {
   ToolNotFoundError,
   ToolHookDeniedError,
   ToolSchedulerError,
+  ToolUsageError,
+  ServerToolContinuationLimitError,
 } from "./errors.js";
 import {
   AsyncEventQueue,
@@ -49,7 +51,7 @@ import {
   type TraceSpan,
   type Tracer,
 } from "./tracing.js";
-import { aggregateUsage as mergeUsage, type UsageCost } from "./pricing.js";
+import { aggregateUsage as mergeUsage, resolveUsageTotals, type UsageCost } from "./pricing.js";
 import {
   traceOperation,
   endOperationSpan,
@@ -104,6 +106,7 @@ export interface MayOptions {
 
 /** @experimental */
 export interface RunOptions {
+  maxServerToolContinuations?: number;
   readonly recordRequest?: ModelRequestSink;
   /** Host-only control, checked after a complete model/tool step. Never interrupts tools. */
   shouldYield?: () => boolean;
@@ -122,6 +125,7 @@ export interface RunOptions {
 
 /** @experimental */
 export interface ContinueOptions {
+  maxServerToolContinuations?: number;
   readonly recordRequest?: ModelRequestSink;
   shouldYield?: () => boolean;
   stepInputSource?: StepInputSource;
@@ -168,6 +172,7 @@ export type StepInputSource = (boundary: {
 }) => Promise<readonly UserMessage[]>;
 
 interface RunExecution {
+  readonly maxServerToolContinuations: number;
   readonly tools: ToolRegistry;
   readonly runId: string;
   readonly input: UserMessage | undefined;
@@ -254,6 +259,9 @@ export class May implements AgentRuntime {
   }
 
   private start(input: UserMessage | undefined, options: ContinueOptions): RunHandle {
+    const maxServerToolContinuations = options.maxServerToolContinuations ?? 8;
+    if (!Number.isSafeInteger(maxServerToolContinuations) || maxServerToolContinuations < 0)
+      throw new RangeError("maxServerToolContinuations must be a non-negative safe integer");
     const {
       signal: externalSignal,
       traceContext: parentTraceContext,
@@ -343,6 +351,7 @@ export class May implements AgentRuntime {
           };
 
     const result = this.execute({
+      maxServerToolContinuations,
       tools,
       runId,
       input,
@@ -440,6 +449,7 @@ export class May implements AgentRuntime {
       return result;
     };
     let aggregateUsage: Usage | undefined;
+    let serverToolContinuations = 0;
     let modelCalls = 0;
     let toolCalls = 0;
     let pendingTools:
@@ -645,6 +655,13 @@ export class May implements AgentRuntime {
           const result = createRunResult(runId, step, modelCalls, toolCalls, message, aggregateUsage);
           result.budget = budget.snapshot();
           if (shouldYield?.() === true) return await yieldRun(step, result);
+          if (message.continuation === "server-tool-pause") {
+            serverToolContinuations += 1;
+            if (serverToolContinuations > run.maxServerToolContinuations)
+              throw new ServerToolContinuationLimitError(serverToolContinuations);
+            continue;
+          }
+          serverToolContinuations = 0;
           if (await this.receiveStepInput(stepInputSource, runId, step, signal, emit)) continue;
           const settlement = await this.transform(
             runtimeHooks.runBeforeEnd,
@@ -679,6 +696,7 @@ export class May implements AgentRuntime {
           return result;
         }
 
+        serverToolContinuations = 0;
         budget.reserveTools(calls.length);
         toolCalls += calls.length;
         const batchSpan = startTraceSpan(
@@ -704,6 +722,13 @@ export class May implements AgentRuntime {
             pendingTools!,
             batchSpan?.context,
             checkpoint,
+            (outcome) => {
+              if (outcome.usage !== undefined) {
+                const toolUsage = { inputTokens: 0, outputTokens: 0, ...outcome.usage };
+                aggregateUsage = mergeUsage(aggregateUsage, toolUsage);
+                budget.recordUsage(toolUsage);
+              }
+            },
           );
           const failedCount = outcomes.filter((outcome) => outcome.type === "failed").length;
           endTraceSpan(batchSpan, {
@@ -750,7 +775,8 @@ export class May implements AgentRuntime {
           result.budget = budget.snapshot();
           return await yieldRun(step, result);
         }
-        await this.receiveStepInput(stepInputSource, runId, step, signal, emit);
+        if (!message.serverToolCalls?.some((call) => call.status === "pending"))
+          await this.receiveStepInput(stepInputSource, runId, step, signal, emit);
       }
 
       if (budget.limits.maxSteps !== undefined && budget.limits.maxSteps <= this.maxSteps)
@@ -962,6 +988,7 @@ export class May implements AgentRuntime {
     },
     batchTraceContext: TraceContext | undefined,
     checkpoint: RunCheckpoint | undefined,
+    recordUsage: (outcome: ToolExecutionOutcome) => void,
   ): Promise<readonly ToolExecutionOutcome[]> {
     const operations = calls.map((call, index) => {
       let execution: Promise<ToolExecutionOutcome> | undefined;
@@ -983,9 +1010,18 @@ export class May implements AgentRuntime {
                       call,
                       output: outcome.output,
                       content: outcome.message.content,
+                      ...(outcome.usage === undefined ? {} : { usage: outcome.usage }),
                     }
-                  : { type: "tool.failed", runId, step, call, error: outcome.error },
+                  : {
+                      type: "tool.failed",
+                      runId,
+                      step,
+                      call,
+                      error: outcome.error,
+                      ...(outcome.usage === undefined ? {} : { usage: outcome.usage }),
+                    },
               );
+              recordUsage(outcome);
               if (outcome.type === "completed" && outcome.fatal === undefined) {
                 await this.observe(
                   runtimeHooks.toolAfter,
@@ -1036,6 +1072,7 @@ export class May implements AgentRuntime {
     let active = true;
     let progressTail = Promise.resolve();
     let rawOutput: { readonly value: unknown; readonly content: ContentPart[] } | undefined;
+    let outputUsage: Usage | undefined;
     const toolSpan = startTraceSpan(
       this.tracer,
       "may.tool.call",
@@ -1053,6 +1090,8 @@ export class May implements AgentRuntime {
       const tool = tools.get(call.name);
       if (!tool) throw new ToolNotFoundError(call.name);
 
+      const originalInput = structuredClone(call.input);
+      const originalRawInput = call.rawInput;
       const prepared = await this.transform(
         runtimeHooks.toolBefore,
         { call, input: call.input },
@@ -1077,6 +1116,7 @@ export class May implements AgentRuntime {
             runId,
             step,
             toolCallId: call.id,
+            rawInput: jsonEqual(prepared.input, originalInput) ? originalRawInput : undefined,
             idempotencyKey: `${runId}:${step}:${call.id}`,
             signal,
             traceContext: toolSpan?.context,
@@ -1093,6 +1133,11 @@ export class May implements AgentRuntime {
         }),
       );
 
+      const reportedUsage = tool.usage?.(output);
+      if (reportedUsage !== undefined) {
+        resolveUsageTotals(reportedUsage);
+        outputUsage = structuredClone(reportedUsage);
+      }
       const originalContent: ContentPart[] = tool.resultContent?.(output) ?? [{ type: "json", value: output }];
       rawOutput = { value: output, content: originalContent };
       await progressTail;
@@ -1110,6 +1155,7 @@ export class May implements AgentRuntime {
         type: "completed",
         call,
         output,
+        ...(outputUsage === undefined ? {} : { usage: outputUsage }),
         message: {
           role: "tool",
           toolCallId: call.id,
@@ -1124,6 +1170,7 @@ export class May implements AgentRuntime {
           type: "completed",
           call,
           output: rawOutput.value,
+          ...(outputUsage === undefined ? {} : { usage: outputUsage }),
           message: { role: "tool", toolCallId: call.id, name: call.name, content: rawOutput.content },
           fatal:
             error instanceof FatalToolExecutionError
@@ -1146,6 +1193,7 @@ export class May implements AgentRuntime {
         type: "failed",
         call,
         error: serialized,
+        ...(error instanceof ToolUsageError ? { usage: structuredClone(error.usage) } : {}),
         message: {
           role: "tool",
           toolCallId: call.id,

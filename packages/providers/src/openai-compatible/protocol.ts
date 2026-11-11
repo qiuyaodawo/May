@@ -33,7 +33,11 @@ export type OpenAICompatibleMessage =
     };
 
 /** @experimental */
-export interface OpenAICompatibleToolDefinition {
+export type OpenAICompatibleToolDefinition =
+  OpenAICompatibleFunctionDefinition | { type: "web_search"; web_search: Readonly<Record<string, unknown>> };
+
+/** @experimental */
+interface OpenAICompatibleFunctionDefinition {
   type: "function";
   function: {
     name: string;
@@ -65,11 +69,24 @@ export interface OpenAICompatibleStreamError {
 
 /** @experimental */
 export interface OpenAICompatibleChunk {
+  id?: string;
+  web_search?: Array<{
+    title?: string;
+    link: string;
+    content?: string;
+    media?: string;
+    publish_date?: string;
+    refer?: string;
+  }>;
   /** 顶层错误事件；一旦出现，本次流立即失败。 */
   error?: OpenAICompatibleStreamError | string | number | boolean | null;
   choices?: Array<{
     index: number;
     delta?: {
+      annotations?: Array<{
+        type: string;
+        url_citation?: { url: string; title?: string; start_index: number; end_index: number };
+      }>;
       content?: string | null;
       refusal?: string | null;
       reasoning_content?: string | null;

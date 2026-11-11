@@ -8,6 +8,46 @@ import { Model } from '@sortedyuan/may/core';
 import { ModelEvent } from '@sortedyuan/may/core';
 import { ModelRequest } from '@sortedyuan/may/core';
 import { ModelStreamOptions } from '@sortedyuan/may/core';
+import { Tool } from '@sortedyuan/may/core';
+import { ToolUsageError } from '@sortedyuan/may/core';
+import { Usage } from '@sortedyuan/may/core';
+
+// @public (undocumented)
+export function createKimiFormulaTools(options: KimiFormulaToolsOptions): Promise<Tool[]>;
+
+// @public (undocumented)
+export class KimiFormulaError extends ToolUsageError {
+    constructor(message: string, status?: string | number | undefined, fiberId?: string | undefined, options?: ErrorOptions & {
+        readonly usage?: Usage;
+    });
+    // (undocumented)
+    readonly code = "KIMI_FORMULA_ERROR";
+    // (undocumented)
+    readonly fiberId?: string | undefined;
+    // (undocumented)
+    readonly status?: string | number | undefined;
+}
+
+// @public (undocumented)
+export class KimiFormulaRawInputError extends Error {
+    constructor();
+    // (undocumented)
+    readonly code = "KIMI_FORMULA_RAW_INPUT_REQUIRED";
+}
+
+// @public (undocumented)
+export interface KimiFormulaToolsOptions {
+    // (undocumented)
+    readonly apiKey: string;
+    // (undocumented)
+    readonly baseURL?: string;
+    // (undocumented)
+    readonly fetch?: typeof globalThis.fetch;
+    // (undocumented)
+    readonly timeoutMs?: number;
+    // (undocumented)
+    readonly uri: string;
+}
 
 // @public (undocumented)
 export class KimiModel extends OpenAICompatibleChatModel {
@@ -30,6 +70,8 @@ export interface KimiModelOptions {
     reasoningEffort?: KimiReasoningEffort;
     // (undocumented)
     thinking?: Readonly<KimiThinkingConfig>;
+    // (undocumented)
+    webSearch?: false | WebSearchOptions;
 }
 
 // @public
