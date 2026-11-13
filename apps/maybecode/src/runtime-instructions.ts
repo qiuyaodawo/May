@@ -1,6 +1,6 @@
 import { codingRuntimeInstructions, getShellToolInfo } from "@sortedyuan/coding-tools";
 import { omitUndefined, type Tool } from "@sortedyuan/may/core";
-import type { MaybeCodeApplicationOptions } from "./application.js";
+import type { MaybeCodeApplicationOptions } from "./application-open.js";
 
 export interface MaybeCodeRuntimeEnvironment {
   readonly workspace: string;

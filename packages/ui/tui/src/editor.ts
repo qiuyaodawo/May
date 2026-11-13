@@ -1,16 +1,18 @@
 import type { KeyBindingDefinition, KeyStroke } from "./keybindings/index.js";
 import sliceAnsi from "slice-ansi";
 import stringWidth from "string-width";
-import type {
-  CursorPosition,
-  FocusTarget,
-  InteractiveComponent,
-  PointerEvent,
-  RenderResult,
-  RenderSize,
-} from "./component.js";
+import type { FocusTarget, InteractiveComponent, PointerEvent, RenderResult, RenderSize } from "./component.js";
 import type { Clipboard } from "./clipboard.js";
+import { normalizeValue, type EditorHistory } from "./editor-history.js";
 import { createEditorKeymap, EDITOR_ACTIONS, type EditorAction } from "./editor-keymap.js";
+import {
+  displayGrapheme,
+  fitPrefix,
+  indexAt,
+  indexAtColumn,
+  layoutEditor,
+  type EditorLayout,
+} from "./editor-layout.js";
 import { styleText, type TextStyle } from "./theme.js";
 
 /** @experimental */
@@ -30,65 +32,6 @@ export interface EditorOptions {
   readonly selectionStyle?: TextStyle;
   /** 未提供时，Enter 插入换行。Shift+Enter 始终插入换行。 */
   readonly onSubmit?: (value: string) => void;
-}
-
-/** @experimental */
-export interface EditorHistoryOptions {
-  readonly entries?: readonly string[];
-  readonly maximumEntries?: number;
-}
-
-/**
- * In-process command history that can be shared with or replaced by a UI.
- * @experimental
- */
-export class EditorHistory {
-  private readonly maximumEntries: number;
-  private entries: string[];
-  private index: number;
-  private draft = "";
-
-  constructor(options: EditorHistoryOptions = {}) {
-    this.maximumEntries = positiveInteger(options.maximumEntries ?? 100, "maximumEntries");
-    this.entries = (options.entries ?? [])
-      .map(normalizeValue)
-      .filter((value) => value.trim() !== "")
-      .slice(-this.maximumEntries);
-    this.index = this.entries.length;
-  }
-
-  get values(): readonly string[] {
-    return [...this.entries];
-  }
-
-  record(value: string): void {
-    const normalized = normalizeValue(value);
-    if (normalized.trim() !== "" && this.entries.at(-1) !== normalized) {
-      this.entries.push(normalized);
-      if (this.entries.length > this.maximumEntries) {
-        this.entries.splice(0, this.entries.length - this.maximumEntries);
-      }
-    }
-    this.reset();
-  }
-
-  previous(current: string): string | undefined {
-    if (this.entries.length === 0 || this.index === 0) return undefined;
-    if (this.index === this.entries.length) this.draft = current;
-    this.index -= 1;
-    return this.entries[this.index];
-  }
-
-  next(): string | undefined {
-    if (this.index >= this.entries.length) return undefined;
-    this.index += 1;
-    return this.index === this.entries.length ? this.draft : this.entries[this.index];
-  }
-
-  reset(): void {
-    this.index = this.entries.length;
-    this.draft = "";
-  }
 }
 
 /** @experimental */
@@ -582,114 +525,6 @@ export class Editor implements InteractiveComponent, FocusTarget {
   }
 }
 
-interface EditorCell {
-  readonly index: number;
-  readonly x: number;
-  readonly width: number;
-}
-
-interface EditorRow {
-  readonly start: number;
-  readonly end: number;
-  readonly cells: readonly EditorCell[];
-}
-
-interface EditorLayout {
-  readonly lines: readonly string[];
-  readonly rows: readonly EditorRow[];
-  readonly positions: readonly CursorPosition[];
-}
-
-function layoutEditor(
-  graphemes: readonly string[],
-  width: number,
-  firstPrompt: string,
-  continuationPrompt: string,
-  selection: readonly [number, number],
-  selectionStyle: TextStyle,
-): EditorLayout {
-  const lines: string[] = [];
-  const rows: EditorRow[] = [];
-  const positions: CursorPosition[] = [];
-  let prompt = fitPrefix(firstPrompt, width);
-  let line = prompt;
-  let lineWidth = stringWidth(prompt);
-  let promptWidth = lineWidth;
-  let rowStart = 0;
-  let cells: EditorCell[] = [];
-
-  const nextLine = (end: number, start = end): void => {
-    lines.push(line);
-    rows.push({ start: rowStart, end, cells });
-    rowStart = start;
-    cells = [];
-    prompt = fitPrefix(continuationPrompt, width);
-    line = prompt;
-    lineWidth = stringWidth(prompt);
-    promptWidth = lineWidth;
-  };
-
-  for (let index = 0; index < graphemes.length; index++) {
-    const grapheme = graphemes[index]!;
-    if (grapheme === "\n") {
-      positions[index] = { x: Math.min(lineWidth, width - 1), y: lines.length };
-      if (index >= selection[0] && index < selection[1] && lineWidth < width) {
-        line += styleText(" ", selectionStyle);
-      }
-      nextLine(index, index + 1);
-      continue;
-    }
-    let displayed = displayGrapheme(grapheme);
-    let graphemeWidth = stringWidth(displayed);
-    if (lineWidth + graphemeWidth > width && lineWidth > promptWidth) nextLine(index);
-    if (lineWidth + graphemeWidth > width) {
-      displayed = "�";
-      graphemeWidth = 1;
-    }
-    positions[index] = { x: lineWidth, y: lines.length };
-    cells.push({ index, x: lineWidth, width: graphemeWidth });
-    line += index >= selection[0] && index < selection[1] ? styleText(displayed, selectionStyle) : displayed;
-    lineWidth += graphemeWidth;
-  }
-  if (lineWidth >= width) nextLine(graphemes.length);
-  positions[graphemes.length] = { x: lineWidth, y: lines.length };
-  lines.push(line);
-  rows.push({ start: rowStart, end: graphemes.length, cells });
-  return { lines, rows, positions };
-}
-
-function indexAt(row: EditorRow, column: number): number {
-  for (const cell of row.cells) {
-    if (column < cell.x + cell.width / 2) return cell.index;
-  }
-  return row.end;
-}
-
-function indexAtColumn(graphemes: readonly string[], start: number, end: number, column: number): number {
-  let width = 0;
-  for (let index = start; index < end; index++) {
-    const next = stringWidth(displayGrapheme(graphemes[index]!));
-    if (column < width + next / 2) return index;
-    width += next;
-  }
-  return end;
-}
-
-function fitPrefix(value: string, width: number): string {
-  if (width <= 1) return "";
-  return sliceAnsi(value.replace(/[\r\n]/gu, ""), 0, width - 1);
-}
-
-function displayGrapheme(value: string): string {
-  if (value === "\t") return "  ";
-  if (/^[\u0000-\u001f\u007f-\u009f]$/u.test(value)) return "�";
-  return value;
-}
-
-function normalizeValue(value: string): string {
-  return value.replace(/\r\n?/gu, "\n");
-}
-
 function segment(value: string): string[] {
   const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
   return [...segmenter.segment(value)].map((part) => part.segment);
@@ -738,11 +573,4 @@ function nextWordBoundary(graphemes: readonly string[], cursor: number): number 
 function wordClass(value: string): "space" | "word" | "punctuation" {
   if (/^\s+$/u.test(value)) return "space";
   return /^[\p{Letter}\p{Number}\p{Mark}_]+$/u.test(value) ? "word" : "punctuation";
-}
-
-function positiveInteger(value: number, name: string): number {
-  if (!Number.isSafeInteger(value) || value < 1) {
-    throw new RangeError(`${name} must be a positive safe integer`);
-  }
-  return value;
 }

@@ -39,8 +39,8 @@ import {
   validateHandoff,
   validateMessage,
   validateOutput,
-  validateSnapshot,
 } from "./validation.js";
+import { validateSnapshot } from "./snapshot-validation.js";
 
 /** @experimental */
 export interface CoordinationRuntimeOptions {

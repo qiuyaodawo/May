@@ -21,7 +21,7 @@ import {
   workspaceFilesService,
 } from "@sortedyuan/coordination/delegation";
 import { SkillRegistry } from "@sortedyuan/may/skills";
-import type { MaybeCodeApplicationOptions } from "../application.js";
+import type { MaybeCodeApplicationOptions } from "../application-open.js";
 import { createCodingPermissionPolicy } from "../policy.js";
 import { defaultMaybeCodeSkillDirectories } from "../skills.js";
 import {

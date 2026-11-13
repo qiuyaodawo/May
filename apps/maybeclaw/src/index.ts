@@ -8,5 +8,7 @@ export * from "./gateway-store.js";
 export * from "./gateway-adapters.js";
 export * from "./gateway.js";
 export * from "./gateway-host.js";
+export * from "./channel-content.js";
 export * from "./gateway-ui.js";
+export * from "./gateway-ui-commands.js";
 export * from "./plugins/web-api.js";

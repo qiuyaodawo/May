@@ -1,5 +1,6 @@
 import type { CoordinationJournal, CoordinationSnapshot, CoordinationStore } from "./types.js";
-import { copy, name, validateSnapshot } from "./validation.js";
+import { validateSnapshot } from "./snapshot-validation.js";
+import { copy, name } from "./validation.js";
 
 /** @experimental */
 export class InMemoryCoordinationStore implements CoordinationStore {

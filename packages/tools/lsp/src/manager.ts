@@ -1,23 +1,18 @@
-import { createHash } from "node:crypto";
 import { watch, type FSWatcher } from "node:fs";
-import { mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
-import { dirname, extname, join, relative } from "node:path";
-import type { ChildProcess } from "node:child_process";
+import { stat } from "node:fs/promises";
+import { extname, join } from "node:path";
 import {
   createProtocolConnection,
-  type ProtocolConnection,
   type ServerCapabilities,
   type Diagnostic,
   type Location,
   type LocationLink,
   type Range,
-  type TextEdit,
   type WorkspaceEdit,
   type DocumentSymbol,
   type SymbolInformation,
   type WorkspaceSymbol,
   type Hover,
-  type FileSystemWatcher,
 } from "vscode-languageserver-protocol/node";
 import {
   CancellationTokenSource,
@@ -26,21 +21,15 @@ import {
   ResponseError,
   Trace,
 } from "vscode-jsonrpc/node";
-import { TextDocument } from "vscode-languageserver-textdocument";
 import { URI } from "vscode-uri";
-import picomatch from "picomatch";
-import { z } from "zod";
 import {
-  atomicWriteText,
   createReadTool,
   resolveExistingWorkspacePath,
-  workspaceFileKey,
   type WorkspacePath,
   type WorkspaceFileFeedback,
   type WorkspaceFileFeedbackTicket,
   type WorkspaceFileGuard,
 } from "@sortedyuan/coding-tools";
-import { writeFileDurable } from "@sortedyuan/may/storage";
 import type {
   FileDiagnostics,
   LanguageServerManager,
@@ -53,59 +42,17 @@ import type {
   SymbolList,
   LspSymbol,
 } from "./types.js";
-import {
-  LspProtocolError,
-  LspRenameConflictError,
-  LspRenameWriteError,
-  LspServerExitedError,
-  LspTimeoutError,
-} from "./errors.js";
+import { LspProtocolError, LspServerExitedError, LspTimeoutError } from "./errors.js";
 import { resolveServerCommand, serverDefinition } from "./presets.js";
-
-const hash = (text: string) => createHash("sha256").update(text).digest("hex");
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
-const journalSchema = z.object({
-  files: z.array(z.object({ path: z.string(), original: z.string(), updatedHash: z.string() })),
-});
-interface DocumentState {
-  path: WorkspacePath;
-  content: string;
-  version: number;
-  sentVersion: number;
-  used: number;
-  pending: number;
-}
-interface DiagnosticState {
-  version?: number;
-  items: Diagnostic[];
-  receivedAt: string;
-  generation: number;
-}
-interface ServerState {
-  definition: ReturnType<typeof serverDefinition>;
-  state: LanguageServerStatus["state"];
-  connection?: ProtocolConnection;
-  child?: ChildProcess;
-  controller?: AbortController;
-  starting?: Promise<void>;
-  capabilities: ServerCapabilities;
-  documents: Map<string, DocumentState>;
-  diagnostics: Map<string, DiagnosticState>;
-  waiters: Set<() => void>;
-  progress: Map<string | number, string>;
-  watchers: Map<string, FileSystemWatcher[]>;
-  knownFiles: Set<string>;
-  sync: Promise<void>;
-  exits: number;
-  startedAt: number;
-  used: number;
-  generation: number;
-  stopping: boolean;
-  stderr: string;
-  logs: string;
-  lastError?: string;
-  resolved?: { command: string; args: readonly string[] };
-}
+import { RenameTransactions } from "./rename-transaction.js";
+import {
+  CLIENT_CAPABILITIES,
+  createServerState,
+  registerClientHandlers,
+  watchedChanges,
+  type ServerState,
+} from "./server-session.js";
+import { hash, message, tail } from "./text.js";
 
 class Manager implements LanguageServerManager {
   readonly fileFeedback: WorkspaceFileFeedback;
@@ -125,16 +72,12 @@ class Manager implements LanguageServerManager {
     | "maxServers",
     number
   >;
-  private readonly journal: string;
-  private readonly plans = new Map<string, { input: string; plan: RenamePlan }>();
-  private readonly ownedPlans = new WeakSet<RenamePlan>();
-  private readonly usedPlans = new WeakSet<RenamePlan>();
+  private readonly renames: RenameTransactions;
   private watcher: FSWatcher | undefined;
   private watchTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly changes = new Set<string>();
   private closed = false;
   private recovery: string | undefined;
-  private transaction: Promise<unknown> = Promise.resolve();
   private lifecycle: Promise<unknown> = Promise.resolve();
 
   constructor(options: LanguageServerManagerOptions) {
@@ -158,29 +101,14 @@ class Manager implements LanguageServerManager {
         this.limits[key] = value;
       }
     }
-    this.journal = join(options.dataDirectory, "lsp-rename", `${hash(options.execution.workspace)}.json`);
+    this.renames = new RenameTransactions(
+      join(options.dataDirectory, "lsp-rename", `${hash(options.execution.workspace)}.json`),
+      { path: (input) => this.path(input), read: (path, signal) => this.read(path, signal) },
+    );
     for (const input of options.servers) {
       const definition = serverDefinition(input);
       if (this.servers.has(definition.id)) throw new TypeError(`Duplicate server ${definition.id}`);
-      const server: ServerState = {
-        definition,
-        state: "stopped",
-        capabilities: {},
-        documents: new Map(),
-        diagnostics: new Map(),
-        waiters: new Set(),
-        progress: new Map(),
-        watchers: new Map(),
-        knownFiles: new Set(),
-        sync: Promise.resolve(),
-        exits: 0,
-        startedAt: 0,
-        used: 0,
-        generation: 0,
-        stopping: false,
-        stderr: "",
-        logs: "",
-      };
+      const server = createServerState(definition);
       this.servers.set(definition.id, server);
       for (const [language, extensions] of Object.entries(definition.languages)) {
         for (const extension of extensions) {
@@ -194,21 +122,7 @@ class Manager implements LanguageServerManager {
   }
 
   async open(): Promise<void> {
-    await mkdir(dirname(this.journal), { recursive: true });
-    if ((await readdir(dirname(this.journal))).includes(this.journal.split(/[\\/]/u).at(-1)!)) {
-      const journal = journalSchema.parse(JSON.parse(await readFile(this.journal, "utf8")));
-      const recovered: string[] = [];
-      for (const file of journal.files) {
-        const path = await this.path(file.path);
-        const content = await this.read(path, new AbortController().signal);
-        if (hash(content) === file.updatedHash) {
-          await atomicWriteText(path.absolute, file.original, new AbortController().signal);
-          recovered.push(path.relative);
-        }
-      }
-      await rm(this.journal);
-      this.recovery = `Recovered rename transaction: ${recovered.join(", ")}`;
-    }
+    this.recovery = await this.renames.recover();
     this.watcher = watch(this.options.execution.workspace, { recursive: true }, (_event, name) => {
       if (!name || name.toString().replace(/\\/gu, "/").split("/").includes(".git")) return;
       this.changes.add(name.toString());
@@ -354,7 +268,7 @@ class Manager implements LanguageServerManager {
       });
       server.child = child;
       child.stderr!.on("data", (data: Buffer) => {
-        server.stderr = this.tail(server.stderr + data.toString());
+        server.stderr = tail(server.stderr + data.toString());
       });
       const connection = createProtocolConnection(
         new StreamMessageReader(child.stdout!),
@@ -363,91 +277,14 @@ class Manager implements LanguageServerManager {
       server.connection = connection;
       await connection.trace(Trace.Messages, {
         log: (entry: string) => {
-          server.logs = this.tail(server.logs + entry + "\n");
+          server.logs = tail(server.logs + entry + "\n");
         },
       });
       const folder = {
         uri: this.uri({ absolute: this.options.execution.workspace, relative: "." }),
         name: "workspace",
       };
-      connection.onRequest("workspace/configuration", (params: { items: { section?: string }[] }) =>
-        params.items.map((item) => {
-          let value: unknown = server.definition.settings ?? {};
-          for (const part of item.section?.split(".") ?? [])
-            value = typeof value === "object" && value !== null ? (value as Record<string, unknown>)[part] : undefined;
-          return value ?? null;
-        }),
-      );
-      connection.onRequest("workspace/workspaceFolders", () => [folder]);
-      connection.onRequest("workspace/applyEdit", () => ({
-        applied: false,
-        failureReason: "Use lsp_rename to modify workspace files",
-      }));
-      connection.onRequest("window/showMessageRequest", () => null);
-      connection.onRequest("window/workDoneProgress/create", () => null);
-      connection.onRequest(
-        "client/registerCapability",
-        async (params: {
-          registrations: { id: string; method: string; registerOptions?: { watchers?: FileSystemWatcher[] } }[];
-        }) => {
-          if (
-            params.registrations.some((registration) => registration.method === "workspace/didChangeWatchedFiles") &&
-            !server.watchers.size
-          ) {
-            const entries = await readdir(this.options.execution.workspace, { recursive: true, withFileTypes: true });
-            for (const entry of entries) if (entry.isFile()) server.knownFiles.add(join(entry.parentPath, entry.name));
-          }
-          for (const registration of params.registrations)
-            if (registration.method === "workspace/didChangeWatchedFiles")
-              server.watchers.set(registration.id, registration.registerOptions?.watchers ?? []);
-          return null;
-        },
-      );
-      connection.onRequest(
-        "client/unregisterCapability",
-        (params: { unregisterations?: { id: string }[]; unregistrations?: { id: string }[] }) => {
-          for (const registration of params.unregisterations ?? params.unregistrations ?? [])
-            server.watchers.delete(registration.id);
-          return null;
-        },
-      );
-      for (const method of [
-        "workspace/diagnostic/refresh",
-        "workspace/semanticTokens/refresh",
-        "workspace/inlayHint/refresh",
-        "workspace/codeLens/refresh",
-        "workspace/inlineValue/refresh",
-        "workspace/foldingRange/refresh",
-      ])
-        connection.onRequest(method, () => {
-          server.diagnostics.clear();
-          return null;
-        });
-      connection.onNotification(
-        "textDocument/publishDiagnostics",
-        (params: { uri: string; version?: number; diagnostics: Diagnostic[] }) => {
-          const document = server.documents.get(params.uri);
-          if (params.version !== undefined && document && params.version < document.version) return;
-          server.diagnostics.set(params.uri, {
-            ...(params.version === undefined ? {} : { version: params.version }),
-            items: params.diagnostics,
-            receivedAt: new Date().toISOString(),
-            generation: server.generation,
-          });
-          for (const wake of server.waiters) wake();
-        },
-      );
-      connection.onNotification(
-        "$/progress",
-        (params: { token: string | number; value: { kind?: string; title?: string } }) => {
-          if (params.value.kind === "end") server.progress.delete(params.token);
-          else if (params.value.title) server.progress.set(params.token, params.value.title);
-        },
-      );
-      for (const method of ["window/logMessage", "window/showMessage"])
-        connection.onNotification(method, (params: { message: string }) => {
-          server.logs = this.tail(server.logs + params.message + "\n");
-        });
+      registerClientHandlers(connection, server, this.options.execution.workspace, folder);
       child.on("error", (error) => {
         server.lastError = message(error);
       });
@@ -485,27 +322,7 @@ class Manager implements LanguageServerManager {
           rootUri: folder.uri,
           workspaceFolders: [folder],
           initializationOptions: server.definition.initializationOptions,
-          capabilities: {
-            general: { positionEncodings: ["utf-16"] },
-            textDocument: {
-              synchronization: { didSave: true },
-              publishDiagnostics: { versionSupport: true },
-              diagnostic: {},
-              definition: { linkSupport: true },
-              hover: { contentFormat: ["markdown", "plaintext"] },
-              rename: { prepareSupport: true },
-              documentSymbol: { hierarchicalDocumentSymbolSupport: true },
-            },
-            workspace: {
-              workspaceFolders: true,
-              configuration: true,
-              didChangeWatchedFiles: { dynamicRegistration: true, relativePatternSupport: true },
-              workspaceEdit: { documentChanges: true, resourceOperations: [] },
-              applyEdit: false,
-              symbol: {},
-            },
-            window: { workDoneProgress: true },
-          },
+          capabilities: CLIENT_CAPABILITIES,
         },
         controller.signal,
         this.limits.startTimeoutMs,
@@ -530,9 +347,6 @@ class Manager implements LanguageServerManager {
     }
   }
 
-  private tail(text: string): string {
-    return Buffer.from(text).subarray(-65536).toString("utf8");
-  }
   private async request<T>(
     server: ServerState,
     method: string,
@@ -614,8 +428,7 @@ class Manager implements LanguageServerManager {
         textDocument: { uri, version },
         contentChanges: [{ text: content }],
       });
-    if (document.sentVersion !== version)
-      server.logs = this.tail(server.logs + `Document sync ${uri} version ${version}\n`);
+    if (document.sentVersion !== version) server.logs = tail(server.logs + `Document sync ${uri} version ${version}\n`);
     document.sentVersion = version;
     if (touch) document.used = Date.now();
     const sync = server.capabilities.textDocumentSync;
@@ -1021,39 +834,11 @@ class Manager implements LanguageServerManager {
   }
 
   private async watched(server: ServerState, inputs: string[]): Promise<void> {
-    const changes: { uri: string; type: number }[] = [];
-    for (const input of inputs) {
-      const absolute = join(this.options.execution.workspace, input);
-      const uri = this.uri({ absolute, relative: input });
-      const exists = await stat(absolute).then(
-        (info) => info.isFile(),
-        (error: NodeJS.ErrnoException) => {
-          if (error.code === "ENOENT") return false;
-          throw error;
-        },
-      );
-      for (const watchers of server.watchers.values()) {
-        for (const watcher of watchers) {
-          const pattern = watcher.globPattern;
-          const base =
-            typeof pattern === "string"
-              ? this.options.execution.workspace
-              : this.hostUri(typeof pattern.baseUri === "string" ? pattern.baseUri : pattern.baseUri.uri).host;
-          if (!base) continue;
-          const glob = (typeof pattern === "string" ? pattern : pattern.pattern).replace(/\\/gu, "/");
-          const candidate =
-            typeof pattern === "string" && (/^\//u.test(glob) || /^[a-z]:\//iu.test(glob))
-              ? this.options.execution.toEnvironmentPath(absolute).replace(/\\/gu, "/")
-              : relative(base, absolute).replace(/\\/gu, "/");
-          if (picomatch(glob, { dot: true })(candidate)) {
-            const type = exists ? (server.knownFiles.has(absolute) ? 2 : 1) : 3;
-            if ((watcher.kind ?? 7) & (type === 1 ? 1 : type === 2 ? 2 : 4)) changes.push({ uri, type });
-          }
-        }
-      }
-      if (exists) server.knownFiles.add(absolute);
-      else server.knownFiles.delete(absolute);
-    }
+    const changes = await watchedChanges(server, inputs, {
+      execution: this.options.execution,
+      uri: (path) => this.uri(path),
+      hostUri: (uri) => this.hostUri(uri),
+    });
     await this.synchronize(server, new AbortController().signal);
     if (changes.length) await server.connection!.sendNotification("workspace/didChangeWatchedFiles", { changes });
   }
@@ -1090,172 +875,27 @@ class Manager implements LanguageServerManager {
       false,
     );
     if (!edit) throw new Error("This position cannot be renamed");
-    if (edit.changes && edit.documentChanges)
-      throw new LspProtocolError("Rename response contains both changes and documentChanges");
-    const grouped = new Map<string, { edits: TextEdit[]; version: number | null }>();
-    for (const [uri, edits] of Object.entries(edit.changes ?? {})) grouped.set(uri, { edits, version: null });
-    for (const change of edit.documentChanges ?? []) {
-      if (!("textDocument" in change)) throw new LspProtocolError("Rename resource operations are not supported");
-      if (grouped.has(change.textDocument.uri)) throw new LspProtocolError("Duplicate rename document");
-      const edits: TextEdit[] = change.edits.map((entry) => {
-        if (!("newText" in entry)) throw new LspProtocolError("Rename snippet edits are not supported");
-        return entry;
-      });
-      grouped.set(change.textDocument.uri, { edits, version: change.textDocument.version });
-    }
-    if (grouped.size > 100 || [...grouped.values()].reduce((total, file) => total + file.edits.length, 0) > 5000)
-      throw new LspProtocolError("Rename exceeds 100 files or 5000 edits");
-    const files: RenamePlan["files"][number][] = [];
-    const keys = new Set<string>();
-    for (const [uri, change] of grouped) {
-      const mapped = this.hostUri(uri);
-      if (!mapped.host) throw new LspProtocolError(`Rename outside workspace: ${mapped.environmentPath}`);
-      const path = await this.path(mapped.host);
-      const key = workspaceFileKey(path);
-      if (keys.has(key)) throw new LspProtocolError(`Duplicate rename file ${path.relative}`);
-      keys.add(key);
-      if (change.version !== null && change.version !== server.documents.get(uri)?.sentVersion)
-        throw new LspRenameConflictError(`Document version changed: ${path.relative}`);
-      const original = await this.read(path, signal);
-      const document = TextDocument.create(uri, this.select(path).language, change.version ?? 0, original);
-      const ordered = [...change.edits].sort(
-        (a, b) => document.offsetAt(a.range.start) - document.offsetAt(b.range.start),
-      );
-      let previousEnd = -1;
-      for (const textEdit of ordered) {
-        const start = document.offsetAt(textEdit.range.start);
-        const end = document.offsetAt(textEdit.range.end);
-        const actualStart = document.positionAt(start);
-        const actualEnd = document.positionAt(end);
-        if (
-          start < previousEnd ||
-          end < start ||
-          actualStart.line !== textEdit.range.start.line ||
-          actualStart.character !== textEdit.range.start.character ||
-          actualEnd.line !== textEdit.range.end.line ||
-          actualEnd.character !== textEdit.range.end.character
-        )
-          throw new LspProtocolError(`Invalid or overlapping rename edits: ${path.relative}`);
-        previousEnd = end;
-      }
-      const updated = TextDocument.applyEdits(document, change.edits);
-      if (Buffer.byteLength(updated) > this.limits.maxFileBytes)
-        throw new LspProtocolError(`Renamed file exceeds maxFileBytes: ${path.relative}`);
-      files.push({
-        path,
-        original,
-        updated,
-        originalHash: hash(original),
-        updatedHash: hash(updated),
-        edits: change.edits,
-      });
-    }
-    const plan = Object.freeze({
-      files: Object.freeze(
-        files.map((file) =>
-          Object.freeze({
-            ...file,
-            path: Object.freeze(file.path),
-            edits: Object.freeze(
-              file.edits.map((edit) =>
-                Object.freeze({
-                  ...edit,
-                  range: Object.freeze({ start: Object.freeze(edit.range.start), end: Object.freeze(edit.range.end) }),
-                }),
-              ),
-            ),
-          }),
-        ),
-      ),
+    return this.renames.plan(edit, {
       newName,
+      signal,
+      maxFileBytes: this.limits.maxFileBytes,
+      documents: server.documents,
+      hostUri: (uri) => this.hostUri(uri),
+      select: (path) => this.select(path),
     });
-    this.ownedPlans.add(plan);
-    return plan;
   }
   cacheRename(toolCallId: string, input: SymbolPosition & { readonly newName: string }, plan: RenamePlan): void {
-    if (!this.ownedPlans.has(plan)) throw new TypeError("Rename plan belongs to another manager");
-    this.plans.set(toolCallId, { input: JSON.stringify(input), plan });
-    if (this.plans.size > 100) this.plans.delete(this.plans.keys().next().value!);
+    this.renames.cache(toolCallId, input, plan);
   }
   takeRename(toolCallId: string, input: SymbolPosition & { readonly newName: string }): RenamePlan | undefined {
-    const cached = this.plans.get(toolCallId);
-    this.plans.delete(toolCallId);
-    if (cached && cached.input !== JSON.stringify(input))
-      throw new LspRenameConflictError("Rename input changed after preview");
-    return cached?.plan;
+    return this.renames.take(toolCallId, input);
   }
   async executeRename(plan: RenamePlan, signal: AbortSignal, guard = this.options.guard): Promise<RenameOutput> {
-    if (!this.ownedPlans.has(plan) || this.usedPlans.has(plan))
-      throw new TypeError("Invalid or already executed rename plan");
-    const operation = async () => {
-      signal.throwIfAborted();
-      const paths = await Promise.all(plan.files.map((file) => this.path(file.path.relative)));
-      const tickets: { path: string; ticket: WorkspaceFileFeedbackTicket }[] = [];
-      const write = async () => {
-        for (const [index, file] of plan.files.entries())
-          if (
-            workspaceFileKey(paths[index]!) !== workspaceFileKey(file.path) ||
-            hash(await this.read(paths[index]!, signal)) !== file.originalHash
-          )
-            throw new LspRenameConflictError(`File changed after rename preview: ${file.path.relative}`);
-        await writeFileDurable(
-          this.journal,
-          JSON.stringify({
-            files: plan.files.map((file) => ({
-              path: file.path.relative,
-              original: file.original,
-              updatedHash: file.updatedHash,
-            })),
-          }),
-        );
-        const written: (typeof plan.files)[number][] = [];
-        let failedPath = "";
-        try {
-          for (const file of plan.files) {
-            failedPath = file.path.relative;
-            await atomicWriteText(file.path.absolute, file.updated, signal);
-            written.push(file);
-          }
-        } catch (error) {
-          const restored: string[] = [];
-          const errors: string[] = [];
-          for (const file of written.reverse()) {
-            try {
-              await atomicWriteText(file.path.absolute, file.original, new AbortController().signal);
-              restored.push(file.path.relative);
-            } catch (restoreError) {
-              errors.push(`${file.path.relative}: ${message(restoreError)}`);
-            }
-          }
-          if (!errors.length) await rm(this.journal);
-          throw new LspRenameWriteError(
-            `Rename failed at ${failedPath}: ${message(error)}. Restored: ${restored.join(", ")}. Recovery errors: ${errors.join(", ")}`,
-            { cause: error },
-          );
-        }
-        await rm(this.journal);
-        this.usedPlans.add(plan);
-        for (const file of plan.files) {
-          const ticket = this.record(file.path, file.updated);
-          if (ticket) tickets.push({ path: file.path.relative, ticket });
-        }
-      };
-      if (guard) await guard.runMany(paths, "lsp_rename", write);
-      else await write();
-      const diagnostics: Record<string, FileDiagnostics> = {};
-      await Promise.all(
-        tickets.map(async ({ path, ticket }) => {
-          diagnostics[path] = (await ticket.result(signal)).diagnostics;
-        }),
-      );
-      return { files: plan.files.map((file) => ({ path: file.path.relative, edits: file.edits.length })), diagnostics };
-    };
-    const result = this.transaction.then(operation);
-    this.transaction = result.then(
-      () => {},
-      () => {},
-    );
-    return result;
+    return this.renames.execute(plan, {
+      signal,
+      guard,
+      record: (path, content) => this.record(path, content),
+    });
   }
 
   private async stop(server: ServerState): Promise<void> {
@@ -1309,7 +949,7 @@ class Manager implements LanguageServerManager {
     this.closed = true;
     this.watcher?.close();
     if (this.watchTimer) clearTimeout(this.watchTimer);
-    await this.transaction;
+    await this.renames.settled();
     await this.lifecycle;
     await Promise.all(
       [...this.servers.values()].map(async (server) => {
@@ -1317,7 +957,7 @@ class Manager implements LanguageServerManager {
         await this.stop(server);
       }),
     );
-    this.plans.clear();
+    this.renames.clear();
   }
 }
 

@@ -1,6 +1,6 @@
 import { omitUndefined } from "@sortedyuan/may/core";
 import { MAYBE_CODE_USAGE, parseMaybeCodeArgs } from "./args.js";
-import type { OpenConfiguredMaybeCodeOptions } from "./configured.js";
+import type { OpenConfiguredMaybeCodeOptions } from "./configured-options.js";
 import { MaybeCodeUsageError } from "./errors.js";
 import { createNodeTerminal, type TerminalIO } from "@sortedyuan/tui/node-terminal";
 import type { MaybeCodeController } from "./controller.js";

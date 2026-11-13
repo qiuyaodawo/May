@@ -184,5 +184,3 @@ existing corpus baseline without claiming an exhaustive semantic audit.
 5. Report changed files, commands run, results, and important verification gaps.
    Documentation maintenance instructions usually need no changeset. Follow root
    changeset rules when changes affect consumer behavior or published contents.
-6. Obtain explicit user confirmation before every Git commit. Commit, push, and
-   publish require separate authorization.

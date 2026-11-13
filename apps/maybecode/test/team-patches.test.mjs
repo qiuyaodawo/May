@@ -9,8 +9,8 @@ import {
   cleanupTeamPatchTemporaries,
   createTeamPatch,
   readTeamPatchApplication,
-  renderTeamPatchDiff,
 } from "../dist/team-patches.js";
+import { renderTeamPatchDiff } from "../dist/team-patch-bundle.js";
 
 async function fixture(t) {
   // Match the CLI's canonical root before invoking the link-rejecting patch APIs.

@@ -1,35 +1,31 @@
 import { acquireFileLock, hasErrorCode } from "@sortedyuan/may/storage";
-import { createHash, randomUUID } from "node:crypto";
-import { constants } from "node:fs";
-import { lstat, mkdir, open, realpath, rename, unlink, type FileHandle } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { lstat, mkdir, open, rename, unlink, type FileHandle } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import type { TaskWorkspaceManager, WorkspacePatchChange, WorkspacePatchSnapshot } from "@sortedyuan/coordination";
-
-const MAX_BUNDLE_BYTES = 16_777_216;
-const MAX_FILE_BYTES = 262_144;
-const MAX_TOTAL_BYTES = 2_097_152;
-
-export interface TeamPatchFile extends Omit<WorkspacePatchChange, "taskId"> {
-  readonly taskIds: readonly string[];
-}
-export interface TeamPatchConflict {
-  readonly path: string;
-  readonly candidates: readonly TeamPatchFile[];
-}
-interface TeamPatchPayload {
-  readonly format: 1;
-  readonly sourceDirectory: string;
-  readonly baselineDigest: string;
-  readonly taskSnapshots: WorkspacePatchSnapshot["taskSnapshots"];
-  readonly files: readonly TeamPatchFile[];
-  readonly conflicts: readonly TeamPatchConflict[];
-}
-export interface TeamPatchBundle extends TeamPatchPayload {
-  readonly id: string;
-  readonly digest: string;
-}
+import type { TaskWorkspaceManager } from "@sortedyuan/coordination";
+import {
+  assertPatchId,
+  bundleFrom,
+  MAX_BUNDLE_BYTES,
+  MAX_FILE_BYTES,
+  validateBundle,
+  type TeamPatchBundle,
+  type TeamPatchFile,
+} from "./team-patch-bundle.js";
+import {
+  assertParents,
+  checkedPath,
+  durableFile,
+  hash,
+  inside,
+  missingDirectories,
+  privateDirectory,
+  safeRead,
+  safeRoot,
+  syncDirectory,
+} from "./team-patch-files.js";
 
 export interface TeamPatchApplication {
   readonly status: "applied" | "unknown";
@@ -81,24 +77,6 @@ export async function readTeamPatch(directory: string, patchId: string): Promise
   const value = JSON.parse(bytes.toString("utf8")) as TeamPatchBundle;
   validateBundle(value, patchId);
   return value;
-}
-
-/** Full-file unified hunks intentionally favor exact, bounded evidence over heuristic merging. */
-export function renderTeamPatchDiff(bundle: TeamPatchBundle): string {
-  validateBundle(bundle, bundle.id);
-  const sections = [
-    `Patch ${bundle.id}`,
-    `Confirm digest: ${bundle.digest}`,
-    `Tasks: ${bundle.taskSnapshots.map((task) => task.taskId).join(", ")}`,
-  ];
-  for (const file of bundle.files) sections.push(fileDiff(file));
-  for (const conflict of bundle.conflicts) {
-    sections.push(`CONFLICT ${conflict.path}: different task results; apply is blocked.`);
-    for (const file of conflict.candidates)
-      sections.push(`Candidate tasks: ${file.taskIds.join(", ")}\n${fileDiff(file)}`);
-  }
-  if (bundle.files.length === 0 && bundle.conflicts.length === 0) sections.push("No source changes.");
-  return `${sections.join("\n\n")}\n`;
 }
 
 /** User/host-only operation. A model tool must never invoke this API or manufacture confirmation. */
@@ -368,126 +346,6 @@ export async function cleanupTeamPatchTemporaries(options: {
   return [...paths];
 }
 
-function bundleFrom(snapshot: WorkspacePatchSnapshot): TeamPatchBundle {
-  const groups = new Map<string, TeamPatchFile[]>();
-  for (const { taskId, ...change } of snapshot.changes) {
-    assertRelativePath(change.path);
-    const group = groups.get(change.path) ?? [];
-    const identical = group.find((file) =>
-      isDeepStrictEqual({ ...file, taskIds: undefined }, { ...change, taskIds: undefined }),
-    );
-    if (identical) group[group.indexOf(identical)] = { ...identical, taskIds: [...identical.taskIds, taskId].sort() };
-    else group.push({ ...change, taskIds: [taskId] });
-    groups.set(change.path, group);
-  }
-  const payload: TeamPatchPayload = {
-    format: 1,
-    sourceDirectory: snapshot.sourceDirectory,
-    baselineDigest: snapshot.baselineDigest,
-    taskSnapshots: [...snapshot.taskSnapshots].sort((a, b) => a.taskId.localeCompare(b.taskId)),
-    files: [],
-    conflicts: [],
-  };
-  const files: TeamPatchFile[] = [];
-  const conflicts: TeamPatchConflict[] = [];
-  const aliases = new Map<string, string>();
-  for (const [path, candidates] of [...groups].sort(([a], [b]) => a.localeCompare(b))) {
-    const alias = process.platform === "win32" ? path.toLowerCase() : path;
-    if (aliases.has(alias) && aliases.get(alias) !== path) throw new Error("Patch contains filesystem path aliases");
-    aliases.set(alias, path);
-    if (candidates.length === 1) files.push(candidates[0]!);
-    else conflicts.push({ path, candidates });
-  }
-  const body = { ...payload, files, conflicts };
-  const digest = hash(JSON.stringify(body));
-  const bundle = { ...body, id: `patch-${digest}`, digest };
-  validateBundle(bundle, bundle.id);
-  return bundle;
-}
-
-function validateBundle(bundle: TeamPatchBundle, expectedId: string): void {
-  assertPatchId(expectedId);
-  if (
-    !bundle ||
-    bundle.format !== 1 ||
-    bundle.id !== expectedId ||
-    bundle.id !== `patch-${bundle.digest}` ||
-    !isAbsolute(bundle.sourceDirectory) ||
-    !/^[a-f0-9]{64}$/u.test(bundle.baselineDigest) ||
-    !Array.isArray(bundle.taskSnapshots) ||
-    !bundle.taskSnapshots.length ||
-    !Array.isArray(bundle.files) ||
-    !Array.isArray(bundle.conflicts)
-  )
-    throw new Error("Invalid patch bundle");
-  const { id: _id, digest, ...body } = bundle;
-  if (hash(JSON.stringify(body)) !== digest) throw new Error("Patch digest does not match its content");
-  const ids = new Set<string>();
-  for (const task of bundle.taskSnapshots) {
-    if (typeof task.taskId !== "string" || !task.taskId || ids.has(task.taskId) || !/^[a-f0-9]{64}$/u.test(task.digest))
-      throw new Error("Invalid patch task identity");
-    ids.add(task.taskId);
-  }
-  let total = 0;
-  const records = [...bundle.files, ...bundle.conflicts.flatMap((conflict) => conflict.candidates)];
-  if (records.length > 128) throw new Error("Patch has too many file records");
-  for (const file of records) {
-    assertRelativePath(file.path);
-    if (
-      !["added", "modified", "deleted"].includes(file.kind) ||
-      !Array.isArray(file.taskIds) ||
-      !file.taskIds.length ||
-      file.taskIds.some((id: unknown) => typeof id !== "string" || !ids.has(id))
-    )
-      throw new Error("Invalid patch file ownership");
-    for (const prefix of ["before", "after"] as const) {
-      const text = file[`${prefix}Text`];
-      const sha = file[`${prefix}Sha256`];
-      const expected = prefix === "before" ? file.kind !== "added" : file.kind !== "deleted";
-      if (
-        expected
-          ? typeof text !== "string" ||
-            sha !== hash(text) ||
-            /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(text)
-          : text !== undefined || sha !== undefined
-      )
-        throw new Error("Invalid patch file content/hash or unsafe display controls");
-      if (text !== undefined) {
-        const bytes = Buffer.byteLength(text);
-        if (bytes > MAX_FILE_BYTES) throw new Error("Patch file exceeds its byte limit");
-        total += bytes;
-      }
-    }
-  }
-  if (total > MAX_TOTAL_BYTES) throw new Error("Patch exceeds its total byte limit");
-}
-
-function fileDiff(file: TeamPatchFile): string {
-  const old = lines(file.beforeText);
-  const next = lines(file.afterText);
-  const rendered = [
-    `diff --git a/${file.path} b/${file.path}`,
-    `--- ${file.beforeText === undefined ? "/dev/null" : `a/${file.path}`}`,
-    `+++ ${file.afterText === undefined ? "/dev/null" : `b/${file.path}`}`,
-    `@@ -${old.length ? 1 : 0},${old.length} +${next.length ? 1 : 0},${next.length} @@`,
-  ];
-  for (const [prefix, entries, text] of [
-    ["-", old, file.beforeText],
-    ["+", next, file.afterText],
-  ] as const) {
-    for (const line of entries) rendered.push(`${prefix}${line}`);
-    if (entries.length && !text!.endsWith("\n")) rendered.push("\\ No newline at end of file");
-  }
-  return rendered.join("\n");
-}
-
-function lines(text?: string): string[] {
-  if (!text) return [];
-  const result = text.split("\n");
-  if (text.endsWith("\n")) result.pop();
-  return result;
-}
-
 async function preflight(source: string, files: readonly TeamPatchFile[]): Promise<Map<string, Buffer | undefined>> {
   const originals = new Map<string, Buffer | undefined>();
   const paths = files.map((file) => file.path);
@@ -511,176 +369,4 @@ function assertBefore(file: TeamPatchFile, current?: Buffer): void {
       : current === undefined || hash(current) !== file.beforeSha256
   )
     throw new Error(`Source changed since the baseline: ${file.path}`);
-}
-
-async function safeRead(root: string, path: string, maxBytes: number): Promise<Buffer | undefined> {
-  await assertParents(root, path);
-  let before;
-  try {
-    before = await lstat(path);
-  } catch (error) {
-    if (hasErrorCode(error, "ENOENT")) return undefined;
-    throw error;
-  }
-  if (!before.isFile() || before.isSymbolicLink() || before.nlink > 1 || before.size > maxBytes)
-    throw new Error("Patch file is unsafe or exceeds its byte limit");
-  const file = await open(path, constants.O_RDONLY | (process.platform === "win32" ? 0 : constants.O_NOFOLLOW));
-  try {
-    const stat = await file.stat();
-    if (
-      !stat.isFile() ||
-      stat.ino !== before.ino ||
-      stat.dev !== before.dev ||
-      stat.size !== before.size ||
-      stat.nlink > 1
-    )
-      throw new Error("Patch file changed while opening");
-    const bytes = Buffer.alloc(before.size + 1);
-    let position = 0;
-    while (position < bytes.length) {
-      const result = await file.read(bytes, position, bytes.length - position, position);
-      if (!result.bytesRead) break;
-      position += result.bytesRead;
-    }
-    const after = await file.stat();
-    if (position !== before.size || after.size !== before.size || after.mtimeMs !== stat.mtimeMs)
-      throw new Error("Patch file changed while reading");
-    await assertParents(root, path);
-    return bytes.subarray(0, position);
-  } finally {
-    await file.close();
-  }
-}
-
-async function assertParents(root: string, path: string): Promise<void> {
-  if (!inside(root, path)) throw new Error("Patch path leaves its root");
-  if ((await safeRoot(root)) !== root) throw new Error("Patch root identity changed");
-  let cursor = root;
-  for (const part of relative(root, dirname(path)).split(sep).filter(Boolean)) {
-    cursor = join(cursor, part);
-    try {
-      const info = await lstat(cursor);
-      if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Patch parent is not a safe directory");
-    } catch (error) {
-      if (hasErrorCode(error, "ENOENT")) return;
-      throw error;
-    }
-  }
-}
-
-async function missingDirectories(root: string, path: string): Promise<string[]> {
-  if (!inside(root, path)) throw new Error("Patch directory leaves its root");
-  const missing: string[] = [];
-  let cursor = root;
-  for (const part of relative(root, path).split(sep).filter(Boolean)) {
-    cursor = join(cursor, part);
-    try {
-      const info = await lstat(cursor);
-      if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Patch parent is unsafe");
-    } catch (error) {
-      if (!hasErrorCode(error, "ENOENT")) throw error;
-      missing.push(cursor);
-    }
-  }
-  return missing;
-}
-
-async function safeRoot(path: string): Promise<string> {
-  const absolute = resolve(path);
-  let cursor = absolute;
-  for (;;) {
-    const info = await lstat(cursor);
-    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("Patch directory is unsafe");
-    const parent = dirname(cursor);
-    if (parent === cursor) break;
-    cursor = parent;
-  }
-  return realpath(absolute);
-}
-
-async function privateDirectory(path: string): Promise<string> {
-  const absolute = resolve(path);
-  const missing: string[] = [];
-  let parent = absolute;
-  for (;;) {
-    try {
-      await safeRoot(parent);
-      break;
-    } catch (error) {
-      if (!hasErrorCode(error, "ENOENT")) throw error;
-      missing.unshift(parent);
-      parent = dirname(parent);
-    }
-  }
-  for (const directory of missing) {
-    try {
-      await mkdir(directory, { mode: 0o700 });
-    } catch (error) {
-      if (!hasErrorCode(error, "EEXIST")) throw error;
-    }
-    await safeRoot(directory);
-  }
-  return safeRoot(absolute);
-}
-
-async function durableFile(path: string, content: string | Uint8Array, flag: "wx"): Promise<void> {
-  const file = await open(path, flag, 0o600);
-  try {
-    await file.writeFile(content);
-    await file.sync();
-  } finally {
-    await file.close();
-  }
-}
-
-async function syncDirectory(path: string): Promise<void> {
-  let directory: FileHandle | undefined;
-  try {
-    directory = await open(path, "r");
-    await directory.sync();
-  } catch (error) {
-    if (
-      process.platform !== "win32" ||
-      !["EPERM", "EACCES", "EINVAL", "EISDIR"].some((code) => hasErrorCode(error, code))
-    )
-      throw error;
-  } finally {
-    await directory?.close();
-  }
-}
-
-function checkedPath(root: string, path: string): string {
-  assertRelativePath(path);
-  const target = resolve(root, path);
-  if (!inside(root, target)) throw new Error("Patch path leaves its root");
-  return target;
-}
-function assertRelativePath(path: string): void {
-  if (
-    typeof path !== "string" ||
-    !path ||
-    isAbsolute(path) ||
-    /[\\:\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/u.test(path) ||
-    path
-      .split("/")
-      .some(
-        (part) =>
-          !part ||
-          part === "." ||
-          part === ".." ||
-          /[. ]$/u.test(part) ||
-          /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/iu.test(part),
-      )
-  )
-    throw new Error("Unsafe or nonportable patch path");
-}
-function assertPatchId(id: string): void {
-  if (!/^patch-[a-f0-9]{64}$/u.test(id)) throw new Error("Invalid patch id");
-}
-function inside(root: string, path: string): boolean {
-  const child = relative(root, path);
-  return child === "" || (!isAbsolute(child) && child !== ".." && !child.startsWith(`..${sep}`));
-}
-function hash(value: string | Uint8Array): string {
-  return createHash("sha256").update(value).digest("hex");
 }

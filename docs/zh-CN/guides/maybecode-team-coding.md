@@ -79,7 +79,7 @@
 `TaskWorkspaceManager.snapshotPatch(taskIds)` 返回有界文本改动、基线和任务摘要，不写入源文件。产品模块 `team-patches.ts` 提供：
 
 - `createTeamPatch({ directory, workspaces, taskIds })`
-- `readTeamPatch(directory, patchId)` 和 `renderTeamPatchDiff(bundle)`
+- `readTeamPatch(directory, patchId)`，以及位于 `team-patch-bundle.ts` 的 `renderTeamPatchDiff(bundle)`
 - `applyTeamPatch({ directory, workspaces, patchId, confirmDigest })`
 - `readTeamPatchApplication(directory, patchId)`
 
@@ -87,7 +87,7 @@
 
 ## 中断后的暂存清理
 
-停止所有团队宿主、补丁应用进程及编辑器后，可调用 `@sortedyuan/maybecode` 导出的
+停止所有团队宿主、补丁应用进程及编辑器后，可调用产品模块 `team-patches.ts` 中的
 `cleanupTeamPatchTemporaries`，传入 `directory`、`patchId`、精确的 `confirmDigest`
 和 `confirmHostsStopped: true`。函数先验证日志与暂存路径，再仅删除日志中记录的
 `.maybecode-*.tmp` 文件，不删除源目标或备份，也不会续写或重放补丁。

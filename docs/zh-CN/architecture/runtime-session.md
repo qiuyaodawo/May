@@ -340,8 +340,8 @@ MaybeCode 渲染和命令策略由相应前端提供。
 定义 `GatewayHost`，负责启动渠道 adapter 和插件宿主并运行交付循环。
 `gateway-repository.ts` 定义 `GatewayRepository`，在同一个 SQLite 事务中写入相关的
 Gateway 记录和渠道记录。`gateway-ui.ts` 定义 `GatewayUiHost`，它是向
-`@sortedyuan/ui-client` 提供 Gateway 会话的 `UiHost`。`gateway-browser.ts` 包含基于
-`@sortedyuan/web-ui` 的浏览器登录和管理界面。
+`@sortedyuan/ui-client` 提供 Gateway 会话的 `UiHost`。`gateway-browser.ts` 和
+`gateway-browser/` 目录下的模块包含基于 `@sortedyuan/web-ui` 的浏览器登录和管理界面。
 
 ## 事件与持久化
 

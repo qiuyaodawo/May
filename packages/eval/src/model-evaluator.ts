@@ -9,7 +9,8 @@ import {
   type RunBudget,
 } from "@sortedyuan/may/core";
 import type { EvalEvaluator, EvaluationContext, EvaluationResult } from "./types.js";
-import { EvalTelemetryCollector, evalMetrics } from "./telemetry.js";
+import { EvalTelemetryCollector } from "./telemetry.js";
+import { evalMetrics } from "./eval-agent-metrics.js";
 import { EvalTrialBudget } from "./agent-budget.js";
 import { errorCode } from "./application.js";
 import { assertJson } from "./validation.js";

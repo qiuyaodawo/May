@@ -1,5 +1,5 @@
 import { DefaultMcpClientPool } from "./client-pool.js";
-import { freezeTree } from "./connection.js";
+import { freezeTree } from "./value-support.js";
 import { McpConfigurationError } from "./errors.js";
 import { validateMcpServerOptions } from "./transports.js";
 import type { McpClientPool, OpenMcpClientPoolOptions } from "./types.js";

@@ -1,4 +1,5 @@
 import { omitUndefined } from "../core/omit-undefined.js";
+import { positiveInteger } from "../core/positive-integer.js";
 import type { SessionEvent } from "./events.js";
 import type { SessionStore } from "./store.js";
 import { validateSessionHistory } from "./store.js";
@@ -156,13 +157,6 @@ function validateEventType(type: SessionEventType): void {
 
 function validateOptionalSeq(value: number | undefined, name: string): void {
   if (value !== undefined) positiveInteger(value, name);
-}
-
-function positiveInteger(value: number, name: string): number {
-  if (!Number.isSafeInteger(value) || value < 1) {
-    throw new RangeError(`${name} must be a positive safe integer`);
-  }
-  return value;
 }
 
 function requireSessionId(sessionId: string): void {

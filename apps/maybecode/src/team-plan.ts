@@ -2,7 +2,7 @@ import { open } from "node:fs/promises";
 import type { CoordinationLimits, TaskSpec } from "@sortedyuan/coordination";
 import { omitUndefined, resolveRunBudget, type RunBudget } from "@sortedyuan/may/core";
 import { MaybeCodeUsageError } from "./errors.js";
-import { parseTeamChecks, type TeamCheckSpec } from "./team-verification.js";
+import { parseTeamChecks, type TeamCheckSpec } from "./team-check-spec.js";
 
 export type TeamMode = "read-only" | "coding";
 export type TeamPreset = "supervisor" | "pipeline" | "parallel";

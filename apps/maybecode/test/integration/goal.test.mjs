@@ -15,7 +15,7 @@ import { loadMayConfig } from "@sortedyuan/may/config";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
 import { openConfiguredMaybeCode } from "../../dist/index.js";
-import { executeMaybeCodeSlashCommand } from "../../dist/slash-commands.js";
+import { executeMaybeCodeSlashCommand } from "../../dist/slash-command-execution.js";
 import { createMaybeCodeWebHost } from "../../dist/web-ui.js";
 import { runRetainedTerminalUI } from "../../dist/ui/retained-tui.js";
 import { MaybeCodeWorkspace } from "../../dist/workspace.js";

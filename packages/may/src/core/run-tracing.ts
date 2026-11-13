@@ -1,7 +1,7 @@
 import { RunCancelledError } from "./errors.js";
 import type { Model } from "./model.js";
 import { omitUndefined } from "./omit-undefined.js";
-import { resolveUsageTotals, type UsageCost } from "./pricing.js";
+import type { UsageCost } from "./pricing.js";
 import {
   endTraceSpan,
   startTraceSpan,
@@ -12,6 +12,7 @@ import {
   type Tracer,
 } from "./tracing.js";
 import type { Usage } from "./types.js";
+import { resolveUsageTotals } from "./usage-totals.js";
 
 export async function traceOperation<T>(
   tracer: Tracer | undefined,

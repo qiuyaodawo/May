@@ -11,7 +11,8 @@ import type {
   Tool as ProtocolTool,
 } from "@modelcontextprotocol/client";
 import type { Tool, TraceAttributes, TraceContext, Tracer } from "@sortedyuan/may/core";
-import type { McpOAuthManager, McpOAuthOptions } from "./oauth.js";
+import type { McpOAuthManager } from "./oauth.js";
+import type { McpOAuthOptions } from "./oauth-options.js";
 import type { McpInteractionBroker, McpInteractionOwner } from "./interactions.js";
 import type { McpHostServices, McpServerHostOptions } from "./host-services.js";
 import type { McpTaskJournal, McpTaskRecord } from "./task-journal.js";

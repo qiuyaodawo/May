@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AsyncEventQueue, AsyncStateSerializer, omitUndefined, type Tool } from "@sortedyuan/may/core";
-import { McpConnection, closeConnectionQuietly, fingerprint, freezeTree } from "./connection.js";
+import { McpConnection, closeConnectionQuietly } from "./connection.js";
+import { fingerprint, freezeTree } from "./value-support.js";
 import { toDiagnostic } from "./transport-support.js";
 import { McpClientPoolClosedError, McpCatalogError, McpCapabilityError, McpConfigurationError } from "./errors.js";
 import { McpAuthenticationError } from "./oauth.js";

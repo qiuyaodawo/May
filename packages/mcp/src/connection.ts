@@ -1,5 +1,7 @@
 import { openConnectionApp } from "./connection-apps.js";
-import { createHash, randomUUID } from "node:crypto";
+import { listMcpCatalog } from "./connection-catalog.js";
+import { createTools, describeToolError, formatProgress } from "./connection-tools.js";
+import { randomUUID } from "node:crypto";
 import {
   StreamableHTTPClientTransport,
   type CallToolResult,
@@ -13,7 +15,6 @@ import {
   omitUndefined,
   startTraceSpan,
   traceError,
-  type JsonSchema,
   type Tool,
   type ToolExecutionContext,
   type TraceAttributes,
@@ -46,17 +47,11 @@ import { McpTaskRuntime, type McpTaskWaitOptions, type McpTaskUpdateOptions } fr
 import { MCP_TASKS_EXTENSION, taskFailure } from "./tasks.js";
 import type { McpInteractionOwner } from "./interactions.js";
 import { assertMcpContentSize, mcpToolResultContent } from "./content.js";
-import { namespaceMcpToolName } from "./names.js";
 import { McpAuthenticationError } from "./oauth.js";
 import { McpCredentialStoreError } from "./credentials.js";
 import { createMcpTransport, safeMcpTransportError, validateMcpServerOptions } from "./transports.js";
-import {
-  BoundedStderrBuffer,
-  errorMessage,
-  requestOptions,
-  sanitizeDiagnosticText,
-  truncate,
-} from "./transport-support.js";
+import { BoundedStderrBuffer, errorMessage, requestOptions, sanitizeDiagnosticText } from "./transport-support.js";
+import { fingerprint, freezeTree } from "./value-support.js";
 import type {
   McpOperationOptions,
   McpServerStatus,
@@ -319,73 +314,8 @@ export class McpConnection {
     const span = startTraceSpan(this.tracer, "may.mcp.tools.list", { attributes: this.traceAttributes });
     try {
       await this.checkAuthorization();
-      const capabilities = this.client.getServerCapabilities() ?? {};
-      const options = requestOptions(this.options, signal);
-      // Explicit page walking rejects repeated cursors rather than publishing a partial catalog.
-      const tools =
-        capabilities.tools === undefined
-          ? []
-          : await listAll(this.options.id, async (cursor) => {
-              const result = await this.client.request(
-                { method: "tools/list", params: omitUndefined({ cursor }) },
-                options,
-              );
-              return { items: result.tools, nextCursor: result.nextCursor };
-            });
-      const resources =
-        capabilities.resources === undefined
-          ? []
-          : await listAll(this.options.id, async (cursor) => {
-              const result = await this.client.request(
-                { method: "resources/list", params: omitUndefined({ cursor }) },
-                options,
-              );
-              return { items: result.resources, nextCursor: result.nextCursor };
-            });
-      const resourceTemplates =
-        capabilities.resources === undefined
-          ? []
-          : await listAll(this.options.id, async (cursor) => {
-              const result = await this.client.request(
-                { method: "resources/templates/list", params: omitUndefined({ cursor }) },
-                options,
-              );
-              return { items: result.resourceTemplates, nextCursor: result.nextCursor };
-            });
-      const prompts =
-        capabilities.prompts === undefined
-          ? []
-          : await listAll(this.options.id, async (cursor) => {
-              const result = await this.client.request(
-                { method: "prompts/list", params: omitUndefined({ cursor }) },
-                options,
-              );
-              return { items: result.prompts, nextCursor: result.nextCursor };
-            });
-      const catalog = { capabilities, tools, resources, resourceTemplates, prompts };
-      if (
-        tools.length + resources.length + resourceTemplates.length + prompts.length > 4096 ||
-        Buffer.byteLength(JSON.stringify(catalog)) > 8 * 1024 * 1024
-      ) {
-        throw new McpCatalogError(this.options.id, "catalog exceeds host limits");
-      }
-      assertUnique(
-        tools.map((tool) => namespaceMcpToolName(this.options.id, tool.name)),
-        this.options.id,
-      );
-      assertUnique(
-        resources.map((resource) => resource.uri),
-        this.options.id,
-      );
-      assertUnique(
-        resourceTemplates.map((template) => template.uriTemplate),
-        this.options.id,
-      );
-      assertUnique(
-        prompts.map((prompt) => prompt.name),
-        this.options.id,
-      );
-      endTraceSpan(span, { status: "ok", attributes: { "may.mcp.tools.count": tools.length } });
+      const catalog = await listMcpCatalog(this.client, this.options.id, requestOptions(this.options, signal));
+      endTraceSpan(span, { status: "ok", attributes: { "may.mcp.tools.count": catalog.tools.length } });
       return freezeTree(structuredClone(catalog));
     } catch (error) {
       const safeError = safeMcpTransportError(error, this.options);
@@ -867,114 +797,6 @@ export class McpConnection {
   }
 }
 
-function createTools(connection: McpConnection, definitions: readonly ProtocolTool[]): readonly Tool[] {
-  return definitions.map((original) => {
-    validateToolSchema(original.inputSchema);
-    const definition = freezeTree(structuredClone(original));
-    const generation = connection.generation;
-    const exposedName = namespaceMcpToolName(connection.options.id, definition.name);
-    return Object.freeze({
-      name: exposedName,
-      permissionVersion: fingerprint([connection.options, generation, definition]),
-      description: `[MCP server: ${connection.options.id}] ${definition.description ?? definition.name}`,
-      inputSchema: definition.inputSchema as JsonSchema,
-      parse: (input: unknown) => parseArguments(exposedName, input),
-      resultContent: (output: McpToolOutput) => mcpToolResultContent(connection.options.id, definition.name, output),
-      execute: (input: Record<string, unknown>, context: ToolExecutionContext) =>
-        connection.callTool(definition, exposedName, input, context, generation),
-    });
-  });
-}
-
-function validateToolSchema(value: unknown): void {
-  const invalid = () => {
-    throw new TypeError("MCP tool inputSchema is invalid or exceeds host limits");
-  };
-  if (!value || typeof value !== "object" || Array.isArray(value) || (value as { type?: unknown }).type !== "object")
-    invalid();
-  if (Buffer.byteLength(JSON.stringify(value)) > 256 * 1024) invalid();
-  let nodes = 0;
-  const visit = (schema: unknown, depth: number): void => {
-    if (++nodes > 4096 || depth > 32) invalid();
-    if (typeof schema === "boolean") return;
-    if (!schema || typeof schema !== "object" || Array.isArray(schema)) invalid();
-    const record = schema as Record<string, unknown>;
-    if (record.type !== undefined) {
-      const types = typeof record.type === "string" ? [record.type] : Array.isArray(record.type) ? record.type : [];
-      if (
-        types.length === 0 ||
-        !types.every((type) => ["object", "array", "string", "number", "integer", "boolean", "null"].includes(type))
-      )
-        invalid();
-    }
-    if (
-      record.required !== undefined &&
-      (!Array.isArray(record.required) ||
-        record.required.some((key) => typeof key !== "string") ||
-        new Set(record.required).size !== record.required.length)
-    )
-      invalid();
-    for (const key of ["properties", "patternProperties", "$defs", "definitions"] as const) {
-      const children = record[key];
-      if (children === undefined) continue;
-      if (!children || typeof children !== "object" || Array.isArray(children)) invalid();
-      for (const child of Object.values(children as object)) visit(child, depth + 1);
-    }
-    for (const key of ["allOf", "anyOf", "oneOf", "prefixItems"] as const) {
-      const children = record[key];
-      if (children === undefined) continue;
-      if (!Array.isArray(children)) invalid();
-      for (const child of children as unknown[]) visit(child, depth + 1);
-    }
-    for (const key of ["items", "additionalProperties", "not", "if", "then", "else", "contains"] as const) {
-      const child = record[key];
-      if (child !== undefined) {
-        if (key === "items" && Array.isArray(child)) for (const entry of child) visit(entry, depth + 1);
-        else visit(child, depth + 1);
-      }
-    }
-  };
-  visit(value, 0);
-}
-
-function parseArguments(exposedName: string, input: unknown): Record<string, unknown> {
-  if (input === undefined || input === null) return {};
-  if (typeof input !== "object" || Array.isArray(input)) {
-    throw new TypeError(`MCP tool "${exposedName}" input must be an object`);
-  }
-  return input as Record<string, unknown>;
-}
-
-function formatProgress(progress: unknown): string {
-  if (typeof progress !== "object" || progress === null) {
-    return "MCP tool reported progress";
-  }
-  const record = progress as Record<string, unknown>;
-  if (typeof record.message === "string" && record.message !== "") {
-    return record.message;
-  }
-  if (typeof record.progress === "number") {
-    return typeof record.total === "number"
-      ? `MCP tool progress: ${record.progress}/${record.total}`
-      : `MCP tool progress: ${record.progress}`;
-  }
-  return "MCP tool reported progress";
-}
-
-function describeToolError(result: CallToolResult): string {
-  const text = result.content
-    .filter((content) => content.type === "text")
-    .map((content) => content.text)
-    .join("\n")
-    .trim();
-  if (text !== "") return truncate(text, 4_000);
-  try {
-    return truncate(JSON.stringify(result.content), 4_000);
-  } catch {
-    return "The remote tool returned isError=true";
-  }
-}
-
 function endMcpSpan(span: ReturnType<typeof startTraceSpan>, error: unknown, signal?: AbortSignal): void {
   endTraceSpan(span, {
     status: signal?.aborted === true ? "cancelled" : "error",
@@ -996,50 +818,4 @@ export async function closeConnectionQuietly(connection: McpConnection | undefin
   } catch {
     // Preserve the startup failure that caused cleanup.
   }
-}
-
-export function fingerprint(value: unknown): string {
-  return createHash("sha256")
-    .update(
-      JSON.stringify(value, (_key, item: unknown) => {
-        if (typeof item !== "object" || item === null || Array.isArray(item)) return item;
-        return Object.fromEntries(Object.entries(item).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
-      }),
-    )
-    .digest("hex");
-}
-
-export function freezeTree<T>(value: T): T {
-  if (typeof value === "object" && value !== null && !Object.isFrozen(value)) {
-    Object.freeze(value);
-    for (const child of Object.values(value)) freezeTree(child);
-  }
-  return value;
-}
-
-function assertUnique(values: readonly string[], serverId: string): void {
-  if (new Set(values).size !== values.length) throw new McpCatalogError(serverId, "duplicate catalog identity");
-}
-
-async function listAll<T>(
-  serverId: string,
-  page: (cursor?: string) => Promise<{ items: readonly T[]; nextCursor: string | undefined }>,
-): Promise<T[]> {
-  const items: T[] = [];
-  const seen = new Set<string>();
-  let cursor: string | undefined;
-  let bytes = 0;
-  for (let count = 0; count < 64; count++) {
-    const result = await page(cursor);
-    bytes += Buffer.byteLength(JSON.stringify(result));
-    if (items.length + result.items.length > 4096 || bytes > 8 * 1024 * 1024) {
-      throw new McpCatalogError(serverId, "catalog exceeds host limits");
-    }
-    items.push(...result.items);
-    cursor = result.nextCursor;
-    if (cursor === undefined) return items;
-    if (seen.has(cursor)) throw new McpCatalogError(serverId, "catalog cursor repeated");
-    seen.add(cursor);
-  }
-  throw new McpCatalogError(serverId, "catalog pagination exceeds 64 pages");
 }

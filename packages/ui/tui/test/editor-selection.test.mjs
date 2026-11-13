@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { stripVTControlCharacters } from "node:util";
 import { keyStroke } from "@sortedyuan/tui/keybindings";
-import { Editor, EditorHistory } from "../dist/editor.js";
+import { Editor } from "../dist/editor.js";
+import { EditorHistory } from "../dist/editor-history.js";
 import { createTerminalClipboard } from "../dist/clipboard.js";
 import { EDITOR_ACTIONS } from "../dist/editor-keymap.js";
 

@@ -1,6 +1,6 @@
 import { DEFAULT_DARK_THEME, type TuiTheme } from "@sortedyuan/tui";
 
-/** MaybeCode's restrained dark palette. Applications may replace it later. */
+/** MaybeCode's restrained dark palette; `MaybeCodeTerminalView` uses it unless `theme` is given. */
 export const MAYBECODE_DARK_THEME: TuiTheme = {
   ...DEFAULT_DARK_THEME,
   name: "maybecode-dark",

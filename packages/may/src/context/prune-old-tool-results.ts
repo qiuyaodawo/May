@@ -1,5 +1,6 @@
 import type { ContextSnapshot, Message, ToolMessage } from "../core/index.js";
 import { pendingServerToolInteractionIndex } from "../core/index.js";
+import { utf8Bytes } from "../core/utf8-bytes.js";
 
 import type { ContextCompactionStrategy } from "./compaction.js";
 
@@ -65,8 +66,4 @@ function nonNegativeInteger(value: number, name: string): number {
     throw new RangeError(`${name} must be a non-negative safe integer`);
   }
   return value;
-}
-
-function utf8Bytes(value: string): number {
-  return new TextEncoder().encode(value).byteLength;
 }

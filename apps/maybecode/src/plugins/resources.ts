@@ -10,7 +10,7 @@ import {
   createSharedObservabilityPlugin,
   observabilityHostService,
 } from "@sortedyuan/observability/plugin";
-import type { MaybeCodeObservabilityOptions } from "../configured.js";
+import type { MaybeCodeObservabilityOptions } from "../configured-resolvers.js";
 import { composeMaybeCodePlugins } from "./application.js";
 
 export function createMaybeCodeResourcePlugins(options: {

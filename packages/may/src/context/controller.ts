@@ -6,6 +6,7 @@ import {
   omitUndefined,
 } from "../core/index.js";
 import type { Context, ContextSnapshot, Message, Usage } from "../core/index.js";
+import { utf8Bytes } from "../core/utf8-bytes.js";
 
 import type {
   ContextCompactionDetails,
@@ -547,10 +548,6 @@ function validateInteger(value: number, name: string, minimum: number): void {
   if (!Number.isSafeInteger(value) || value < minimum) {
     throw new RangeError(`${name} must be a safe integer greater than or equal to ${minimum}`);
   }
-}
-
-function utf8Bytes(value: string): number {
-  return new TextEncoder().encode(value).byteLength;
 }
 
 function throwIfAborted(signal: AbortSignal | undefined): void {

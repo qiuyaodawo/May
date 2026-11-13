@@ -9,4 +9,5 @@ export * from "./shared-budget.js";
 export * from "./artifact-store.js";
 export * from "./task-workspace.js";
 export { delegationTool as createDelegationTool, type DelegationToolOptions } from "./delegation-tool.js";
-export { validateSnapshot as validateCoordinationSnapshot, validateTaskFiles } from "./validation.js";
+export { validateSnapshot as validateCoordinationSnapshot } from "./snapshot-validation.js";
+export { validateTaskFiles } from "./validation.js";

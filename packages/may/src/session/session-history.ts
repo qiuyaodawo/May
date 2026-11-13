@@ -1,4 +1,6 @@
 import { omitUndefined, type Tool } from "../core/index.js";
+import { positiveInteger } from "../core/positive-integer.js";
+import { utf8Bytes } from "../core/utf8-bytes.js";
 import {
   SESSION_EVENT_TYPES,
   sessionToolResultContent,
@@ -287,17 +289,6 @@ function utf8Prefix(value: string, maxBytes: number): string {
 function optionalPositiveInteger(value: unknown, name: string): number | undefined {
   if (value === undefined) return undefined;
   return positiveInteger(value, `session_history: ${name}`);
-}
-
-function positiveInteger(value: unknown, name: string): number {
-  if (!Number.isSafeInteger(value) || (value as number) < 1) {
-    throw new RangeError(`${name} must be a positive safe integer`);
-  }
-  return value as number;
-}
-
-function utf8Bytes(value: string): number {
-  return new TextEncoder().encode(value).byteLength;
 }
 
 function throwIfAborted(signal: AbortSignal): void {

@@ -3,7 +3,7 @@ import { loadMayConfig, type MayConfig } from "@sortedyuan/may/config";
 import { omitUndefined } from "@sortedyuan/may/core";
 import { KeyringMcpCredentialStore, McpOAuthManager } from "@sortedyuan/mcp";
 import type { MaybeCodeMcpCommand } from "./args.js";
-import { getDefaultMaybeCodeDataDirectory, resolveMaybeCodeMcp } from "./configured.js";
+import { getDefaultMaybeCodeDataDirectory, resolveMaybeCodeMcp } from "./configured-resolvers.js";
 import { MaybeCodeConfigError } from "./errors.js";
 
 export interface MaybeCodeMcpAuthDependencies {

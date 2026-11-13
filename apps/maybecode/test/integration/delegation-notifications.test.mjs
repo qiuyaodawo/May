@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { loadMayConfig, resolveModelProfile } from "@sortedyuan/may/config";
 import { openConfiguredMaybeCode } from "../../dist/index.js";
 import { executeDelegationCommand } from "../../dist/delegation-commands.js";
-import { executeMaybeCodeSlashCommand } from "../../dist/slash-commands.js";
+import { executeMaybeCodeSlashCommand } from "../../dist/slash-command-execution.js";
 
 test("配置文件、命令、Session 切换和重新打开工作区保留正确的通知设置", async (t) => {
   const base = join(testOutputRoot, "maybecode", "delegation-notifications");

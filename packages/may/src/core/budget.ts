@@ -4,7 +4,6 @@ import type { Usage } from "./types.js";
 import {
   priceUsage,
   resolvePriceSchedule,
-  resolveUsageTotals,
   validateTokenPrices,
   validateUsageCost,
   type TokenPrices,
@@ -12,6 +11,7 @@ import {
   type UsageCost,
   type UsagePricer,
 } from "./pricing.js";
+import { resolveUsageTotals } from "./usage-totals.js";
 
 /** Limits for one Run/continue. Token and cost limits are checked at response boundaries.
  * @experimental

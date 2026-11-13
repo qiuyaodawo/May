@@ -11,12 +11,9 @@ import { MaybeCodeUsageError } from "./errors.js";
 import type { MaybeCodeController } from "./controller.js";
 import { parsePermissionMode } from "./policy.js";
 import { parseMaybeCodeSlashCommand } from "./slash-commands.js";
-import {
-  createMaybeCodeSlashCommandSuggester,
-  executeMaybeCodeSlashCommand,
-  formatMaybeCodeMcpStatus,
-  type MaybeCodeSlashCommandResult,
-} from "./slash-commands.js";
+import { formatMaybeCodeMcpStatus, type MaybeCodeSlashCommandResult } from "./slash-commands.js";
+import { createMaybeCodeSlashCommandSuggester } from "./slash-command-suggestions.js";
+import { executeMaybeCodeSlashCommand } from "./slash-command-execution.js";
 
 export class MaybeCodeWebCommands {
   private busy = false;

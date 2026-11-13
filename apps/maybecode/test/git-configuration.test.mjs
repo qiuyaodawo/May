@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { homedir } from "node:os";
 import { loadMayConfig } from "@sortedyuan/may/config";
-import { resolveMaybeCodeGit } from "../dist/configured.js";
+import { resolveMaybeCodeGit } from "../dist/configured-resolvers.js";
 
 const artifacts = join(testOutputRoot, "maybecode", "git-configuration");
 

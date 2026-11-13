@@ -3,7 +3,8 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { TeamVerificationStore, parseTeamChecks, parseTeamReport } from "../dist/team-verification.js";
+import { TeamVerificationStore } from "../dist/team-verification.js";
+import { parseTeamChecks, parseTeamReport } from "../dist/team-check-spec.js";
 
 async function fixture(t) {
   const directory = await mkdtemp(join(tmpdir(), "may-team-verification-"));

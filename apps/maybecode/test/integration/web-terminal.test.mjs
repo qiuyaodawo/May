@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { openConfiguredMaybeCode } from "../../dist/index.js";
-import { executeMaybeCodeSlashCommand } from "../../dist/slash-commands.js";
+import { executeMaybeCodeSlashCommand } from "../../dist/slash-command-execution.js";
 import { MaybeCodeTerminalWeb } from "../../dist/terminal-web.js";
 
 test(

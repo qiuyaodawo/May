@@ -37,6 +37,16 @@ implementation when selected; image codecs and Web server assets load when used.
 - `pnpm format` formats the repository with Prettier (`printWidth: 120`), and
   `pnpm format:check` reports unformatted files without changing them; CI runs the
   check on Linux with Node.js 24.
+- `pnpm install` registers the Husky `pre-commit` hook, which runs
+  `scripts/check-file-size.mjs` on staged files. In a checkout whose dependencies
+  are already installed, run `pnpm run prepare` to register it. A commit fails when a staged file
+  exceeds 20,000 bytes (about 5,000 tokens); divide the file by responsibility and
+  commit again. Lockfiles, `api/` reports, `docs/i18n/` records and configuration schemas
+  are exempt. Markdown files are exempt too, except the documents written for agents:
+  files named `AGENTS.md`, `CLAUDE.md` or `SKILL.md`, and the guides that the root
+  `AGENTS.md` links to. `scripts/file-size-baseline.json` lists the files that
+  exceeded the limit when the hook was introduced; remove a file from the list once
+  it fits the limit or is deleted.
 - `pnpm docs:check` checks bilingual document pairing, language links, local
   destination files, and code-fence pairing. Review anchors, wording, and examples
   separately.

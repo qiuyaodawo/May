@@ -416,8 +416,9 @@ These modules use internal owner interfaces; mutable state remains owned by
 plugin host and runs the delivery cycle. `gateway-repository.ts` defines
 `GatewayRepository`, which writes related Gateway and channel records in one
 SQLite transaction. `gateway-ui.ts` defines `GatewayUiHost`, the `UiHost` that
-exposes Gateway sessions to `@sortedyuan/ui-client`. `gateway-browser.ts` contains
-the browser sign-in and management views built on `@sortedyuan/web-ui`.
+exposes Gateway sessions to `@sortedyuan/ui-client`. `gateway-browser.ts` and the
+modules in `gateway-browser/` contain the browser sign-in and management views
+built on `@sortedyuan/web-ui`.
 
 ## Events and persistence
 

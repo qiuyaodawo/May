@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { withFileAccess } from "@sortedyuan/may/storage";
 import type { MaybeCodeTeamCommand } from "./args.js";
-import { getDefaultMaybeCodeDataDirectory } from "./configured.js";
+import { getDefaultMaybeCodeDataDirectory } from "./configured-resolvers.js";
 import { MaybeCodeUsageError } from "./errors.js";
 import type { RunMaybeCodeTeamDependencies } from "./team-common.js";
 

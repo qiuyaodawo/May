@@ -16,6 +16,7 @@ export * from "./types.js";
 export * from "./correlation.js";
 export * from "./telemetry.js";
 export * from "./pricing.js";
+export * from "./usage-totals.js";
 export * from "./structured-output.js";
 export * from "./state-serializer.js";
 export * from "./omit-undefined.js";

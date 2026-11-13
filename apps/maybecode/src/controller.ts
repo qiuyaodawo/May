@@ -54,13 +54,6 @@ export type MaybeCodeCompactionStrategyName =
 /** @experimental */
 export type MaybeCodeCompactionSelection = MaybeCodeCompactionStrategyName | ContextCompactionStrategy;
 
-/**
- * Headless MaybeCode control surface for terminal, graphical, or remote UIs.
- *
- * A UI sends user intents through these methods and observes asynchronous
- * runtime changes through `events`. It does not depend on readline, ANSI
- * rendering, or the concrete workspace implementation.
- */
 type MaybeCodeProductEvent = Extract<
   MaybeCodeEvent,
   | { type: "model.changed" }
@@ -76,7 +69,14 @@ type MaybeCodeProductEvent = Extract<
   | { type: "mcp.server.disconnected" }
 >;
 
-/** @experimental */
+/**
+ * Headless MaybeCode control surface for terminal, graphical, or remote UIs.
+ *
+ * A UI sends user intents through these methods and observes asynchronous
+ * runtime changes through `events`. It does not depend on readline, ANSI
+ * rendering, or the concrete workspace implementation.
+ * @experimental
+ */
 export interface MaybeCodeController extends Omit<
   AgentWorkspaceController<MaybeCodeSessionEvent, MaybeCodeProductEvent, MaybeCodeCompactionSelection, MaybeCodeRun>,
   "forkSession"

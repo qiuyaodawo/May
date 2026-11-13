@@ -5,7 +5,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { InMemorySessionStore, InMemorySessionCatalog } from "@sortedyuan/may/session";
 import { MaybeCodeWorkspace } from "../dist/workspace.js";
-import { executeMaybeCodeSlashCommand, createMaybeCodeSlashCommandSuggester } from "../dist/slash-commands.js";
+import { executeMaybeCodeSlashCommand } from "../dist/slash-command-execution.js";
+import { createMaybeCodeSlashCommandSuggester } from "../dist/slash-command-suggestions.js";
 
 async function fixture(t) {
   const workspace = await realpath(await mkdtemp(join(tmpdir(), "may-skills-app-")));

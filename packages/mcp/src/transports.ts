@@ -5,7 +5,8 @@ import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotoc
 import { McpConfigurationError, McpContentError } from "./errors.js";
 import { assertMcpServerId } from "./names.js";
 import type { McpServerOptions } from "./types.js";
-import { McpAuthenticationError, validateMcpOAuthOptions, type McpOAuthManager } from "./oauth.js";
+import { McpAuthenticationError, type McpOAuthManager } from "./oauth.js";
+import { validateMcpOAuthOptions } from "./oauth-options.js";
 import { McpCredentialStoreError } from "./credentials.js";
 import { taskHeaderValue } from "./task-wire.js";
 

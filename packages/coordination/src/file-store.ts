@@ -10,7 +10,8 @@ import { lstat, mkdir, open, readFile, type FileHandle } from "node:fs/promises"
 import { join, resolve } from "node:path";
 import { AsyncStateSerializer } from "@sortedyuan/may/core";
 import type { CoordinationJournal, CoordinationSnapshot, CoordinationStore } from "./types.js";
-import { copy, name, positive, validateSnapshot } from "./validation.js";
+import { validateSnapshot } from "./snapshot-validation.js";
+import { copy, name, positive } from "./validation.js";
 
 /** Local single-writer JSONL journal.
  * @experimental

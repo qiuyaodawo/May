@@ -3,7 +3,8 @@ import test from "node:test";
 import { InMemoryContextFactory } from "@sortedyuan/may/context";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { MaybeCodeApplication } from "../dist/application.js";
-import { createMaybeCodeSlashCommandSuggester, executeMaybeCodeSlashCommand } from "../dist/slash-commands.js";
+import { createMaybeCodeSlashCommandSuggester } from "../dist/slash-command-suggestions.js";
+import { executeMaybeCodeSlashCommand } from "../dist/slash-command-execution.js";
 
 const message = (role, text) => ({ role, content: [{ type: "text", text }] });
 const history = [

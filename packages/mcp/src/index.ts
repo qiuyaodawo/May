@@ -5,6 +5,7 @@ export * from "./types.js";
 export { validateMcpServerOptions } from "./transports.js";
 export * from "./credentials.js";
 export * from "./oauth.js";
+export { validateMcpOAuthOptions, type McpOAuthOptions } from "./oauth-options.js";
 export * from "./content.js";
 export * from "./interactions.js";
 export type {

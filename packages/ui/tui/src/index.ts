@@ -3,6 +3,7 @@ export * from "./clipboard.js";
 export * from "./images.js";
 export * from "./column.js";
 export * from "./editor.js";
+export { EditorHistory, type EditorHistoryOptions } from "./editor-history.js";
 export * from "./editor-keymap.js";
 export * from "./text-selection.js";
 export * from "./focus.js";

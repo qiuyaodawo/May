@@ -14,7 +14,7 @@ import { TranscriptStore } from "@sortedyuan/tui/transcript";
 import { openConfiguredMaybeCode } from "../dist/index.js";
 import { createCodingPermissionPolicy } from "../dist/policy.js";
 import { parseMaybeCodeArgs } from "../dist/args.js";
-import { executeMaybeCodeSlashCommand } from "../dist/slash-commands.js";
+import { executeMaybeCodeSlashCommand } from "../dist/slash-command-execution.js";
 import { MaybeCodeApplication } from "../dist/application.js";
 import { MaybeCodeTerminalView } from "../dist/ui/terminal-view.js";
 import { localModel, yoloDirectory, yoloWorkspace } from "./yolo-support.mjs";

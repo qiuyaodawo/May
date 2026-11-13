@@ -305,7 +305,7 @@ throughout directory use. Process exit releases it automatically; restart remove
 `host.lock` metadata for an exited local PID. Another host, a live PID, damaged
 metadata, or unverifiable ownership requires manual inspection. Preserve
 `host.lock.access` during use and recovery; never delete or replace it. See
-[MaybeClaw lifecycle and storage](maybeclaw.md#lifecycle-storage-and-migration).
+[MaybeClaw lifecycle and storage](maybeclaw.md#lifecycle-and-storage).
 
 `FileSessionStore` serializes reads, writes and tail repair per Session in one instance.
 Append validation reuses the last sequence only while file identity, length and timestamps

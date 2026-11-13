@@ -2,7 +2,8 @@ import type { CoordinationRuntime, CoordinationSnapshot } from "@sortedyuan/coor
 import { omitUndefined, type Tracer } from "@sortedyuan/may/core";
 import type { EvalExecutionAdapter, EvalExecutionResult, ExecutionCreateContext } from "./types.js";
 import { type EvalApprovalHandler, errorCode, waitWithSignal } from "./application.js";
-import { EvalTelemetryCollector, evalIdentities, evalMetrics } from "./telemetry.js";
+import { EvalTelemetryCollector } from "./telemetry.js";
+import { evalIdentities, evalMetrics } from "./eval-agent-metrics.js";
 import { EvalTrialBudget } from "./agent-budget.js";
 
 /** @experimental */

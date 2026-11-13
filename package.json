@@ -3,9 +3,10 @@
   "private": true,
   "packageManager": "pnpm@12.4.2",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.16.0"
   },
   "scripts": {
+    "prepare": "husky",
     "lint": "eslint .",
     "build": "tsc -b && node scripts/build-maybecode.mjs && node scripts/write-config-schema.mjs maybecode && node scripts/write-config-schema.mjs maybeclaw",
     "clean": "tsc -b --clean",
@@ -56,6 +57,7 @@
     "@types/node": "22.20.1",
     "esbuild": "^0.28.2",
     "eslint": "^10.14.0",
+    "husky": "^9.1.7",
     "mdast-util-from-markdown": "^2.1.0",
     "mdast-util-gfm": "^3.1.0",
     "micromark-extension-gfm": "^3.0.0",

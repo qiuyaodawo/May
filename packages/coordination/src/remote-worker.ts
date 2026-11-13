@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from "node:crypto";
+import { timingSafeEqual } from "node:crypto";
 import { mkdir, open, readFile, type FileHandle } from "node:fs/promises";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { join, resolve } from "node:path";
@@ -6,27 +6,21 @@ import type { AgentApplicationEvent } from "@sortedyuan/may";
 import { acquireFileLock, type FileLock } from "@sortedyuan/may/storage";
 import { AsyncStateSerializer, isStreamingMayEvent, validateTelemetryCorrelation } from "@sortedyuan/may/core";
 import type { ApprovalDecision } from "@sortedyuan/may/permissions";
-import type { CoordinationAgent, TaskExecution, TaskRecovery } from "./types.js";
-import { canonical, copy, freeze, name, positive, validateOutput } from "./validation.js";
+import type { CoordinationAgent, TaskRecovery } from "./types.js";
+import {
+  body,
+  dispatchId,
+  fingerprint,
+  validateOutcome,
+  validateToken,
+  type Dispatch,
+  type Job,
+  type JobView,
+} from "./remote-protocol.js";
+import { copy, freeze, name, positive, validateOutput } from "./validation.js";
 
-interface Dispatch {
-  readonly agent: string;
-  readonly execution: TaskExecution;
-}
-interface Job extends Dispatch {
-  readonly id: string;
-  readonly fingerprint: string;
-  readonly status: "queued" | "running" | "terminal";
-  readonly cancelRequested?: boolean;
-  readonly outcome?: TaskRecovery;
-}
-interface JobView {
-  readonly id: string;
-  readonly status: Job["status"];
-  readonly outcome?: TaskRecovery;
-  readonly events: readonly { seq: number; event: AgentApplicationEvent }[];
-  readonly cursor: number;
-}
+export { createRemoteAgent, type RemoteAgentOptions } from "./remote-agent.js";
+
 interface Active {
   readonly controller: AbortController;
   readonly done: Promise<void>;
@@ -516,168 +510,6 @@ export class CoordinationWorker {
   }
 }
 
-/** @experimental */
-export interface RemoteAgentOptions {
-  readonly url: string;
-  readonly token: string;
-  readonly agent: string;
-  readonly version: string;
-  readonly pollIntervalMs?: number;
-  readonly requestTimeoutMs?: number;
-  readonly maxResponseBytes?: number;
-}
-
-/** Independent remote worker adapter. The coordinator keeps graph ownership and recovery policy.
- * @experimental
- */
-export function createRemoteAgent(options: RemoteAgentOptions): CoordinationAgent {
-  options = { ...options };
-  validateToken(options.token);
-  name(options.agent, "remote agent");
-  name(options.version, "remote version");
-  const base = new URL(options.url);
-  if (
-    base.username ||
-    base.password ||
-    base.search ||
-    base.hash ||
-    base.pathname !== "/" ||
-    (base.protocol !== "https:" &&
-      !(base.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(base.hostname)))
-  )
-    throw new Error("Remote worker requires an HTTPS origin except on loopback; credentials belong in token options");
-  const timeout = options.requestTimeoutMs ?? 20_000,
-    interval = options.pollIntervalMs ?? 250,
-    maxBytes = options.maxResponseBytes ?? 2_097_152;
-  for (const value of [timeout, interval, maxBytes]) positive(value, "remote limit");
-  const active = new Map<string, string>();
-  const request = async (path: string, value?: unknown, signal?: AbortSignal): Promise<unknown> => {
-    const response = await fetch(new URL(path, base), {
-      method: value === undefined ? "GET" : "POST",
-      redirect: "error",
-      headers: { authorization: `Bearer ${options.token}`, "content-type": "application/json" },
-      ...(value === undefined ? {} : { body: JSON.stringify(value) }),
-      signal: AbortSignal.any([AbortSignal.timeout(timeout), ...(signal ? [signal] : [])]),
-    });
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new Error(`Remote worker rejected request (${response.status}); execution was not retried`);
-    }
-    if (!response.body) throw new Error("Missing remote response");
-    const chunks: Uint8Array[] = [];
-    let size = 0;
-    const reader = response.body.getReader();
-    try {
-      while (true) {
-        const chunk = await reader.read();
-        if (chunk.done) break;
-        size += chunk.value.length;
-        if (size > maxBytes) throw new Error("Remote response exceeds limit");
-        chunks.push(chunk.value);
-      }
-    } finally {
-      await reader.cancel().catch(() => undefined);
-      reader.releaseLock();
-    }
-    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-  };
-  return {
-    version: options.version,
-    async execute(execution, context) {
-      context.signal.throwIfAborted();
-      const id = dispatchId(execution);
-      let cursor = 0;
-      active.set(execution.task.sessionId, id);
-      try {
-        let view = (await request("/v1/jobs", { agent: options.agent, execution }, context.signal)) as JobView;
-        while (true) {
-          if (view.id !== id || !Array.isArray(view.events) || !["queued", "running", "terminal"].includes(view.status))
-            throw new Error("Invalid remote job response");
-          for (const item of view.events)
-            if (item.seq > cursor) {
-              context.report(item.event);
-              cursor = item.seq;
-            }
-          if (view.status === "terminal") {
-            const outcome = validateOutcome(view.outcome!);
-            if (outcome.status === "completed") return outcome.output;
-            throw new Error("Remote execution requires outcome reconciliation");
-          }
-          await pause(interval, context.signal);
-          view = (await request(`/v1/jobs/${id}?after=${cursor}`, undefined, context.signal)) as JobView;
-        }
-      } catch (error) {
-        if (context.signal.aborted)
-          await request("/v1/cancel", { agent: options.agent, execution }).catch(() => undefined);
-        throw error;
-      } finally {
-        active.delete(execution.task.sessionId);
-      }
-    },
-    async recover(execution) {
-      try {
-        if (execution.task.cancelRequested) await request("/v1/cancel", { agent: options.agent, execution });
-        return validateOutcome((await request("/v1/recover", { agent: options.agent, execution })) as TaskRecovery);
-      } catch {
-        return { status: "recovery-required", detail: "Remote outcome unavailable; do not re-dispatch or replay" };
-      }
-    },
-    async cancel(execution) {
-      await request("/v1/cancel", { agent: options.agent, execution });
-    },
-    async resolveApproval(sessionId, requestId, decision) {
-      const id = active.get(sessionId);
-      if (!id) return false;
-      return (
-        ((await request(`/v1/jobs/${id}/approval`, { requestId, decision })) as { accepted: boolean }).accepted === true
-      );
-    },
-  };
-}
-
-function dispatchId(execution: TaskExecution): string {
-  return createHash("sha256")
-    .update(
-      canonical([execution.coordinationId, execution.task.id, execution.task.dispatchId, execution.task.turn ?? 0]),
-    )
-    .digest("hex");
-}
-function fingerprint(dispatch: Dispatch): string {
-  const {
-    status: _status,
-    detail: _detail,
-    cancelRequested: _cancel,
-    output: _output,
-    ...task
-  } = dispatch.execution.task;
-  const { telemetry: _telemetry, ...execution } = dispatch.execution;
-  return createHash("sha256")
-    .update(canonical({ agent: dispatch.agent, execution: { ...execution, task } }))
-    .digest("hex");
-}
-function validateOutcome(outcome: TaskRecovery): TaskRecovery {
-  if (!outcome || !["not-started", "completed", "failed", "cancelled", "recovery-required"].includes(outcome.status))
-    throw new Error("Invalid remote outcome");
-  if (outcome.status === "completed") validateOutput(outcome.output, 1_048_576);
-  else if (outcome.status !== "not-started" && (!("detail" in outcome) || typeof outcome.detail !== "string"))
-    throw new Error("Invalid remote outcome detail");
-  return freeze(copy(outcome));
-}
-function validateToken(token: string): void {
-  if (typeof token !== "string" || token.length < 24 || /\s/u.test(token))
-    throw new Error("Worker token must contain at least 24 non-whitespace characters");
-}
-async function body(request: IncomingMessage, maxBytes: number): Promise<unknown> {
-  const chunks: Buffer[] = [];
-  let size = 0;
-  for await (const chunk of request) {
-    const bytes = Buffer.from(chunk);
-    size += bytes.length;
-    if (size > maxBytes) throw new Error("Request too large");
-    chunks.push(bytes);
-  }
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
-}
 function reply(response: ServerResponse, status: number, value: unknown): void {
   if (response.writableEnded || response.destroyed) return;
   response.writeHead(status, {
@@ -686,18 +518,4 @@ function reply(response: ServerResponse, status: number, value: unknown): void {
     "x-content-type-options": "nosniff",
   });
   response.end(JSON.stringify(value));
-}
-function pause(ms: number, signal: AbortSignal): Promise<void> {
-  signal.throwIfAborted();
-  return new Promise((resolve, reject) => {
-    const abort = () => {
-      clearTimeout(timer);
-      reject(signal.reason);
-    };
-    const timer = setTimeout(() => {
-      signal.removeEventListener("abort", abort);
-      resolve();
-    }, ms);
-    signal.addEventListener("abort", abort, { once: true });
-  });
 }

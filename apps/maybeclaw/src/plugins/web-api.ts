@@ -26,6 +26,11 @@ export async function startGatewayServer(options: {
     type: "text/javascript; charset=utf-8",
     body: await readFile(new URL("../gateway-browser.js", import.meta.url), "utf8"),
   });
+  for (const name of ["dialogs", "sessions", "agents", "service", "permissions"])
+    assets.set(`/gateway-browser/${name}.js`, {
+      type: "text/javascript; charset=utf-8",
+      body: await readFile(new URL(`../gateway-browser/${name}.js`, import.meta.url), "utf8"),
+    });
   assets.set("/app.js", {
     type: "text/javascript; charset=utf-8",
     body: 'import { UiClient } from "/ui/client.js"; import { mountWebUI } from "/webui/index.js"; import { createGatewayManager, gatewayAuthentication } from "/gateway-browser.js"; const client = new UiClient(); const root = document.getElementById("app"); const manager = createGatewayManager(client); const unmount = mountWebUI(root, client, { title: "MaybeClaw", kind: "session", authentication: gatewayAuthentication(), connectionHint: "输入配置的管理员密码。刷新页面后需要重新登录。", onNew: manager.onNew, navigation: manager.navigation }); let closing; window.addEventListener("beforeunload", () => { closing ??= Promise.all([unmount(), manager.dispose()]).catch(error => console.error("MaybeClaw UI cleanup failed", error)); });',

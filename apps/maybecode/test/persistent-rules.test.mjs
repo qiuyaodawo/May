@@ -10,7 +10,7 @@ import { FilePermissionRuleStore } from "@sortedyuan/may/permissions/file-store"
 import { acquireFileLock } from "@sortedyuan/may/storage";
 import { openConfiguredMaybeCode } from "../dist/index.js";
 import { createCodingPermissionPolicy } from "../dist/policy.js";
-import { executeMaybeCodeSlashCommand } from "../dist/slash-commands.js";
+import { executeMaybeCodeSlashCommand } from "../dist/slash-command-execution.js";
 import { createMaybeCodeWebHost } from "../dist/web-ui.js";
 
 const artifacts = join(testOutputRoot, "maybecode", "persistent-rules");

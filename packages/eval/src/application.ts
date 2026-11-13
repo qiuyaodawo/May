@@ -3,7 +3,8 @@ import type { ApprovalDecision, ApprovalRequest } from "@sortedyuan/may/permissi
 import type { RunResult, Tracer, UserMessage } from "@sortedyuan/may/core";
 import type { EvalExecutionAdapter, EvalExecutionResult, ExecutionCreateContext, JsonValue } from "./types.js";
 import { assertJson } from "./validation.js";
-import { EvalTelemetryCollector, evalIdentities, evalMetrics } from "./telemetry.js";
+import { EvalTelemetryCollector } from "./telemetry.js";
+import { evalIdentities, evalMetrics } from "./eval-agent-metrics.js";
 import { EvalTrialBudget } from "./agent-budget.js";
 
 /** @experimental */

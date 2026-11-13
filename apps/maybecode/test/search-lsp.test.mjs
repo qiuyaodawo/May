@@ -17,7 +17,7 @@ import { createCodingToolRendererRegistry, readCodingToolPresentation } from "@s
 import { DEFAULT_DARK_THEME } from "@sortedyuan/tui";
 import { MaybeCodeApplication } from "../dist/application.js";
 import { createMaybeCodeToolPresentation } from "../dist/tool-presentation.js";
-import { executeMaybeCodeSlashCommand } from "../dist/slash-commands.js";
+import { executeMaybeCodeSlashCommand } from "../dist/slash-command-execution.js";
 import { readMaybeCodeSettings } from "../dist/settings.js";
 import { createCodingPermissionPolicy } from "../dist/policy.js";
 import { searchStatus } from "../dist/search.js";

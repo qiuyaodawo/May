@@ -277,7 +277,7 @@ MaybeClaw 数据目录使用独立的 `host.lock.access` 操作系统独占锁�
 始终持有该锁。进程退出后自动释放，重新启动时自动清理本机已退出 PID 的
 `host.lock` 记录。其他机器、存活 PID、损坏或无法核实的所有者记录需要人工检查。
 使用和恢复期间保留 `host.lock.access` 文件，禁止删除或替换。详见
-[MaybeClaw 生命周期与存储](maybeclaw.md#生命周期存储与迁移)。
+[MaybeClaw 生命周期与存储](maybeclaw.md#生命周期与存储)。
 
 同一个 `FileSessionStore` 实例按 Session 串行执行读取、写入与残尾修复。追加操作仅在
 文件身份、长度和时间戳一致时复用上次验证的序号；显式历史读取仍校验完整记录。

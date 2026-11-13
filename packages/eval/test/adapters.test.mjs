@@ -6,7 +6,8 @@ import test from "node:test";
 import { PermissionToolExecutor } from "@sortedyuan/may/permissions";
 import { DiagnosticsStore } from "../../observability/dist/index.js";
 import { EvalTrialBudget } from "../dist/agent-budget.js";
-import { EvalTelemetryCollector, createEvalTaskAssessment, evalMetrics } from "../dist/telemetry.js";
+import { createEvalTaskAssessment, evalMetrics } from "../dist/eval-agent-metrics.js";
+import { EvalTelemetryCollector } from "../dist/telemetry.js";
 
 const directory = join(testOutputRoot, "eval", "adapters");
 await mkdir(directory, { recursive: true });

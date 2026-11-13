@@ -19,10 +19,12 @@ export async function webUiAssets(
     type: "text/html; charset=utf-8",
     body: `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><title>${escaped} · May ${kind === "task" ? "任务工作台" : "工作台"}</title><link rel="stylesheet" href="/app.css"><script type="module" src="/app.js"></script></head><body><div id="app" data-title="${escaped}" data-kind="${kind}"></div><noscript>工作台需要启用 JavaScript。</noscript></body></html>`,
   });
-  assets.set("/app.css", {
-    type: "text/css; charset=utf-8",
-    body: await readFile(new URL("../assets/workbench.css", import.meta.url), "utf8"),
-  });
+  const styles = await Promise.all(
+    ["base", "sidebar", "transcript", "composer", "details", "dialogs"].map((name) =>
+      readFile(new URL(`../assets/workbench-${name}.css`, import.meta.url), "utf8"),
+    ),
+  );
+  assets.set("/app.css", { type: "text/css; charset=utf-8", body: styles.join("") });
   assets.set("/app.js", {
     type: "text/javascript; charset=utf-8",
     body: `${options.extensionModule === undefined ? "const extensions = {};" : 'import { extensions } from "/product.js";'} import { UiClient } from "/ui/client.js"; import { mountWebUI } from "/webui/index.js"; ${options.browserLogin ? 'import { browserLogin } from "/webui/browser-login.js";' : ""} const root = document.getElementById("app"); mountWebUI(root, new UiClient(), { title: root.dataset.title, kind: root.dataset.kind, extensions${options.browserLogin ? ', initialToken: browserLogin(), connectionHint: "在终端重新打开 Web UI，即可连接当前会话。"' : ""} });`,
@@ -34,6 +36,10 @@ export async function webUiAssets(
     "components",
     "markdown",
     "reading",
+    "inspector",
+    "resource-list",
+    "connection-dialog",
+    "composer",
     "browser-login",
     "commands",
     "navigation",

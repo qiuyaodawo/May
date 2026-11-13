@@ -1,59 +1,31 @@
 import { acquireFileLock, hasErrorCode, type FileLock } from "@sortedyuan/may/storage";
-import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, mkdir, open, readdir, realpath, type FileHandle } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { lstat, mkdir, open, realpath, type FileHandle } from "node:fs/promises";
+import { join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { AsyncStateSerializer } from "@sortedyuan/may/core";
 import type { TaskExecution } from "@sortedyuan/coordination";
 import type { Tool } from "@sortedyuan/may/core";
-import { openCodingExecutionEnvironment, type CodingExecutionEnvironment } from "@sortedyuan/coding-tools";
+import type { CodingExecutionEnvironment } from "@sortedyuan/coding-tools";
+import {
+  boundedString,
+  identifier,
+  parseTeamCheck,
+  parseTeamChecks,
+  parseTeamReport,
+  type TeamCheckSpec,
+  type TeamReport,
+} from "./team-check-spec.js";
+import { hash, message, noFollow, readWorkspaceFile, runCommand, workspaceFingerprint } from "./team-check-runner.js";
+import { createTeamVerificationTools } from "./team-verification-tools.js";
+import {
+  maxJournalBytes,
+  readJournal,
+  sameIdentity,
+  type Identity,
+  type JournalEvent,
+} from "./team-verification-journal.js";
 
-export type TeamCheckSpec =
-  | {
-      readonly id: string;
-      readonly taskId: string;
-      readonly type: "file-contains";
-      readonly path: string;
-      readonly text: string;
-    }
-  | {
-      readonly id: string;
-      readonly taskId: string;
-      readonly type: "file-sha256";
-      readonly path: string;
-      readonly sha256: string;
-    }
-  | {
-      readonly id: string;
-      readonly taskId: string;
-      readonly type: "command";
-      readonly command: string;
-      readonly args: readonly string[];
-      readonly timeoutMs?: number;
-      readonly maxOutputBytes?: number;
-    };
-
-export interface TeamEvidence {
-  readonly path: string;
-  readonly startLine: number;
-  readonly endLine: number;
-  readonly quote?: string;
-}
-export interface TeamReport {
-  readonly summary: string;
-  readonly claims: readonly {
-    readonly text: string;
-    readonly kind: "finding" | "proposal";
-    readonly evidence?: readonly TeamEvidence[];
-  }[];
-}
-interface Identity {
-  readonly taskId: string;
-  readonly coordinationId?: string;
-  readonly dispatchId?: string;
-  readonly turn?: number;
-}
 export interface StoredTeamReport extends Identity {
   readonly commandId: string;
   readonly report: TeamReport;
@@ -99,15 +71,6 @@ export interface TeamCheckOptions {
   readonly signal?: AbortSignal;
   readonly execution?: TaskExecution;
 }
-type JournalEvent =
-  | { readonly type: "config"; readonly checks: readonly TeamCheckSpec[] }
-  | { readonly type: "report"; readonly report: StoredTeamReport }
-  | { readonly type: "check"; readonly result: TeamCheckResult };
-interface Entry {
-  readonly sequence: number;
-  readonly event: JournalEvent;
-}
-const maxJournalBytes = 16_777_216;
 
 /** Host evidence and deterministic checks; a model report can never grant acceptance. */
 export class TeamVerificationStore {
@@ -227,78 +190,7 @@ export class TeamVerificationStore {
       if (!spec) throw new Error("Check is not configured for this task");
       return this.runCheck(commandId, spec, workspace, { ...options, ...extra, execution });
     };
-    const tools = (): readonly Tool[] => [
-      {
-        name: "submit_report",
-        permissionVersion: "team-verification-v1",
-        description:
-          "Store a structured report and file/line evidence. The host validates evidence bytes, not claim correctness. This never grants acceptance.",
-        inputSchema: {
-          type: "object",
-          additionalProperties: false,
-          required: ["summary", "claims"],
-          properties: {
-            summary: { type: "string" },
-            claims: {
-              type: "array",
-              items: {
-                type: "object",
-                additionalProperties: false,
-                required: ["text", "kind"],
-                properties: {
-                  text: { type: "string" },
-                  kind: { type: "string", enum: ["finding", "proposal"] },
-                  evidence: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      additionalProperties: false,
-                      required: ["path", "startLine", "endLine"],
-                      properties: {
-                        path: { type: "string" },
-                        startLine: { type: "integer" },
-                        endLine: { type: "integer" },
-                        quote: { type: "string" },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        parse: parseTeamReport,
-        async execute(input, call) {
-          call.signal.throwIfAborted();
-          return submit(hash(call.idempotencyKey), input as TeamReport);
-        },
-      },
-      {
-        name: "run_check",
-        permissionVersion: "team-verification-v1",
-        description: `Run one exact host-configured check by id; no model-supplied commands or arguments. Available: ${
-          this.checks
-            .filter((entry) => entry.taskId === identity.taskId)
-            .map((entry) => entry.id)
-            .join(", ") || "none"
-        }. Command checks require explicit host authorization and are not sandboxed.`,
-        inputSchema: {
-          type: "object",
-          additionalProperties: false,
-          required: ["id"],
-          properties: { id: { type: "string" } },
-        },
-        parse(value: unknown) {
-          const input = fields(value, ["id"]);
-          identifier(input.id, "check id");
-          return { id: input.id as string };
-        },
-        async execute(input, call) {
-          call.signal.throwIfAborted();
-          return runCheck(hash(call.idempotencyKey), (input as { id: string }).id, { signal: call.signal });
-        },
-      },
-    ];
+    const tools = (): readonly Tool[] => createTeamVerificationTools(this.checks, identity.taskId, submit, runCheck);
     return { submit, runCheck, tools };
   }
 
@@ -557,326 +449,6 @@ export class TeamVerificationStore {
   }
 }
 
-export function parseTeamCheck(value: unknown): TeamCheckSpec {
-  const raw = fields(value, [
-    "id",
-    "taskId",
-    "type",
-    "path",
-    "text",
-    "sha256",
-    "command",
-    "args",
-    "timeoutMs",
-    "maxOutputBytes",
-  ]);
-  identifier(raw.id, "check id");
-  identifier(raw.taskId, "check taskId");
-  if (raw.type === "file-contains") {
-    fields(raw, ["id", "taskId", "type", "path", "text"]);
-    safeRelative(raw.path);
-    boundedString(raw.text, "check text", 65536);
-  } else if (raw.type === "file-sha256") {
-    fields(raw, ["id", "taskId", "type", "path", "sha256"]);
-    safeRelative(raw.path);
-    if (typeof raw.sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(raw.sha256)) throw new Error("Invalid SHA-256");
-  } else if (raw.type === "command") {
-    fields(raw, ["id", "taskId", "type", "command", "args", "timeoutMs", "maxOutputBytes"]);
-    boundedString(raw.command, "check command", 4096);
-    if (
-      /[\u0000\r\n]/u.test(raw.command as string) ||
-      !Array.isArray(raw.args) ||
-      raw.args.length > 64 ||
-      raw.args.some((arg) => typeof arg !== "string" || arg.length > 8192 || arg.includes("\0"))
-    )
-      throw new Error("Invalid check command arguments");
-    if (raw.timeoutMs !== undefined) integer(raw.timeoutMs, 1, 120000, "check timeoutMs");
-    if (raw.maxOutputBytes !== undefined) integer(raw.maxOutputBytes, 1, 1048576, "check maxOutputBytes");
-  } else throw new Error("Unknown check type");
-  return structuredClone(raw) as unknown as TeamCheckSpec;
-}
-
-export function parseTeamChecks(value: unknown): readonly TeamCheckSpec[] {
-  if (!Array.isArray(value) || value.length > 128) throw new Error("Checks must be an array of at most 128 entries");
-  const checks = value.map(parseTeamCheck);
-  if (new Set(checks.map((entry) => entry.id)).size !== checks.length) throw new Error("Check ids must be unique");
-  return checks;
-}
-
-export function parseTeamReport(value: unknown): TeamReport {
-  const report = fields(value, ["summary", "claims"]);
-  boundedString(report.summary, "report summary", 8192);
-  if (!Array.isArray(report.claims) || report.claims.length > 64)
-    throw new Error("Report claims must be an array of at most 64 entries");
-  for (const value of report.claims) {
-    const claim = fields(value, ["text", "kind", "evidence"]);
-    boundedString(claim.text, "claim text", 4096);
-    if (claim.kind !== "finding" && claim.kind !== "proposal") throw new Error("Invalid report claim kind");
-    if (claim.evidence !== undefined) {
-      if (!Array.isArray(claim.evidence) || claim.evidence.length > 16) throw new Error("Too many evidence references");
-      for (const item of claim.evidence) {
-        const evidence = fields(item, ["path", "startLine", "endLine", "quote"]);
-        safeRelative(evidence.path);
-        integer(evidence.startLine, 1, 1000000, "evidence startLine");
-        integer(evidence.endLine, evidence.startLine as number, 1000000, "evidence endLine");
-        if ((evidence.endLine as number) - (evidence.startLine as number) > 1000)
-          throw new Error("Evidence range exceeds 1001 lines");
-        if (evidence.quote !== undefined) boundedString(evidence.quote, "evidence quote", 8192);
-      }
-    }
-  }
-  if (Buffer.byteLength(JSON.stringify(report)) > 65536) throw new Error("Report exceeds 64 KiB");
-  return structuredClone(report) as unknown as TeamReport;
-}
-
-/** All directory/file names and file bytes count; no ignored changes can retain a green check. */
-export async function workspaceFingerprint(directory: string): Promise<string> {
-  const root = await realpath(directory);
-  if ((await lstat(directory)).isSymbolicLink()) throw new Error("Workspace root must not be a symbolic link");
-  const entries: unknown[] = [];
-  let bytes = 0;
-  let files = 0;
-  async function visit(path: string): Promise<void> {
-    const names = (await readdir(path)).sort();
-    for (const name of names) {
-      const child = join(path, name);
-      const stat = await lstat(child);
-      const nameInRoot = relative(root, child).split(sep).join("/");
-      if (++files > 10000 || stat.isSymbolicLink())
-        throw new Error("Workspace exceeds 10000 entries or contains a symbolic link");
-      if (stat.isDirectory()) {
-        entries.push([nameInRoot, "directory"]);
-        await visit(child);
-      } else if (stat.isFile()) {
-        if ((bytes += stat.size) > 67108864) throw new Error("Workspace exceeds 64 MiB");
-        const content = await readWorkspaceFile(root, nameInRoot);
-        entries.push([nameInRoot, "file", content.length, hash(content)]);
-      } else throw new Error("Workspace contains unsupported file type");
-    }
-  }
-  await visit(root);
-  return hash(JSON.stringify(entries));
-}
-
-async function readWorkspaceFile(directory: string, path: string): Promise<Buffer> {
-  safeRelative(path);
-  const root = await realpath(directory);
-  let target = root;
-  for (const part of path.replace(/\\/gu, "/").split("/")) {
-    target = join(target, part);
-    if ((await lstat(target)).isSymbolicLink()) throw new Error("Evidence/check path must not contain symbolic links");
-  }
-  const canonical = await realpath(target);
-  const rel = relative(root, canonical);
-  if (!rel || rel.startsWith(`..${sep}`) || rel === ".." || isAbsolute(rel))
-    throw new Error("Evidence/check path escapes workspace");
-  const before = await lstat(target);
-  if (!before.isFile() || before.size > 67108864) throw new Error("Evidence/check file is invalid or exceeds 64 MiB");
-  const file = await open(target, constants.O_RDONLY | noFollow());
-  try {
-    const current = await file.stat();
-    if (!current.isFile() || current.dev !== before.dev || current.ino !== before.ino || current.size !== before.size)
-      throw new Error("File changed while opening");
-    const buffer = Buffer.alloc(before.size + 1);
-    let length = 0;
-    while (length < buffer.length) {
-      const chunk = await file.read(buffer, length, buffer.length - length, length);
-      if (!chunk.bytesRead) break;
-      length += chunk.bytesRead;
-    }
-    const after = await file.stat();
-    if (length !== before.size || after.size !== current.size || after.mtimeMs !== current.mtimeMs)
-      throw new Error("File changed while reading");
-    return buffer.subarray(0, length);
-  } finally {
-    await file.close();
-  }
-}
-
-async function runCommand(
-  spec: Extract<TeamCheckSpec, { type: "command" }>,
-  workspace: string,
-  signal?: AbortSignal,
-  executionFor?: (workspace: string) => Promise<CodingExecutionEnvironment>,
-): Promise<Pick<TeamCheckResult, "status" | "detail" | "exitCode" | "output">> {
-  const environment = executionFor
-    ? await executionFor(workspace)
-    : await openCodingExecutionEnvironment({ workspace, isolation: { mode: "host" } });
-  try {
-    return await runEnvironmentCommand(spec, workspace, environment, signal);
-  } finally {
-    if (!executionFor) await environment.close();
-  }
-}
-
-async function runEnvironmentCommand(
-  spec: Extract<TeamCheckSpec, { type: "command" }>,
-  workspace: string,
-  environment: CodingExecutionEnvironment,
-  signal?: AbortSignal,
-): Promise<Pick<TeamCheckResult, "status" | "detail" | "exitCode" | "output">> {
-  signal?.throwIfAborted();
-  if (process.platform === "win32" && /\.(?:cmd|bat)$/iu.test(spec.command))
-    return {
-      status: "failed",
-      detail:
-        "Command checks execute native programs directly. Use node.exe with the package manager JavaScript entry point, not .cmd/.bat.",
-    };
-  const cwd = await realpath(workspace);
-  const env: Record<string, string> = {};
-  // No inherited API keys, proxy tokens, NODE_OPTIONS, package hooks, or user home config.
-  for (const key of [
-    "PATH",
-    "Path",
-    "PATHEXT",
-    "SystemRoot",
-    "WINDIR",
-    "COMSPEC",
-    "TEMP",
-    "TMP",
-    "TMPDIR",
-    "LANG",
-    "LC_ALL",
-  ])
-    if (environment.isolation.mode === "host" && process.env[key] !== undefined) env[key] = process.env[key];
-  env.CI = "1";
-  return new Promise((resolveResult, rejectResult) => {
-    const cancellation = new AbortController();
-    let output = Buffer.alloc(0);
-    let reason: string | undefined;
-    let settled = false;
-    const child = environment.spawn(spec.command, spec.args, {
-      cwd,
-      env,
-      signal: cancellation.signal,
-    });
-    const stdout = child.stdout;
-    const stderr = child.stderr;
-    if (!stdout || !stderr) {
-      rejectResult(new Error("Execution environment must provide command output pipes"));
-      return;
-    }
-    const finish = (status: "passed" | "failed" | "unknown", exitCode?: number, detail?: string) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", abort);
-      resolveResult({
-        status,
-        ...(exitCode !== undefined ? { exitCode } : {}),
-        ...(detail ? { detail } : {}),
-        output: boundedOutput(output, spec.maxOutputBytes ?? 65536),
-      });
-    };
-    const stop = (detail: string) => {
-      if (reason) return;
-      reason = detail;
-      cancellation.abort();
-    };
-    const abort = () => stop("Check interrupted");
-    const timer = setTimeout(() => stop("Check timed out"), spec.timeoutMs ?? 30000);
-    const collect = (chunk: Buffer) => {
-      const limit = spec.maxOutputBytes ?? 65536;
-      if (output.length + chunk.length > limit) {
-        output = Buffer.concat([output, chunk.subarray(0, limit - output.length)]);
-        stop("Check output limit exceeded");
-      } else output = Buffer.concat([output, chunk]);
-    };
-    stdout.on("data", collect);
-    stderr.on("data", collect);
-    child.on("error", (error) => finish(child.pid === undefined ? "failed" : "unknown", undefined, message(error)));
-    child.on("close", (code, terminationSignal) => {
-      if (reason || terminationSignal || code === null)
-        finish("unknown", undefined, reason ?? `Check ended by ${terminationSignal ?? "unknown termination"}`);
-      else
-        finish(
-          code === 0 ? "passed" : "failed",
-          code,
-          code === 0 ? "Configured command exited successfully" : "Configured command exited unsuccessfully",
-        );
-    });
-    signal?.addEventListener("abort", abort, { once: true });
-    if (signal?.aborted) abort();
-  });
-}
-
-async function readJournal(file: FileHandle): Promise<{ entries: Entry[]; committed: number; size: number }> {
-  const stat = await file.stat();
-  if (!stat.isFile() || stat.size > maxJournalBytes) throw new Error("Invalid verification journal type or size");
-  const bytes = Buffer.alloc(stat.size);
-  let count = 0;
-  while (count < bytes.length) {
-    const result = await file.read(bytes, count, bytes.length - count, count);
-    if (!result.bytesRead) break;
-    count += result.bytesRead;
-  }
-  const committed = count === 0 || bytes[count - 1] === 10 ? count : bytes.subarray(0, count).lastIndexOf(10) + 1;
-  const entries: Entry[] = [];
-  const reportIds = new Set<string>();
-  const checkResults = new Map<string, TeamCheckResult>();
-  let specs: readonly TeamCheckSpec[] = [];
-  for (const line of bytes.subarray(0, committed).toString("utf8").split("\n").slice(0, -1)) {
-    const entry = JSON.parse(line) as Entry;
-    if (!entry || entry.sequence !== entries.length + 1 || !entry.event)
-      throw new Error("Invalid verification journal sequence");
-    const event = entry.event;
-    if (event.type === "config") {
-      if (entries.length !== 0) throw new Error("Duplicate verification config");
-      specs = parseTeamChecks(event.checks);
-    } else if (entries.length === 0) throw new Error("Missing verification config");
-    else if (event.type === "report") {
-      parseTeamReport(event.report.report);
-      validateStored(event.report);
-      if (reportIds.size >= 256 || reportIds.has(event.report.commandId) || !Array.isArray(event.report.evidence))
-        throw new Error("Invalid stored report history");
-      for (const item of event.report.evidence) {
-        safeRelative(item.path);
-        integer(item.startLine, 1, 1000000, "stored evidence startLine");
-        integer(item.endLine, item.startLine, 1000000, "stored evidence endLine");
-        if (typeof item.valid !== "boolean" || (item.valid && !/^[a-f0-9]{64}$/u.test(item.sha256 ?? "")))
-          throw new Error("Invalid stored evidence");
-      }
-      reportIds.add(event.report.commandId);
-    } else if (event.type === "check") {
-      const result = event.result;
-      parseTeamCheck(result.spec);
-      validateStored(result);
-      if (
-        !isDeepStrictEqual(
-          specs.find((entry) => entry.id === result.spec.id),
-          result.spec,
-        ) ||
-        result.taskId !== result.spec.taskId ||
-        !["pending", "passed", "failed", "unknown", "cancelled"].includes(result.status) ||
-        (result.afterFingerprint !== undefined && !/^[a-f0-9]{64}$/u.test(result.afterFingerprint))
-      )
-        throw new Error("Invalid check record");
-      const old = checkResults.get(result.commandId);
-      if (!old) {
-        if (checkResults.size >= 512 || result.status !== "pending")
-          throw new Error("Check result has no pending intent");
-      } else {
-        if (
-          !sameIdentity(old, result) ||
-          !isDeepStrictEqual(old.spec, result.spec) ||
-          old.workspaceFingerprint !== result.workspaceFingerprint ||
-          (old.status !== "pending" && old.status !== "unknown") ||
-          result.status === "pending" ||
-          (old.status === "unknown" && (!["failed", "cancelled"].includes(result.status) || !result.reconciliation))
-        )
-          throw new Error("Invalid check history transition");
-      }
-      checkResults.set(result.commandId, result);
-    } else throw new Error("Unknown verification journal record");
-    entries.push(entry);
-  }
-  return { entries, committed, size: stat.size };
-}
-function validateStored(value: StoredTeamReport | TeamCheckResult): void {
-  identifier(value.commandId, "stored command id");
-  identifier(value.taskId, "stored task id");
-  if (!/^[a-f0-9]{64}$/u.test(value.workspaceFingerprint)) throw new Error("Invalid stored workspace fingerprint");
-}
 function taskIdentity(execution: TaskExecution): Identity {
   return {
     taskId: execution.task.id,
@@ -885,71 +457,10 @@ function taskIdentity(execution: TaskExecution): Identity {
     turn: execution.task.turn ?? 0,
   };
 }
-function sameIdentity(a: Identity, b: Identity): boolean {
-  return (
-    a.taskId === b.taskId && a.coordinationId === b.coordinationId && a.dispatchId === b.dispatchId && a.turn === b.turn
-  );
-}
-function fields(value: unknown, allowed: readonly string[]): Record<string, unknown> {
-  if (
-    !value ||
-    typeof value !== "object" ||
-    Array.isArray(value) ||
-    Object.keys(value).some((key) => !allowed.includes(key))
-  )
-    throw new Error("Invalid verification fields");
-  return value as Record<string, unknown>;
-}
-function identifier(value: unknown, label: string): asserts value is string {
-  if (typeof value !== "string" || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,255}$/u.test(value))
-    throw new Error(`Invalid ${label}`);
-}
-function boundedString(value: unknown, label: string, max: number): asserts value is string {
-  if (typeof value !== "string" || value.length < 1 || Buffer.byteLength(value) > max || value.includes("\0"))
-    throw new Error(`Invalid ${label}`);
-}
-function integer(value: unknown, min: number, max: number, label: string): void {
-  if (!Number.isSafeInteger(value) || (value as number) < min || (value as number) > max)
-    throw new Error(`Invalid ${label}`);
-}
-function safeRelative(value: unknown): asserts value is string {
-  boundedString(value, "workspace relative path", 2048);
-  if (
-    isAbsolute(value) ||
-    /[:\u0000-\u001f]/u.test(value) ||
-    value
-      .replace(/\\/gu, "/")
-      .split("/")
-      .some((part) => !part || part === "." || part === "..")
-  )
-    throw new Error("Unsafe workspace relative path");
-}
 async function rejectLinkIfPresent(path: string): Promise<void> {
   try {
     if ((await lstat(path)).isSymbolicLink()) throw new Error("Verification file must not be a symbolic link");
   } catch (error) {
     if (!hasErrorCode(error, "ENOENT")) throw error;
   }
-}
-function noFollow(): number {
-  return process.platform === "win32" ? 0 : constants.O_NOFOLLOW;
-}
-function hash(value: string | Uint8Array): string {
-  return createHash("sha256").update(value).digest("hex");
-}
-function message(error: unknown): string {
-  return (error instanceof Error ? error.message : String(error)).slice(0, 2048);
-}
-function boundedOutput(bytes: Buffer, limit: number): string {
-  const text = bytes.toString("utf8");
-  if (Buffer.byteLength(text) <= limit) return text;
-  // Replacement characters for invalid UTF-8 must not expand the persisted output past its cap.
-  let count = 0;
-  const characters: string[] = [];
-  for (const character of text) {
-    count += Buffer.byteLength(character);
-    if (count > limit) break;
-    characters.push(character);
-  }
-  return characters.join("");
 }

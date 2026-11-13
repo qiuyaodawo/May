@@ -51,7 +51,8 @@ import {
   type TraceSpan,
   type Tracer,
 } from "./tracing.js";
-import { aggregateUsage as mergeUsage, resolveUsageTotals, type UsageCost } from "./pricing.js";
+import type { UsageCost } from "./pricing.js";
+import { aggregateUsage as mergeUsage, resolveUsageTotals } from "./usage-totals.js";
 import {
   traceOperation,
   endOperationSpan,

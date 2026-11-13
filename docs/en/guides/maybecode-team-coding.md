@@ -78,7 +78,7 @@ The source lock only coordinates cooperating MaybeCode appliers. It cannot exclu
 `TaskWorkspaceManager.snapshotPatch(taskIds)` returns bounded text changes plus baseline and per-task digests without writing source files. The product module `team-patches.ts` provides:
 
 - `createTeamPatch({ directory, workspaces, taskIds })`
-- `readTeamPatch(directory, patchId)` and `renderTeamPatchDiff(bundle)`
+- `readTeamPatch(directory, patchId)`, with `renderTeamPatchDiff(bundle)` in `team-patch-bundle.ts`
 - `applyTeamPatch({ directory, workspaces, patchId, confirmDigest })`
 - `readTeamPatchApplication(directory, patchId)`
 
@@ -87,7 +87,7 @@ Patch bundles are under the team's `patches/` directory. Application records and
 ## Interrupted staging cleanup
 
 Stop all team hosts, appliers and editors before calling `cleanupTeamPatchTemporaries`
-from `@sortedyuan/maybecode` with `directory`, `patchId`, the exact `confirmDigest`, and
+from the product module `team-patches.ts` with `directory`, `patchId`, the exact `confirmDigest`, and
 `confirmHostsStopped: true`. It validates the journal and staging paths before deleting
 only recorded `.maybecode-*.tmp` files. Source targets and backups are never removed, and
 the application outcome remains unknown until separately reconciled. Cleanup never resumes

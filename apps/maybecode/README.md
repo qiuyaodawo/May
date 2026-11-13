@@ -341,11 +341,11 @@ An application-owned MCP plugin creates and closes its connection for each
 Session; configured shared MCP providers retain their workspace-owned connection
 across Session changes. Custom MCP providers replace configured MCP resources.
 
-Reusable implementations live in `@sortedyuan/plugin-goals`,
-`@sortedyuan/plugin-history-memory`, `@sortedyuan/plugin-delegation`, `@sortedyuan/plugin-mcp`, and
-`@sortedyuan/plugin-observability`. Model, Permission, Skills, and Runtime factories live
-in the corresponding plugin packages. The previous MaybeCode module paths
-continue to re-export history-memory and delegation interfaces.
+Reusable implementations live in `@sortedyuan/may/goals/plugin`,
+`@sortedyuan/may/history-memory`, `@sortedyuan/coordination/delegation`, `@sortedyuan/mcp/plugin`, and
+`@sortedyuan/observability/plugin`. Model, Permission, Skills, and Runtime factories live
+in `@sortedyuan/may/services/models`, `@sortedyuan/may/services/permissions`,
+`@sortedyuan/may/services/skills`, and `@sortedyuan/may/services/runtime`.
 
 ## Product boundary
 
@@ -466,7 +466,7 @@ send the message again. These rules apply to the terminal frontend, Web UI,
 and `MaybeCodeController.submit()` / `steer()`. General `AgentApplication.submit()`
 continues to require that the application has no active operation.
 
-The bundled SessionPicker uses the optional `@sortedyuan/keybindings` package to map
+The terminal frontend uses `@sortedyuan/tui/keybindings` to map
 context-specific key sequences to semantic actions. Custom UIs may reuse that
 resolver or provide their own keyboard and interaction system.
 

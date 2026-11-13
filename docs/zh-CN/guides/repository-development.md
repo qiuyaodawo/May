@@ -34,6 +34,13 @@ Web 服务资源在使用时加载。
   ESLint 使用 TypeScript 5.9；`tsc -b` 使用 TypeScript 7。CI 在 Ubuntu 和 Node.js 24 上执行 lint。
 - `pnpm format`：使用 Prettier（`printWidth: 120`）格式化仓库；`pnpm format:check` 只报告
   未格式化的文件，不修改文件。CI 在 Linux 和 Node.js 24 上运行这项检查。
+- `pnpm install` 会注册 Husky 的 `pre-commit` 钩子，钩子对暂存的文件运行
+  `scripts/check-file-size.mjs`。依赖已经安装完成的工作副本运行 `pnpm run prepare` 注册钩子。暂存的文件超过 20,000 字节（约 5,000 token）时提交失败；
+  按功能把文件分成几个文件之后再提交。lockfile、`api/` 报告、`docs/i18n/` 记录和配置
+  schema 不参与检查。Markdown 文件也不参与检查，写给 agent 读的文档除外：名为
+  `AGENTS.md`、`CLAUDE.md` 或 `SKILL.md` 的文件，以及根目录 `AGENTS.md` 链接的指南。
+  `scripts/file-size-baseline.json` 列出引入钩子时已经
+  超过限制的文件；文件符合限制或者被删除之后，把它从清单中移除。
 - `pnpm docs:check`：检查双语文件配对、语言链接、本地目标文件和代码围栏配对。
   锚点、表达及示例需要另外检查。
 - `pnpm --filter <package-name> test`：检查一个 package，使用其 `package.json` 中

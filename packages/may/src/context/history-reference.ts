@@ -5,6 +5,7 @@ import {
   type Message,
   type SystemMessage,
 } from "../core/index.js";
+import { positiveInteger } from "../core/positive-integer.js";
 
 import type { ContextCompactionOptions, ContextCompactionStrategy } from "./compaction.js";
 
@@ -73,13 +74,6 @@ export class HistoryReferenceStrategy implements ContextCompactionStrategy {
     const compacted: Message[] = [referenceMessage, ...snapshot.messages.slice(boundary)];
     return serializedBytes(compacted) < serializedBytes(snapshot.messages) ? compacted : snapshot.messages;
   }
-}
-
-function positiveInteger(value: number, name: string): number {
-  if (!Number.isSafeInteger(value) || value < 1) {
-    throw new RangeError(`${name} must be a positive safe integer`);
-  }
-  return value;
 }
 
 function serializedBytes(messages: readonly Message[]): number {

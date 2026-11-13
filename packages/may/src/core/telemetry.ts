@@ -1,6 +1,6 @@
 import type { Usage } from "./types.js";
 import { omitUndefined } from "./omit-undefined.js";
-import { resolveUsageTotals } from "./pricing.js";
+import { resolveUsageTotals } from "./usage-totals.js";
 import {
   endTraceSpan,
   setTraceAttributes,

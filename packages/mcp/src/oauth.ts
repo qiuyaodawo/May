@@ -1,5 +1,4 @@
-import { createServer, type Server } from "node:http";
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   auth,
   computeScopeUnion,
@@ -14,24 +13,9 @@ import {
 } from "@modelcontextprotocol/client";
 import { MayError, omitUndefined } from "@sortedyuan/may/core";
 import type { McpCredentialStore } from "./credentials.js";
+import { listenForCallback } from "./oauth-callback.js";
+import { assertSecureOAuthUrl, validateMcpOAuthOptions, type McpOAuthOptions } from "./oauth-options.js";
 import type { McpHttpServerOptions } from "./types.js";
-
-/** @experimental */
-export interface McpOAuthOptions {
-  readonly type: "oauth";
-  /** User-selected credential profile; independent from May Session permissions. */
-  readonly account?: string;
-  /** Public pre-registered native client. Requires expectedIssuer. */
-  readonly clientId?: string;
-  readonly expectedIssuer?: string;
-  /** Public Client ID Metadata Document; preferred over legacy dynamic registration. */
-  readonly clientMetadataUrl?: string;
-  readonly scopes?: readonly string[];
-  /** Explicitly trusted origins for discovery, authorization and token endpoints. */
-  readonly authorizationOrigins?: readonly string[];
-  /** 0 (default) asks the OS for an unused loopback callback port. */
-  readonly callbackPort?: number;
-}
 
 /** @experimental */
 export class McpAuthenticationError extends MayError {
@@ -458,147 +442,4 @@ export class McpOAuthManager {
 function oauthSettings(server: McpHttpServerOptions): McpOAuthOptions {
   if (server.auth?.type !== "oauth") throw new McpAuthenticationError(server.id);
   return server.auth;
-}
-
-/** @experimental */
-export function validateMcpOAuthOptions(value: McpOAuthOptions): void {
-  if (value === null || typeof value !== "object" || value.type !== "oauth") throw new Error("auth.type must be oauth");
-  const allowed = [
-    "type",
-    "account",
-    "clientId",
-    "expectedIssuer",
-    "clientMetadataUrl",
-    "scopes",
-    "authorizationOrigins",
-    "callbackPort",
-  ];
-  for (const key of Object.keys(value)) if (!allowed.includes(key)) throw new Error("Unsupported MCP OAuth option");
-  for (const name of ["account", "clientId", "expectedIssuer", "clientMetadataUrl"] as const) {
-    if (value[name] !== undefined && (typeof value[name] !== "string" || value[name]!.trim() === ""))
-      throw new Error(`auth.${name} must be a non-empty string`);
-  }
-  if (value.clientId !== undefined && value.expectedIssuer === undefined)
-    throw new Error("auth.clientId requires expectedIssuer");
-  if (value.clientId !== undefined && value.clientMetadataUrl !== undefined)
-    throw new Error("Choose clientId or clientMetadataUrl");
-  for (const name of ["scopes", "authorizationOrigins"] as const) {
-    const list = value[name];
-    if (list !== undefined && (!Array.isArray(list) || list.some((item) => typeof item !== "string" || !item)))
-      throw new Error(`auth.${name} must contain strings`);
-  }
-  if (value.scopes?.some((scope) => !/^[\x21\x23-\x5b\x5d-\x7e]+$/u.test(scope)))
-    throw new Error("Invalid OAuth scope");
-  for (const origin of value.authorizationOrigins ?? []) {
-    const parsed = new URL(origin);
-    assertSecureOAuthUrl(parsed);
-    if (parsed.origin !== origin) throw new Error("auth.authorizationOrigins must contain origins only");
-  }
-  if (value.expectedIssuer !== undefined) assertSecureOAuthUrl(new URL(value.expectedIssuer));
-  if (value.clientMetadataUrl !== undefined) {
-    const url = new URL(value.clientMetadataUrl);
-    assertSecureOAuthUrl(url);
-    if (url.protocol !== "https:" || url.pathname === "/")
-      throw new Error("clientMetadataUrl requires HTTPS and a document path");
-  }
-  if (
-    value.callbackPort !== undefined &&
-    (!Number.isSafeInteger(value.callbackPort) || value.callbackPort < 0 || value.callbackPort > 65535)
-  ) {
-    throw new Error("auth.callbackPort must be between 0 and 65535");
-  }
-}
-
-function assertSecureOAuthUrl(url: URL): void {
-  if (
-    url.username ||
-    url.password ||
-    url.hash ||
-    !(
-      url.protocol === "https:" ||
-      (url.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname))
-    )
-  ) {
-    throw new Error("OAuth endpoints must use HTTPS (HTTP is loopback-only), without credentials or fragments");
-  }
-}
-
-async function listenForCallback(state: string, port: number, signal: AbortSignal) {
-  signal.throwIfAborted();
-  let complete!: (params: URLSearchParams) => void;
-  let fail!: (reason: unknown) => void;
-  const result = new Promise<PromiseSettledResult<URLSearchParams>>((resolve) => {
-    complete = (value) => resolve({ status: "fulfilled", value });
-    fail = (reason) => resolve({ status: "rejected", reason });
-  });
-  let closing: Promise<void> | undefined;
-  let url = "";
-  let consumed = false;
-  const server = createServer((request, response) => {
-    response.setHeader("cache-control", "no-store");
-    response.setHeader("content-type", "text/plain; charset=utf-8");
-    if (consumed || request.method !== "GET" || (request.url?.length ?? 0) > 8192) {
-      response.writeHead(400).end();
-      return;
-    }
-    let target: URL;
-    try {
-      target = new URL(request.url ?? "/", url);
-    } catch {
-      response.writeHead(400).end();
-      return;
-    }
-    if (
-      request.headers.host !== new URL(url).host ||
-      target.origin !== new URL(url).origin ||
-      target.pathname !== "/oauth/callback"
-    ) {
-      response.writeHead(404).end();
-      return;
-    }
-    const actual = Buffer.from(target.searchParams.get("state") ?? "");
-    if (
-      ["state", "code", "iss", "error"].some((key) => target.searchParams.getAll(key).length > 1) ||
-      actual.length !== Buffer.byteLength(state) ||
-      !timingSafeEqual(actual, Buffer.from(state))
-    ) {
-      response.writeHead(400).end("Invalid authorization callback.");
-      return;
-    }
-    consumed = true;
-    response.end("Authorization callback received. Return to May to check the result.");
-    complete(target.searchParams);
-  });
-  server.requestTimeout = 10_000;
-  server.headersTimeout = 10_000;
-  await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
-    server.listen(port, "127.0.0.1", () => {
-      server.removeListener("error", reject);
-      resolve();
-    });
-  });
-  const address = server.address();
-  if (address === null || typeof address === "string") throw new Error("Callback listener unavailable");
-  url = `http://127.0.0.1:${address.port}/oauth/callback`;
-  const abort = () => {
-    fail(signal.reason);
-    closing ??= closeServer(server);
-  };
-  signal.addEventListener("abort", abort, { once: true });
-  if (signal.aborted) abort();
-  return {
-    url,
-    result,
-    close: async () => {
-      signal.removeEventListener("abort", abort);
-      await (closing ??= closeServer(server));
-    },
-  };
-}
-async function closeServer(server: Server): Promise<void> {
-  await new Promise<void>((resolve) => {
-    server.close(() => resolve());
-    server.closeAllConnections();
-  });
 }

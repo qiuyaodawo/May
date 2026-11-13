@@ -1,0 +1,567 @@
+.conversation-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  overscroll-behavior: contain;
+}
+.welcome {
+  max-width: 780px;
+  width: 100%;
+  margin: 0 auto;
+  padding: clamp(48px, 13vh, 140px) 36px 30px;
+}
+.welcome-mark {
+  font-family: Georgia, serif;
+  font-size: 56px;
+  color: var(--accent);
+  font-style: italic;
+  line-height: 1;
+  margin-bottom: 25px;
+}
+.welcome h1 {
+  font-size: clamp(27px, 3vw, 37px);
+  line-height: 1.3;
+  letter-spacing: -1px;
+  font-weight: 550;
+}
+.welcome p {
+  font-size: 15px;
+  color: var(--muted);
+  margin-top: 16px;
+  line-height: 1.8;
+  max-width: 620px;
+}
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 32px;
+}
+.suggestion {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 15px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  text-align: left;
+  font-size: 14px;
+  background: var(--bg);
+  max-width: 100%;
+}
+.suggestion svg {
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+}
+.suggestion:hover {
+  background: var(--surface);
+  border-color: #c5c5d4;
+}
+.messages,
+.approvals {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 36px;
+}
+.message {
+  margin: 24px 0 32px;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.message-user {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+.user-bubble {
+  max-width: 85%;
+  padding: 12px 18px;
+  border-radius: 20px 20px 5px 20px;
+  background: var(--surface);
+  white-space: pre-wrap;
+  font-size: 15px;
+  line-height: 1.8;
+}
+.assistant-label {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+.markdown {
+  font-size: 16px;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+.markdown p {
+  margin: 10px 0;
+}
+.markdown h2 {
+  font-size: 23px;
+  line-height: 1.5;
+  margin: 25px 0 12px;
+}
+.markdown h3 {
+  font-size: 19px;
+  margin: 22px 0 10px;
+}
+.markdown h4,
+.markdown h5,
+.markdown h6 {
+  font-size: 16px;
+  margin: 18px 0 10px;
+}
+.markdown ul,
+.markdown ol {
+  padding-left: 24px;
+  margin: 10px 0;
+}
+.markdown li {
+  padding-left: 3px;
+  margin: 6px 0;
+}
+.markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.markdown blockquote {
+  border-left: 3px solid var(--line);
+  margin: 16px 0;
+  padding: 5px 18px;
+  color: var(--muted);
+}
+.markdown hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 24px 0;
+}
+.markdown code {
+  font-family: "Cascadia Code", Consolas, monospace;
+  background: var(--surface);
+  padding: 2px 5px;
+  border-radius: 5px;
+  font-size: 0.88em;
+}
+.code-block {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 18px 0;
+  background: var(--sidebar);
+}
+.code-block figcaption {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.code-block pre {
+  margin: 0;
+  padding: 18px;
+  overflow: auto;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.code-block code {
+  padding: 0;
+  background: none;
+  white-space: pre;
+}
+.code-block button {
+  font-size: 12px;
+  padding: 0;
+  color: var(--muted);
+}
+.table-scroll {
+  overflow: auto;
+  margin: 18px 0;
+}
+.markdown table {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-size: 14px;
+}
+.markdown th,
+.markdown td {
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  padding: 10px 14px;
+  vertical-align: top;
+}
+.markdown th {
+  background: var(--sidebar);
+  font-weight: 600;
+}
+.text-button {
+  font-size: 13px;
+  padding: 5px 0;
+  color: var(--muted);
+}
+.text-button:hover {
+  color: var(--accent);
+}
+.copy-answer {
+  margin-top: 12px;
+}
+.streaming-indicator {
+  font-size: 13px;
+  color: var(--muted);
+  display: block;
+  margin-top: 12px;
+}
+.reasoning {
+  font-size: 14px;
+  margin: 8px 0 16px;
+  color: var(--muted);
+}
+.reasoning summary {
+  cursor: pointer;
+}
+.reasoning-text {
+  border-left: 2px solid var(--line);
+  white-space: pre-wrap;
+  padding: 8px 16px;
+  margin: 12px 0;
+  line-height: 1.7;
+}
+.message-tool {
+  margin: 12px 0;
+}
+.tool-card {
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--sidebar);
+  overflow: hidden;
+  font-size: 14px;
+}
+.tool-card summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 13px 16px;
+  list-style: none;
+}
+.tool-card summary::-webkit-details-marker {
+  display: none;
+}
+.tool-card summary:after {
+  content: "+";
+  margin-left: 5px;
+  color: var(--muted);
+}
+.tool-card[open] summary:after {
+  content: "−";
+}
+.tool-name {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tool-card h4 {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+.tool-content {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 360px;
+  overflow: auto;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0;
+  padding: 0 16px 16px;
+}
+.status {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+.status.running {
+  color: var(--accent);
+}
+.status.failed {
+  color: var(--danger);
+}
+.notice {
+  padding: 12px 16px;
+  border-left: 3px solid var(--muted);
+  background: var(--sidebar);
+  font-size: 14px;
+  white-space: pre-wrap;
+}
+.approval-card {
+  border: 1px solid #c9c4f1;
+  border-radius: 14px;
+  padding: 20px;
+  margin: 20px 0;
+  background: var(--accent-soft);
+}
+.eyebrow {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+}
+.approval-card h3 {
+  font-size: 16px;
+  margin: 7px 0 16px;
+}
+.approval-card .tool-content {
+  padding: 0 0 16px;
+}
+.approval-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+@media (min-width: 1500px) {
+  .welcome {
+    padding-top: 16vh;
+  }
+}
+@media (max-width: 760px) {
+  .welcome {
+    padding: 9vh 24px 20px;
+  }
+  .welcome h1 {
+    font-size: 29px;
+  }
+  .welcome p {
+    font-size: 14px;
+  }
+  .suggestions {
+    margin-top: 24px;
+    gap: 8px;
+  }
+  .suggestion {
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+  .messages,
+  .approvals {
+    padding: 0 22px;
+  }
+  .user-bubble {
+    max-width: 93%;
+  }
+  .message {
+    margin-bottom: 24px;
+  }
+  .markdown {
+    font-size: 16px;
+  }
+  .approval-card {
+    padding: 16px;
+  }
+}
+@media (prefers-color-scheme: dark) {
+  .approval-card {
+    border-color: #514977;
+  }
+  .suggestion:hover {
+    border-color: #585569;
+  }
+}
+.diff-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  color: var(--muted);
+  background: var(--surface);
+  border-radius: 8px 8px 0 0;
+  border: 1px solid var(--line);
+  border-bottom: 0;
+}
+.diff-content {
+  margin: 0;
+  padding: 12px 0;
+  overflow: auto;
+  font:
+    13px/1.7 "Cascadia Code",
+    Consolas,
+    monospace;
+}
+.diff-content span {
+  display: block;
+  padding: 0 16px;
+  white-space: pre;
+  min-height: 1.7em;
+}
+.diff-add {
+  color: #2a7852;
+  background: #46ab7114;
+}
+.diff-remove {
+  color: #b53e49;
+  background: #d25b6714;
+}
+.diff-location {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+@media (prefers-color-scheme: dark) {
+  .diff-add {
+    color: #8acda6;
+  }
+  .diff-remove {
+    color: #eba1ab;
+  }
+}
+
+/* Shared execution evidence; product renderers cannot replace this status chrome. */
+.status.awaiting-approval,
+.status.unknown,
+.status.interrupted {
+  color: var(--accent);
+}
+.status.denied,
+.notice.failed,
+.notice.unknown {
+  border-color: var(--danger);
+}
+.status.denied,
+.error-code {
+  color: var(--danger);
+}
+.execution-reference,
+.approval-record,
+.state-hint,
+.tool-progress {
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.execution-reference {
+  color: var(--muted);
+}
+.approval-record,
+.state-hint {
+  padding: 8px 12px;
+  border-left: 2px solid var(--accent);
+}
+.diagnostic {
+  margin: 12px 0;
+  border-left: 2px solid var(--danger);
+  padding-left: 12px;
+  min-width: 0;
+}
+.diagnostic .tool-content {
+  margin-top: 8px;
+}
+.notice p {
+  margin: 6px 0;
+}
+.tool-card .status {
+  flex-shrink: 0;
+}
+.tool-card > .execution-reference,
+.tool-card > .approval-record,
+.tool-card > .state-hint,
+.tool-card > .tool-progress,
+.tool-card > .diagnostic {
+  margin: 12px 16px;
+}
+.tool-extension {
+  margin: 12px 16px;
+  overflow-wrap: anywhere;
+}
+.run-group {
+  margin: 0 0 26px;
+  min-width: 0;
+}
+.hide-reasoning .reasoning {
+  display: none;
+}
+.run-heading {
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.run-toggle {
+  max-width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.run-body {
+  min-width: 0;
+}
+.inspect-tool {
+  margin: 4px 12px 8px;
+}
+may-image {
+  display: block;
+  margin: 12px 0;
+}
+.reply-image {
+  display: block;
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  margin-bottom: 8px;
+}
+
+/* Diff 统计徽标与无障碍辅助样式 */
+.diff-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+.diff-stat {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 11px;
+}
+.diff-stat-add {
+  color: #2d774a;
+  background: #e8f7ee;
+  border: 1px solid #c2e9d2;
+}
+.diff-stat-remove {
+  color: #b53e49;
+  background: #fdeef0;
+  border: 1px solid #f6ccd1;
+}
+@media (prefers-color-scheme: dark) {
+  .diff-stat-add {
+    color: #8acda6;
+    background: #183626;
+    border-color: #2a573d;
+  }
+  .diff-stat-remove {
+    color: #eba1ab;
+    background: #3d1a1e;
+    border-color: #652a32;
+  }
+}
+.diff-content:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* 响应式尺寸与横向防溢出规则（320px、390px、768px、1440px） */
+.tool-content,
+.diff-content,
+.field-content,
+.command-json {
+  max-width: 100%;
+  overflow-x: auto;
+}

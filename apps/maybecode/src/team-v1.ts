@@ -22,7 +22,7 @@ import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { hasErrorCode, withFileAccess } from "@sortedyuan/may/storage";
 import writeFileAtomic from "write-file-atomic";
 import type { MaybeCodeTeamCommand } from "./args.js";
-import { getDefaultMaybeCodeDataDirectory, resolveMaybeCodeRecording } from "./configured.js";
+import { getDefaultMaybeCodeDataDirectory, resolveMaybeCodeRecording } from "./configured-resolvers.js";
 import { readMaybeCodeSettings } from "./settings.js";
 import { MaybeCodeUsageError } from "./errors.js";
 import { createMaybeCodeModel, selectMaybeCodeModel, type SelectedMaybeCodeModel } from "./model.js";

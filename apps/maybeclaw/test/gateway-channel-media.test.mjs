@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { imageSource } from "../../../packages/media/test/fixture.mjs";
 import { readEmbeddedImage } from "@sortedyuan/media";
 import { channelTextPages } from "@sortedyuan/gateway/delivery";
-import { channelAttachmentContent, readChannelContent, channelEntry } from "../dist/gateway-host.js";
+import { channelAttachmentContent, readChannelContent, channelEntry } from "../dist/channel-content.js";
 import { createMayAdapter } from "../dist/gateway-adapters.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 import { TelegramAdapter } from "../dist/channels.js";
