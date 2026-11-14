@@ -82,6 +82,25 @@ test("discovers and calls namespaced stdio MCP tools", async (t) => {
   );
 });
 
+test("tool progress keeps a call alive past the idle timeout until the total timeout", async (t) => {
+  const open = async (limits) => {
+    const pool = await openMcpClientPool({
+      servers: [{ id: "slow", command: process.execPath, args: [fixture], requestTimeoutMs: 1_000, ...limits }],
+    });
+    t.after(() => pool.close());
+    return pool.tools.find((tool) => tool.name === "mcp__slow__echo_value");
+  };
+  const progress = [];
+  const idle = await open({});
+  assert.deepEqual(await idle.execute({ value: "slow" }, executionContext(progress)), {
+    content: [{ type: "text", text: "echo:slow" }],
+    structuredContent: { echoed: "slow" },
+  });
+  assert.equal(progress.length, 8);
+  const bounded = await open({ maxTotalTimeoutMs: 1_500 });
+  await assert.rejects(bounded.execute({ value: "slow" }, executionContext([])), /timeout/iu);
+});
+
 test("creates bounded provider-safe names and rejects duplicate servers", async () => {
   const name = namespaceMcpToolName("server", "x".repeat(100));
   assert.equal(name.length, 64);

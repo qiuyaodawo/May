@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { parseMaybeCodeArgs } from "../dist/args.js";
 import { runMaybeCodeTeamCommand } from "../dist/team.js";
 
@@ -26,8 +26,7 @@ test("team CLI validates bounded options without changing normal startup", () =>
 });
 
 test("team entry runs isolated workers plus supervisor, persists artifacts/budget, and resumes without replay", async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "maybecode-team-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "maybecode/team");
   const workspace = join(directory, "source");
   const dataDirectory = join(directory, "state");
   await mkdir(workspace);

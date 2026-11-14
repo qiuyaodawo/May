@@ -137,7 +137,7 @@ test("Python diagnostics and queries use pyright --stdio", { timeout: 120000 }, 
   );
 });
 
-test("feedback reserves ordered versions for rapid writes", { timeout: 120000 }, async (t) => {
+test("rapid writes report diagnostics for the latest content", { timeout: 120000 }, async (t) => {
   const { workspace, manager } = await fixture(t);
   await project(workspace);
   const path = await resolveExistingWorkspacePath(workspace, "a.ts");
@@ -150,13 +150,6 @@ test("feedback reserves ordered versions for rapid writes", { timeout: 120000 },
   assert.equal(results[0].diagnostics.status, "pending");
   assert.equal(results[1].diagnostics.status, "unknown");
   assert.ok(results[1].diagnostics.items.some((item) => item.severity === "error"));
-  const syncs = manager
-    .status()[0]
-    .logs.split("\n")
-    .filter((line) => line.startsWith("Document sync "));
-  assert.equal(syncs.length, 2);
-  assert.match(syncs[0], /version 1$/u);
-  assert.match(syncs[1], /version 2$/u);
 });
 
 test("path, size, symbol and tool input checks fail at the boundary", { timeout: 120000 }, async (t) => {

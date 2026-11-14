@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { FileSessionCatalog, latestSession } from "@sortedyuan/may/session/catalog";
 
 test("persists and updates session summaries", async (t) => {
-  const directory = await temporaryDirectory(t);
+  const directory = await createTestDirectory(t, "may/session-catalog");
   const path = join(directory, "catalog.json");
   const first = new FileSessionCatalog(path);
   await first.record({
@@ -54,7 +54,7 @@ test("persists and updates session summaries", async (t) => {
 });
 
 test("rejects corrupt session catalog data", async (t) => {
-  const directory = await temporaryDirectory(t);
+  const directory = await createTestDirectory(t, "may/session-catalog");
   const path = join(directory, "catalog.json");
   await writeFile(path, "not-json", "utf8");
 
@@ -62,7 +62,7 @@ test("rejects corrupt session catalog data", async (t) => {
 });
 
 test("does not lose concurrent updates from separate catalog instances", async (t) => {
-  const directory = await temporaryDirectory(t);
+  const directory = await createTestDirectory(t, "may/session-catalog");
   const path = join(directory, "catalog.json");
   const first = new FileSessionCatalog(path);
   const second = new FileSessionCatalog(path);
@@ -94,9 +94,3 @@ test("does not lose concurrent updates from separate catalog instances", async (
   assert.equal(sessions.length, 41);
   assert.equal(sessions.find((item) => item.id === "rename-me")?.title, "renamed");
 });
-
-async function temporaryDirectory(t) {
-  const directory = await mkdtemp(join(tmpdir(), "may-session-catalog-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  return directory;
-}

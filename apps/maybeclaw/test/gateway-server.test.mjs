@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { testOutputRoot } from "@sortedyuan/test-support";
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { execFile } from "node:child_process";
 import { request as httpRequest } from "node:http";
 import { promisify } from "node:util";
@@ -13,6 +13,7 @@ import { AgentGateway } from "../dist/gateway.js";
 import { GatewayHost } from "../dist/gateway-host.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 import { startGatewayServer } from "../dist/plugins/web-api.js";
+import { createGatewayRpcAdapter } from "../dist/gateway-rpc-adapter.js";
 import { entryKey } from "../dist/gateway-types.js";
 
 const execute = promisify(execFile);
@@ -308,17 +309,12 @@ test(
         () => process.kill(pid, 0),
         (error) => error.code === "ESRCH",
       );
-      const saved = JSON.parse(
-        await readFile(
-          join(
-            directory,
-            "state",
-            `${binding.conversationId}-${createHash("sha256").update(task.inputId).digest("hex")}.json`,
-          ),
-          "utf8",
-        ),
-      );
-      assert.equal(saved.status, "cancelled");
+      const inspector = await createGatewayRpcAdapter(agent.id, agent.options);
+      try {
+        assert.equal((await inspector.inspect(binding.conversationId, task.inputId)).status, "cancelled");
+      } finally {
+        await inspector.close();
+      }
       const configuration = JSON.parse(await readFile(configPath, "utf8"));
       assert.equal(configuration.apps.maybeclaw.agents.find((value) => value.id === agent.id).name, undefined);
     } finally {

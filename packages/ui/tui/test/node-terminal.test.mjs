@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import test from "node:test";
+import { stripVTControlCharacters } from "node:util";
 
 import { createNodeTerminal } from "@sortedyuan/tui/node-terminal";
 
@@ -57,6 +58,20 @@ test("keeps temporary answers out of history and normalizes standalone keys", as
     meta: false,
     text: "d",
   });
+  await terminal.close();
+});
+
+test("updating the prompt keeps the typed text and cursor position", async () => {
+  const { terminal, input, output } = createTestTerminal();
+  const answer = terminal.question("> ");
+  await tick();
+  input.write("abcd\x1b[D\x1b[D");
+  await tick();
+  terminal.updatePrompt("YOLO · Auto-approve > ");
+  terminal.write("YOLO enabled\n");
+  assert.match(stripVTControlCharacters(output()), /YOLO · Auto-approve > abcd/u);
+  input.write("X\r");
+  assert.equal(await answer, "abXcd");
   await terminal.close();
 });
 

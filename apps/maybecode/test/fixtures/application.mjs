@@ -1,6 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { createTestDirectory } from "@sortedyuan/test-support";
 
 export function assistantMessage(text) {
   return { role: "assistant", content: [{ type: "text", text }] };
@@ -15,8 +13,6 @@ export async function collectEvents(app, target, approvalDecision) {
   }
 }
 
-export async function temporaryDirectory(t) {
-  const directory = await mkdtemp(join(tmpdir(), "maybecode-config-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  return directory;
+export function temporaryDirectory(t) {
+  return createTestDirectory(t, "maybecode/config");
 }

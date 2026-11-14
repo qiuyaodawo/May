@@ -1,18 +1,17 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { TeamVerificationStore } from "../dist/team-verification.js";
 import { parseTeamChecks, parseTeamReport } from "../dist/team-check-spec.js";
 
 async function fixture(t) {
-  const directory = await mkdtemp(join(tmpdir(), "may-team-verification-"));
   const stores = [];
   t.after(async () => {
     for (const store of stores) await store.close();
-    await rm(directory, { recursive: true, force: true });
   });
+  const directory = await createTestDirectory(t, "maybecode/team-verification");
   const workspace = join(directory, "workspace");
   const state = join(directory, "state");
   await mkdir(workspace);

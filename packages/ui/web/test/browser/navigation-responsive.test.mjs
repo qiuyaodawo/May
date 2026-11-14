@@ -184,6 +184,13 @@ describe("WebUI 响应式布局与类型化导航", { timeout: 120_000 }, () => 
     assert.ok(stats.updateCalls >= 1, "随着连接建立 update 应当持续收到快照更新");
   });
 
+  test("空会话只显示建议，不显示工具阅读栏和历史搜索", async () => {
+    await page.getByRole("button", { name: "建议1" }).waitFor({ state: "visible" });
+    assert.equal(await page.getByRole("searchbox", { name: "搜索历史内容" }).isVisible(), false);
+    assert.equal(await page.getByLabel("只看异常").isVisible(), false);
+    assert.equal(await page.getByRole("button", { name: "展开全部" }).isVisible(), false);
+  });
+
   test("类型化导航项执行自定义操作", async () => {
     const navContainer = page.locator(".sidebar-navigation");
     await navContainer.waitFor({ state: "visible" });
@@ -300,19 +307,12 @@ describe("WebUI 响应式布局与类型化导航", { timeout: 120_000 }, () => 
     test(`${viewport.name}侧栏遮罩挡住正文控件`, async () => {
       assert.equal(
         await page.evaluate(() => {
-          const backdrop = document.querySelector(".mobile-backdrop");
-          return Boolean(backdrop && !backdrop.hidden);
+          const control = document.querySelector(".icon-button[aria-label='显示或隐藏详情']");
+          const rect = control.getBoundingClientRect();
+          return control.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
         }),
-        true,
-        "移动端侧栏打开时遮罩未呈现",
-      );
-      const hitClassName = await page.evaluate(() => {
-        const rect = document.querySelector(".icon-button[aria-label='显示或隐藏详情']")?.getBoundingClientRect();
-        return rect && document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)?.className;
-      });
-      assert.ok(
-        hitClassName?.includes("mobile-backdrop") || hitClassName?.includes("sidebar"),
-        "遮罩未成功覆盖在正文上方阻断穿透",
+        false,
+        "侧栏打开时正文的详情按钮仍然可以点击",
       );
     });
 
@@ -320,9 +320,16 @@ describe("WebUI 响应式布局与类型化导航", { timeout: 120_000 }, () => 
       await page.keyboard.press("Escape");
       await page.waitForTimeout(50);
       assert.equal(
-        await page.evaluate(() => !document.querySelector(".workbench")?.classList.contains("sidebar-open")),
+        await page.evaluate(() => {
+          const sidebar = document.getElementById("may-sidebar");
+          return sidebar.inert && sidebar.getAttribute("aria-hidden") === "true";
+        }),
         true,
         "按 Escape 未关闭移动端侧栏",
+      );
+      assert.equal(
+        await page.getByRole("button", { name: "切换侧边栏", exact: true }).getAttribute("aria-expanded"),
+        "false",
       );
       assert.equal(
         await page.evaluate(
@@ -337,14 +344,15 @@ describe("WebUI 响应式布局与类型化导航", { timeout: 120_000 }, () => 
   test("详情抽屉接收焦点，Escape 关闭后焦点回到详情按钮", async () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.locator(".icon-button[aria-label='显示或隐藏详情']").click();
-    await page.locator(".workbench.details-open").waitFor({ state: "visible" });
+    await page.getByRole("button", { name: "显示或隐藏详情", exact: true, expanded: true }).waitFor();
     assert.equal(
       await page.evaluate(() => Boolean(document.querySelector(".details-panel")?.contains(document.activeElement))),
       true,
       "展开详情面板后键盘焦点未移入面板",
     );
     await page.keyboard.press("Escape");
-    await page.locator(".workbench:not(.details-open)").waitFor({ state: "visible" });
+    await page.getByRole("button", { name: "显示或隐藏详情", exact: true, expanded: false }).waitFor();
+    assert.equal(await page.evaluate(() => document.querySelector(".details-panel").inert), true);
     assert.equal(
       await page.evaluate(
         () => document.activeElement === document.querySelector(".icon-button[aria-label='显示或隐藏详情']"),

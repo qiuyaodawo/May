@@ -3,8 +3,6 @@ import test from "node:test";
 import { readFile, writeFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
-import { PassThrough } from "node:stream";
-import { createNodeTerminal } from "@sortedyuan/tui/node-terminal";
 import { createWriteTool, createShellTool } from "@sortedyuan/coding-tools";
 import { PermissionToolExecutor } from "@sortedyuan/may/permissions";
 import { services } from "@sortedyuan/may/services";
@@ -31,30 +29,6 @@ function context(signal = new AbortController().signal) {
     },
   };
 }
-
-test("classic 终端更新提示时保留输入文字和光标位置", async (t) => {
-  const input = new PassThrough(),
-    output = new PassThrough();
-  Object.assign(output, { isTTY: true, columns: 80 });
-  let rendered = "";
-  output.on("data", (chunk) => {
-    rendered += chunk.toString();
-  });
-  const terminal = createNodeTerminal({ input, output });
-  t.after(() => {
-    terminal.close();
-    input.destroy();
-    output.destroy();
-  });
-  const answer = terminal.question("> ");
-  input.write("abcd\x1b[D\x1b[D");
-  await new Promise((resolve) => setImmediate(resolve));
-  terminal.updatePrompt("YOLO · Auto-approve > ");
-  terminal.write("YOLO enabled\n");
-  assert.match(stripVTControlCharacters(rendered), /YOLO · Auto-approve > abcd/);
-  input.write("X\r");
-  assert.equal(await answer, "abXcd");
-});
 
 test("YOLO 参数提供明确的开启、关闭和冲突检查", () => {
   assert.equal(parseMaybeCodeArgs([]).permissionMode, undefined);

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, realpath, rm, rmdir, symlink, unlink } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,7 +9,9 @@ if (!pnpm || !basename(pnpm).toLowerCase().includes("pnpm")) {
   throw new Error("Run this test through pnpm test:path-alias");
 }
 const repository = dirname(dirname(fileURLToPath(import.meta.url)));
-const parent = await realpath(await mkdtemp(join(tmpdir(), "may-test-path-alias-")));
+const output = join(repository, ".test-output");
+await mkdir(output, { recursive: true });
+const parent = await realpath(await mkdtemp(join(output, "path-alias-")));
 const target = join(parent, "target");
 const alias = join(parent, "alias");
 let linked = false;

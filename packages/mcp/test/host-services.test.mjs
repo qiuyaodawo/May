@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import {
   McpInteractionBroker,
   openMcpClientPool,
@@ -36,11 +36,7 @@ const nextRequest = (broker) => {
     }
   };
 };
-async function directory(t) {
-  const path = await mkdtemp(join(tmpdir(), "may-mcp-host-"));
-  t.after(() => rm(path, { recursive: true, force: true }));
-  return path;
-}
+const directory = (t) => createTestDirectory(t, "mcp/host-services");
 const sampleParams = { messages: [{ role: "user", content: { type: "text", text: "remote input" } }], maxTokens: 32 };
 
 test(

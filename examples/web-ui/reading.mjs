@@ -10,6 +10,7 @@ const token = "public-reading-fixture-token-not-a-secret";
 const store = new InMemorySessionStore(),
   catalog = new InMemorySessionCatalog();
 const definition = defineAgent({
+  requestRecording: "off",
   model: {
     async *stream(request, options) {
       const last = request.messages.at(-1),

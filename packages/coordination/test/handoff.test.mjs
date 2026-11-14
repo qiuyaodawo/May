@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
+import { createTestDirectory, testOutputRoot } from "@sortedyuan/test-support";
 import { defineAgent } from "@sortedyuan/may";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
@@ -398,11 +397,10 @@ test("handoff never forwards old pending mail and cancellation wins before a com
 });
 
 test("handoff crash windows use durable yield and controller identities without replay", async (t) => {
-  const parent = resolve(tmpdir()),
-    directory = await mkdtemp(join(parent, "may-handoff-"));
+  const parent = resolve(testOutputRoot, "coordination"),
+    directory = await createTestDirectory(t, "coordination/handoff");
   const part = relative(parent, resolve(directory));
-  assert.ok(!isAbsolute(part) && !part.startsWith("..") && part.startsWith("may-handoff-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  assert.ok(!isAbsolute(part) && !part.startsWith("..") && part.startsWith("handoff-"));
   for (const point of [
     "intent",
     "missing-source",

@@ -39,6 +39,7 @@ test("Skills plugin activates actual skill files, persists state and restores an
   assert.match(instructions.snapshot(), /Read the actual documentation/);
   assert.equal(tools.snapshot().require("skill_read").name, "skill_read");
   const state = scope.snapshotState();
+  const original = scope.get(services.skills);
   await scope.close();
   assert.equal(tools.snapshot().size, 0);
   assert.doesNotMatch(instructions.snapshot(), /# Available skills|# Active skills/u);
@@ -50,5 +51,5 @@ test("Skills plugin activates actual skill files, persists state and restores an
   assert.equal(resumed.get(services.skills).listActive()[0].name, "verification");
   assert.match(instructions.snapshot(), /Read the actual documentation/u);
   assert.doesNotMatch(instructions.snapshot(), /Updated instructions/u);
-  assert.notEqual(resumed.get(services.skills), scope);
+  assert.notEqual(resumed.get(services.skills), original);
 });

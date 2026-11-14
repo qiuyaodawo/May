@@ -1,16 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { liveModelProfile } from "../fixtures/live-model.mjs";
 import { fileURLToPath } from "node:url";
 
 import { openConfiguredMaybeCode } from "../../dist/index.js";
 
 test("runs and resumes a real coding session", async (t) => {
-  const dataDirectory = await mkdtemp(join(tmpdir(), "maybecode-live-"));
-  t.after(() => rm(dataDirectory, { recursive: true, force: true }));
+  const dataDirectory = await createTestDirectory(t, "maybecode/live");
   const workspace = fileURLToPath(new URL("../../../..", import.meta.url));
 
   const first = await openConfiguredMaybeCode({

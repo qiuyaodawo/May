@@ -1,9 +1,11 @@
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { testOutputRoot } from "@sortedyuan/test-support";
 
 export async function createWorkspace(t) {
-  const path = await mkdtemp(join(tmpdir(), "may-coding-tools-"));
+  const parent = join(testOutputRoot, "coding-tools");
+  await mkdir(parent, { recursive: true });
+  const path = await mkdtemp(join(parent, "workspace-"));
   t.after(() => rm(path, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }));
   return path;
 }

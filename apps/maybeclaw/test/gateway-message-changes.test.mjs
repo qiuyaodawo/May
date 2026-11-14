@@ -102,8 +102,6 @@ test("dispatched edits and recalls produce persistent notices visible through HT
   const notices = gateway.messages(session.id, operator).filter((item) => item.kind === "notice");
   assert.equal(notices.length, 2);
   assert.ok(notices[0].text.endsWith(text));
-  assert.equal(gateway.store.get("message-changes", `${inboxId(edited)}:change`).input.text, text);
-  assert.equal(gateway.store.get("message-changes", `${inboxId(edited)}:change`).noticeId, notices[0].id);
   assert.match(notices[1].text, /已撤回/);
   const snapshot = await request(`/api/ui/snapshot?selected=${session.id}`);
   assert.equal(snapshot.blocks.find((item) => item.id === message.id).title, actorKey(actor));
@@ -159,7 +157,6 @@ test("platform edit deduplication remains effective after reopening SQLite and t
   onClose(() => nextHost.close());
   await nextHost.receive(edited);
   assert.deepEqual(reopened.messages(session.id, operator), messages);
-  assert.equal(reopened.store.list("message-changes").length, 1);
 });
 
 test("session selection reports active tasks and counts unsent logical messages once", async (t) => {

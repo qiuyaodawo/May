@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
+import { createTestDirectory } from "@sortedyuan/test-support";
 import {
   loadMayConfig,
   MayConfigFileError,
@@ -204,8 +204,7 @@ test("rejects unknown provider and model selections", () => {
 });
 
 test("loads a config from a custom path", async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "may-config-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "may/config");
   const path = join(directory, "config.json");
   await writeFile(
     path,
@@ -223,8 +222,7 @@ test("loads a config from a custom path", async (t) => {
 });
 
 test("atomically updates only the default model with existing formatting", async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "may-config-update-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "may/config-update");
   const path = join(directory, "config.json");
   const source =
     JSON.stringify(
@@ -253,8 +251,7 @@ test("atomically updates only the default model with existing formatting", async
 });
 
 test("distinguishes file and JSON parsing failures", async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "may-config-errors-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "may/config-errors");
   const missingPath = join(directory, "missing.json");
   const invalidPath = join(directory, "invalid.json");
   await writeFile(invalidPath, "{");
@@ -276,8 +273,7 @@ test("distinguishes file and JSON parsing failures", async (t) => {
 });
 
 test("configuration readers and default model updates share file access", async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "may-config-concurrent-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "may/config-concurrent");
   const path = join(directory, "config.json");
   await writeFile(
     path,

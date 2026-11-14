@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
-import { homedir, tmpdir } from "node:os";
+import { mkdir, realpath, rm, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 
 import { MaybeCodeConfigError } from "../dist/index.js";
 import {
@@ -14,6 +15,7 @@ import {
 
 test("uses the built-in system prompt when no override is configured", async (t) => {
   const workspace = await temporaryDirectory(t);
+  await mkdir(join(workspace, ".git"));
 
   const instructions = await loadMaybeCodeInstructions({ workspace });
 
@@ -26,6 +28,7 @@ test("uses the built-in system prompt when no override is configured", async (t)
 test("replaces the built-in prompt and appends workspace AGENTS.md", async (t) => {
   const workspace = await temporaryDirectory(t);
   const directory = join(workspace, ".instructions");
+  await mkdir(join(workspace, ".git"));
   await mkdir(directory);
   await writeFile(join(directory, "system.md"), "custom system", "utf8");
   await writeFile(join(workspace, "AGENTS.md"), "project rules", "utf8");
@@ -177,8 +180,6 @@ test("rejects invalid or missing system instructions", async (t) => {
   );
 });
 
-async function temporaryDirectory(t) {
-  const directory = await mkdtemp(join(tmpdir(), "maybecode-instructions-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  return directory;
+function temporaryDirectory(t) {
+  return createTestDirectory(t, "maybecode/instructions");
 }

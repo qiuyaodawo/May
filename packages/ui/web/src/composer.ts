@@ -149,8 +149,6 @@ export function createComposer(
           select.onchange = () => act(choice.command, { value: select.value });
           choices.append(select);
         }
-        if (!snapshot?.choices.length)
-          choices.append(element("span", "composer-mode", isTask ? "持久任务" : "本地 Agent"));
       }
       const controls = snapshot?.controls;
       cancel.hidden = controls
@@ -162,7 +160,7 @@ export function createComposer(
         ? "需要连接本地服务 · 不会自动发送输入"
         : isTask && selected
           ? "关闭页面不会中止任务 · 执行、验证与送达分别记录"
-          : "Enter 发送 · Shift + Enter 换行 · 请核对 Agent 的输出";
+          : "Enter 发送 · Shift + Enter 换行";
     },
   };
 }

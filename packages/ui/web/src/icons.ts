@@ -1,0 +1,41 @@
+import {
+  ArrowUp,
+  ArrowUpRight,
+  Check,
+  ChevronDown,
+  Code,
+  Funnel,
+  List,
+  Menu,
+  MessageSquare,
+  PanelRight,
+  Plus,
+  Search,
+  Settings,
+  Square,
+  Trash,
+  Users,
+  X,
+} from "lucide";
+
+export { createElement } from "lucide";
+
+export const icons = {
+  plus: Plus,
+  menu: Menu,
+  send: ArrowUp,
+  stop: Square,
+  panel: PanelRight,
+  search: Search,
+  arrow: ArrowUpRight,
+  code: Code,
+  task: List,
+  trash: Trash,
+  gear: Settings,
+  users: Users,
+  message: MessageSquare,
+  check: Check,
+  filter: Funnel,
+  close: X,
+  expand: ChevronDown,
+};

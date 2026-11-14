@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { link, mkdir, mkdtemp, readFile, realpath, rm, unlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { link, mkdir, readFile, realpath, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { TaskWorkspaceManager } from "@sortedyuan/coordination";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import {
   applyTeamPatch,
   cleanupTeamPatchTemporaries,
@@ -13,20 +13,18 @@ import {
 import { renderTeamPatchDiff } from "../dist/team-patch-bundle.js";
 
 async function fixture(t) {
+  let workspaces;
+  t.after(() => workspaces?.close());
   // Match the CLI's canonical root before invoking the link-rejecting patch APIs.
-  const root = await realpath(await mkdtemp(join(tmpdir(), "may-team-patches-")));
+  const root = await realpath(await createTestDirectory(t, "maybecode/team-patches"));
   const source = join(root, "source");
   const directory = join(root, "team");
   await mkdir(source);
   await writeFile(join(source, "a.txt"), "before-a\n");
   await writeFile(join(source, "b.txt"), "before-b\n");
-  const workspaces = await TaskWorkspaceManager.open({
+  workspaces = await TaskWorkspaceManager.open({
     sourceDirectory: source,
     directory: join(directory, "workspaces"),
-  });
-  t.after(async () => {
-    await workspaces.close();
-    await rm(root, { recursive: true, force: true });
   });
   return { source, directory, workspaces };
 }

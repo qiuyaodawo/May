@@ -41,6 +41,21 @@ input.on("line", (line) => {
   if (message.method === "tools/call") {
     if (message.params.arguments?.value === "never") return;
     const progressToken = message.params?._meta?.progressToken;
+    if (message.params.arguments?.value === "slow") {
+      let step = 0;
+      const timer = setInterval(() => {
+        step += 1;
+        write({
+          jsonrpc: "2.0",
+          method: "notifications/progress",
+          params: { progressToken, progress: step, total: 8, message: "slow work" },
+        });
+        if (step < 8) return;
+        clearInterval(timer);
+        reply(message.id, { content: [{ type: "text", text: "echo:slow" }], structuredContent: { echoed: "slow" } });
+      }, 250);
+      return;
+    }
     if (progressToken !== undefined) {
       write({
         jsonrpc: "2.0",

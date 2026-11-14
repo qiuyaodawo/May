@@ -88,6 +88,10 @@ async function queued(gateway, agentId = "healthy", owner = operator) {
   return { graphId: id, taskId: `${id}:request-0` };
 }
 
+function agentStatus(gateway, id) {
+  return gateway.status().agents.find((agent) => agent.id === id).status;
+}
+
 async function completed(gateway, taskId) {
   const task = await until(() => {
     const task = gateway.store.get("tasks", taskId);
@@ -131,7 +135,7 @@ test("撤销权限后的真实运行记录保留待核对状态，其他会话�
   const blocked = restarted.store.get("tasks", taskId);
   assert.equal(blocked.status, "recovery-required");
   assert.match(blocked.detail, /权限已经撤销/);
-  assert.equal(restarted.adapters.has("files"), false);
+  assert.equal(agentStatus(restarted, "files"), "unloaded");
   await completed(restarted, healthy.taskId);
 });
 
@@ -146,7 +150,7 @@ for (const change of ["agent", "policy"])
     const task = gateway.store.get("tasks", blocked.taskId);
     assert.equal(task.status, "recovery-required");
     assert.match(task.detail, change === "agent" ? /Agent files.*版本/ : /访问配置版本/);
-    assert.equal(gateway.adapters.has("files"), false);
+    assert.equal(agentStatus(gateway, "files"), "unloaded");
     await completed(gateway, healthy.taskId);
   });
 
@@ -157,7 +161,10 @@ test("恢复遇到损坏的持久任务图时直接报告错误", async (t) => {
   gateway.store.put("coordination", queuedTask.graphId, { ...snapshot, format: 9 });
   await assert.rejects(gateway.restore(), /journal identity\/format/);
   assert.equal(gateway.store.get("tasks", queuedTask.taskId), undefined);
-  assert.equal(gateway.adapters.size, 0);
+  assert.deepEqual(
+    gateway.status().agents.map((agent) => agent.status),
+    ["unloaded", "unloaded"],
+  );
 });
 
 test("恢复未创建的对话重新请求有效审批，原审批保持失效", async (t) => {

@@ -34,6 +34,7 @@ test("opens configured MaybeCode with injected model creation", async (t) => {
   const instructionsDirectory = join(configDirectory, "instructions", "maybecode");
   await mkdir(instructionsDirectory, { recursive: true });
   await writeFile(join(instructionsDirectory, "system.md"), "custom system");
+  await mkdir(join(directory, ".git"));
   await writeFile(join(directory, "AGENTS.md"), "project rules");
   let selected;
   let request;

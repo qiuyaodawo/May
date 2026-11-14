@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, readFile, writeFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import {
   InMemoryMcpCredentialStore,
   KeyringMcpCredentialStore,
@@ -171,8 +171,7 @@ test(
 );
 
 test("credential vault encrypts large grants, detects tampering, and serializes writers", async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "may-mcp-vault-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "mcp/oauth-vault");
   let secret;
   const keyring =
     process.env.MAY_TEST_OS_KEYRING === "1"

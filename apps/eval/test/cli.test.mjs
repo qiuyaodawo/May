@@ -86,7 +86,7 @@ test("trial failures keep reports and return nonzero", { timeout: 30_000 }, asyn
   assert.equal(report.variants[0].successful, 0);
   assert.equal(report.trials[0].executionStatus, "failed");
   assert.equal(report.trials[0].execution.output.exitCode, 7);
-  assert.equal(typeof (await readFile(join(directory, "cli-failure", "report.md"), "utf8")), "string");
+  assert.match(await readFile(join(directory, "cli-failure", "report.md"), "utf8"), /Success: 0\//);
   const thresholds = join(directory, "success-threshold.json");
   await writeFile(thresholds, JSON.stringify({ minimumSuccessRate: 1, allowedRegressedCases: [] }));
   const gated = await run([

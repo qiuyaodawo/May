@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { link, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { link, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 
 import { createToolChangePreview } from "../dist/index.js";
 
@@ -138,8 +138,6 @@ test("shows EOF newline changes and rejects hard-linked previews", async (t) => 
   assert.match(linked.reason, /hard-linked file/u);
 });
 
-async function temporaryDirectory(t) {
-  const directory = await mkdtemp(join(tmpdir(), "may-coding-preview-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  return directory;
+function temporaryDirectory(t) {
+  return createTestDirectory(t, "coding-tools/change-preview");
 }

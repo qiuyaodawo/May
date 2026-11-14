@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { createTeamPreset, loadTeamPlan, parseTeamPlan } from "../dist/team-plan.js";
 
 test("team presets share one runtime plan while keeping delegation and write authority explicit", () => {
@@ -97,8 +97,7 @@ test("custom plans validate the entire graph and permissions, and loading snapsh
     mutate(value);
     assert.throws(() => parseTeamPlan(value));
   }
-  const directory = await mkdtemp(join(tmpdir(), "may-team-plan-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "maybecode/team-plan");
   const path = join(directory, "plan.json");
   await writeFile(path, `\uFEFF${JSON.stringify(valid())}`);
   assert.deepEqual(await loadTeamPlan(path), plan);

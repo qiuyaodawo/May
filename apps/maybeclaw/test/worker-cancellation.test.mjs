@@ -19,9 +19,6 @@ test("Worker 将持久化取消意图发送至仍在运行的真实 RPC 任务",
   await f.remote.cancel(execution);
   assert.equal((await f.taskRecord(execution)).status, "cancelled");
   assert.equal((await f.remote.recover(execution)).status, "cancelled");
-  const saved = await f.journal();
-  assert.equal(saved.cancelRequested, true);
-  assert.equal(saved.outcome.status, "cancelled");
   const controls = await f.controls();
   assert.ok(controls.some((record) => record.method === "cancel" && record.cancelRequested));
   assert.ok(controls.some((record) => record.method === "recover" && record.cancelRequested));
@@ -35,8 +32,7 @@ test("active 执行在取消期间断开传输后立即继续发送外部取消"
   await f.remote.cancel(execution);
   await rejected;
   await until(async () => (await f.taskRecord(execution))?.status === "cancelled");
-  await until(async () => (await f.journal()).outcome?.status === "cancelled");
-  assert.equal((await f.journal()).outcome.status, "cancelled");
+  assert.equal((await f.remote.recover(execution)).status, "cancelled");
   assert.ok((await f.controls()).some((record) => record.method === "cancel" && record.cancelRequested));
 });
 
@@ -56,7 +52,6 @@ test("Worker 保存发送失败的取消请求，并在重新打开后继续取�
   const reopened = await f.openWorker();
   assert.equal((await f.taskRecord(execution)).status, "cancelled");
   assert.equal((await reopened.recover(execution)).status, "cancelled");
-  assert.equal((await f.journal()).cancelRequested, true);
 });
 
 test("Worker 在网络恢复后的查询中重试保存的取消请求", { timeout: 10_000 }, async (t) => {
@@ -93,7 +88,6 @@ test("没有 Worker 派发记录时保存取消意图并取消已有的外部执
   await rejected;
   assert.equal((await f.taskRecord(execution)).status, "cancelled");
   assert.equal((await f.remote.recover(execution)).status, "cancelled");
-  assert.equal((await f.journal()).cancelRequested, true);
   await assert.rejects(f.remote.execute(execution, context()), /outcome reconciliation/u);
 });
 

@@ -71,7 +71,7 @@ export function createResourceList(
       resourceItems = [...new Map(items.map((item) => [item.id, item])).values()];
       resourcePages = pages;
       resourceCursor = cursor;
-      resourceInfo.textContent = `已加载 ${resourceItems.length} / ${total} 条`;
+      resourceInfo.textContent = resourceItems.length < total ? `已加载 ${resourceItems.length} / ${total} 条` : "";
       renderList();
     } catch (error) {
       if (id === resourceRequest)

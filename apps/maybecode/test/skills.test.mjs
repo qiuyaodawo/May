@@ -1,16 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, mkdir, writeFile, rm, realpath } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile, realpath } from "node:fs/promises";
 import { join } from "node:path";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { InMemorySessionStore, InMemorySessionCatalog } from "@sortedyuan/may/session";
 import { MaybeCodeWorkspace } from "../dist/workspace.js";
 import { executeMaybeCodeSlashCommand } from "../dist/slash-command-execution.js";
 import { createMaybeCodeSlashCommandSuggester } from "../dist/slash-command-suggestions.js";
 
 async function fixture(t) {
-  const workspace = await realpath(await mkdtemp(join(tmpdir(), "may-skills-app-")));
-  t.after(() => rm(workspace, { recursive: true, force: true }));
+  const workspace = await realpath(await createTestDirectory(t, "maybecode/skills"));
   const directory = join(workspace, ".agents", "skills", "research");
   await mkdir(join(directory, "references"), { recursive: true });
   await writeFile(

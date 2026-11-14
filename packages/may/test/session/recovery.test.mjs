@@ -1,18 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, appendFile, readFile, readdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { appendFile, readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { May, InMemoryContext } from "@sortedyuan/may/core";
 import { Session, InMemorySessionStore } from "@sortedyuan/may/session";
+import { createTestDirectory } from "@sortedyuan/test-support";
 
 const call = (id) => ({ id, name: "write", input: { id } });
 const assistant = (toolCalls) => ({ role: "assistant", content: [], toolCalls });
 
 test("file recovery removes only an incomplete final record and permits the next append", async (t) => {
-  const dir = await mkdtemp(join(tmpdir(), "may-recovery-"));
-  t.after(() => rm(dir, { recursive: true, force: true }));
+  const dir = await createTestDirectory(t, "may/recovery");
   const store = new FileSessionStore(dir);
   await store.append({ type: "session.created", sessionId: "s", seq: 1, timestamp: 0 });
   const [file] = await readdir(dir);
@@ -29,8 +28,7 @@ test("file recovery removes only an incomplete final record and permits the next
 });
 
 test("history polling serializes with large appends and rejects malformed complete payloads", async (t) => {
-  const dir = await mkdtemp(join(tmpdir(), "may-poll-"));
-  t.after(() => rm(dir, { recursive: true, force: true }));
+  const dir = await createTestDirectory(t, "may/poll");
   const store = new FileSessionStore(dir);
   await store.append({ type: "session.created", sessionId: "s", seq: 1, timestamp: 0 });
   const work = [];

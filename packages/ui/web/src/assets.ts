@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import type { UiAssets } from "@sortedyuan/ui-client/server";
+import { icons } from "./icons.js";
 
 /**
  * Native ES modules, no CDN, runtime transpilation, inline scripts or application imports.
@@ -49,6 +50,16 @@ export async function webUiAssets(
     assets.set(`/webui/${name}.js`, {
       type: "text/javascript; charset=utf-8",
       body: await readFile(new URL(`./${name}.js`, import.meta.url), "utf8"),
+    });
+  assets.set("/webui/icons.js", {
+    type: "text/javascript; charset=utf-8",
+    body: `export { default as createElement } from "/webui/lucide/createElement.mjs"; export const icons = ${JSON.stringify(icons)};`,
+  });
+  const lucide = new URL("../esm/", import.meta.resolve("lucide"));
+  for (const name of ["createElement", "defaultAttributes"])
+    assets.set(`/webui/lucide/${name}.mjs`, {
+      type: "text/javascript; charset=utf-8",
+      body: await readFile(new URL(`${name}.mjs`, lucide), "utf8"),
     });
   const client = new URL(import.meta.resolve("@sortedyuan/ui-client"));
   for (const name of ["client", "protocol"])

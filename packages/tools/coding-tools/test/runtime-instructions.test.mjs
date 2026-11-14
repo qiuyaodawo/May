@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { relative, resolve } from "node:path";
+import { mkdir } from "node:fs/promises";
+import { join, relative, resolve } from "node:path";
 import test from "node:test";
 import { ToolRegistry } from "@sortedyuan/may/core";
 
@@ -38,6 +39,8 @@ test("运行环境使用当前系统和真实 shell 工具信息", async (t) => 
   assert.ok(runtime.endsWith(shellRuntimeInstructions(shell)));
   assert.equal(runtime.includes("The shell tool runs"), false);
 
+  // .git 标记项目根目录，项目规则的查找停在 workspace，不读取外层 May 仓库的规则文件。
+  await mkdir(join(workspace, ".git"));
   const loaded = await loadCodingInstructions({
     workspace,
     defaultSystemInstructions: "You are a coding agent.",

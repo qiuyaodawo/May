@@ -11,7 +11,7 @@ import {
 import { validateTaskFiles } from "../../dist/index.js";
 import { PluginHost } from "@sortedyuan/may/plugin";
 import { services, ToolSources } from "@sortedyuan/may/services";
-import { createReadTool, resolveWritableWorkspacePath, workspaceFileKey } from "@sortedyuan/coding-tools";
+import { createReadTool, resolveWritableWorkspacePath } from "@sortedyuan/coding-tools";
 
 function captureGuard(directory, options = {}) {
   let captured;
@@ -27,29 +27,34 @@ function captureGuard(directory, options = {}) {
   return { shared, task, guard: captured };
 }
 
-test("batch locks use sorted unique keys and release after failure", async (t) => {
+test("batches with repeated paths finish and release every file after failure", { timeout: 5000 }, async (t) => {
   const directory = await createTestDirectory(t, "coordination/batch-order");
-  const { shared, guard } = captureGuard(directory);
+  const { guard } = captureGuard(directory);
   const paths = await Promise.all(["b.txt", "a.txt"].map((path) => resolveWritableWorkspacePath(directory, path)));
   await assert.rejects(
     guard.runMany([...paths, paths[0]], "lsp_rename", async () => {
-      assert.deepEqual([...shared.locks.keys()], paths.map(workspaceFileKey).sort());
       throw new Error("Operation failed");
     }),
     /Operation failed/u,
   );
-  assert.equal(shared.locks.size, 0);
+  const completed = [];
+  await Promise.all([
+    guard.runMany(paths, "lsp_rename", async () => completed.push("batch")),
+    ...paths.map((path) => guard.runMany([path], "read", async () => completed.push(path.relative))),
+  ]);
+  assert.deepEqual(completed.sort(), ["a.txt", "b.txt", "batch"]);
 });
 
-test("batch scope validation obtains no locks and concurrent reversed paths complete", async (t) => {
+test("out-of-scope batches never run and concurrent reversed paths complete", { timeout: 5000 }, async (t) => {
   const directory = await createTestDirectory(t, "coordination/batch-concurrency");
-  const { shared, guard } = captureGuard(directory, { files: ["a.txt", "b.txt"] });
+  const { guard } = captureGuard(directory, { files: ["a.txt", "b.txt"] });
   const paths = await Promise.all(
     ["a.txt", "b.txt", "outside.txt"].map((path) => resolveWritableWorkspacePath(directory, path)),
   );
-  const rejected = guard.runMany(paths, "lsp_rename", async () => assert.fail("Out-of-scope operation ran"));
-  assert.equal(shared.locks.size, 0);
-  await assert.rejects(rejected, /outside its assigned files/u);
+  await assert.rejects(
+    guard.runMany(paths, "lsp_rename", async () => assert.fail("Out-of-scope operation ran")),
+    /outside its assigned files/u,
+  );
   const completed = [];
   await Promise.all(
     Array.from({ length: 20 }, (_, index) =>
@@ -59,7 +64,6 @@ test("batch scope validation obtains no locks and concurrent reversed paths comp
     ),
   );
   assert.equal(completed.length, 20);
-  assert.equal(shared.locks.size, 0);
 });
 
 test("registered factory tools execute with a task guard and reject unknown names", async (t) => {

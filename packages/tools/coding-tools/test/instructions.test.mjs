@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
-import { link, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { link, mkdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 
 import { CodingInstructionsError, loadCodingInstructions } from "../dist/instructions.js";
 
 test("loads configurable system, runtime, and project instruction sections", async (t) => {
-  const workspace = await temporaryDirectory(t);
+  const workspace = await projectWorkspace(t);
   const directory = join(workspace, ".prompts");
   await mkdir(directory);
   await writeFile(join(directory, "agent-system.txt"), "file system", "utf8");
@@ -94,7 +94,7 @@ test("enforces bounded, non-empty strict UTF-8 instruction documents", async (t)
 });
 
 test("rejects unsafe project instruction filenames and links", async (t) => {
-  const workspace = await temporaryDirectory(t);
+  const workspace = await projectWorkspace(t);
   const outside = join(await temporaryDirectory(t), "outside.md");
   await writeFile(outside, "external secret", "utf8");
 
@@ -138,8 +138,13 @@ function hasCode(code) {
   return (error) => error instanceof CodingInstructionsError && error.code === code;
 }
 
-async function temporaryDirectory(t) {
-  const directory = await mkdtemp(join(tmpdir(), "may-instructions-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  return directory;
+function temporaryDirectory(t) {
+  return createTestDirectory(t, "coding-tools/instructions");
+}
+
+// .git 标记项目根目录，项目规则的查找停在 workspace，不读取外层 May 仓库的规则文件。
+async function projectWorkspace(t) {
+  const workspace = await temporaryDirectory(t);
+  await mkdir(join(workspace, ".git"));
+  return workspace;
 }

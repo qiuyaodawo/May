@@ -27,24 +27,3 @@ test("CLI returns usage errors without opening an application", async () => {
   assert.match(output, /cannot be used together/);
   assert.ok(closed);
 });
-
-test("CLI accepts only the retained and Web interfaces", async () => {
-  let output = "";
-  const terminal = {
-    colors: false,
-    write(text) {
-      output += text;
-    },
-    close() {},
-  };
-  assert.equal(
-    await runMaybeCode(["--ui", "classic"], {
-      terminal,
-      async open() {
-        throw new Error("unreachable");
-      },
-    }),
-    2,
-  );
-  assert.match(output, /--ui must be "retained" or "web"/);
-});

@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, realpath, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { realpath } from "node:fs/promises";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
 import { MaybeCodeWorkspace } from "../dist/workspace.js";
@@ -12,8 +11,7 @@ import { startMaybeCodeWebUI } from "../dist/web-ui.js";
 test("MaybeCode web entry serves browser-only modules and preserves session guards", async (t) => {
   assert.equal(parseMaybeCodeArgs(["--ui", "web", "--port", "0"]).port, 0);
   assert.throws(() => parseMaybeCodeArgs(["--port", "3940"]), /requires --ui web/);
-  const workspace = await realpath(await mkdtemp(join(tmpdir(), "may-web-ui-")));
-  t.after(() => rm(workspace, { recursive: true, force: true }));
+  const workspace = await realpath(await createTestDirectory(t, "maybecode/web-ui"));
   const app = await MaybeCodeWorkspace.open({
     git: false,
     workspace,

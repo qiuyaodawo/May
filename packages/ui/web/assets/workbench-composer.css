@@ -10,12 +10,9 @@
   border-radius: 20px;
   padding: 17px 17px 12px;
   background: var(--bg);
-  box-shadow: var(--shadow);
-  transition: border-color 0.15s;
 }
 .composer:focus-within {
-  border-color: #a09bcf;
-  box-shadow: 0 0 0 3px #5046d906;
+  border-color: var(--muted);
 }
 .composer textarea {
   display: block;
@@ -51,13 +48,8 @@
   border: 0;
   background: var(--sidebar);
   border-radius: 7px;
-  font-size: 13px;
+  font-size: 14px;
   padding: 7px 10px;
-}
-.composer-mode {
-  font-size: 13px;
-  color: var(--muted);
-  padding: 5px 8px;
 }
 .send-button {
   display: grid;
@@ -75,8 +67,7 @@
   color: #b7b9c3;
 }
 .send-button:not(:disabled):hover {
-  background: var(--accent);
-  color: white;
+  opacity: 0.85;
 }
 .composer-hint {
   font-size: 12px;
@@ -92,9 +83,6 @@
   .composer {
     border-radius: 17px;
     padding: 14px;
-  }
-  .composer-hint {
-    font-size: 12px;
   }
   .model-select {
     max-width: 180px;

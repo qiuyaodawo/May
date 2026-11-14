@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { InMemoryMcpCredentialStore, KeyringMcpCredentialStore, McpTaskJournal, parseMcpTask } from "../dist/index.js";
 
 const owner = { workspaceId: "workspace-A", sessionId: "session-A", runId: "run-A", toolCallId: "call-A" };
@@ -179,8 +179,7 @@ test("task journal reads wait for accepted updates across journal instances", as
 });
 
 test("task journal uses encrypted atomic storage, fails closed on partial writes/corruption and bounds retained handles", async (t) => {
-  const directory = await mkdtemp(join(tmpdir(), "may-task-journal-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "mcp/task-journal");
   let password;
   const keyring =
     process.env.MAY_TEST_OS_KEYRING === "1"

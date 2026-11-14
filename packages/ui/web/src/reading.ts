@@ -43,14 +43,13 @@ export function createTranscriptReader(
     updateControls();
   });
   latest.hidden = true;
-  toolbar.append(
+  const toolControls = [
     summary,
     button("展开全部", () => expand(true)),
     button("收起全部", () => expand(false)),
     errorLabel,
-    jumpApproval,
-    latest,
-  );
+  ];
+  toolbar.append(...toolControls, jumpApproval, latest);
   const historyControls = element("div", "history-controls");
   const searchForm = element("form", "history-search");
   const search = element("input");
@@ -60,14 +59,11 @@ export function createTranscriptReader(
   search.setAttribute("aria-label", "搜索历史内容");
   const submit = element("button", "button", "搜索内容");
   submit.type = "submit";
-  searchForm.append(
-    search,
-    submit,
-    button("清除搜索", () => {
-      search.value = "";
-      tasks.run(loadHistory(false));
-    }),
-  );
+  const clear = button("清除搜索", () => {
+    search.value = "";
+    tasks.run(loadHistory(false));
+  });
+  searchForm.append(search, submit, clear);
   const more = button("加载更早记录", () => {
     tasks.run(loadHistory(true));
   });
@@ -128,11 +124,15 @@ export function createTranscriptReader(
     more.disabled = loading || state.connection !== "connected" || state.selecting;
     more.textContent = query ? "加载更多匹配记录" : "加载更早记录";
     submit.disabled = loading || !state.snapshot?.selectedId || state.connection !== "connected" || state.selecting;
-    searchForm.hidden = !state.snapshot?.reads?.history;
+    searchForm.hidden = !state.snapshot?.reads?.history || (!visible.length && !query);
+    clear.hidden = !query;
     latest.hidden = following || !state.snapshot?.blocks.length;
     latest.textContent = unread ? "有新内容 · 回到最新" : "回到最新";
     jumpApproval.hidden = !state.snapshot?.interactions.length;
     jumpApproval.textContent = `定位待审批（${state.snapshot?.interactions.length ?? 0}）`;
+    const noTools = !visible.some((block) => block.kind === "tool") && !onlyErrors.checked;
+    for (const control of toolControls) control.hidden = noTools;
+    toolbar.hidden = [...toolbar.children].every((child) => (child as HTMLElement).hidden);
   }
   async function loadHistory(append: boolean) {
     const requestedQuery = search.value.trim(),

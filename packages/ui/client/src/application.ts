@@ -250,8 +250,7 @@ export class ApplicationUiHost implements UiHost {
       ],
       choices,
       ...(viewingActive && this.options.controls ? { controls: this.options.controls() } : {}),
-      notice:
-        this.fault ?? "选择会话后即可继续对话，终端和已连接页面同步切换。执行或等待交互期间，请先完成或取消当前操作。",
+      ...(this.fault === undefined ? {} : { notice: this.fault }),
     };
   }
   async resources(request: UiPageRequest) {

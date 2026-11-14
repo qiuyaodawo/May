@@ -1,22 +1,13 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import test from "node:test";
 
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { InMemorySessionStore, SessionHistoryReader } from "@sortedyuan/may/session";
 
 for (const [name, createStore] of [
   ["in-memory", async () => new InMemorySessionStore()],
-  [
-    "JSONL",
-    async (t) => {
-      const directory = await mkdtemp(join(tmpdir(), "may-history-"));
-      t.after(() => rm(directory, { recursive: true, force: true }));
-      return new FileSessionStore(directory);
-    },
-  ],
+  ["JSONL", async (t) => new FileSessionStore(await createTestDirectory(t, "may/history"))],
 ]) {
   test(`queries ${name} session history with stable sequence cursors`, async (t) => {
     const store = await createStore(t);

@@ -266,9 +266,9 @@ test("misspelled permission settings fail during configuration validation", () =
 test("quoted session names can match command words without becoming commands", async (t) => {
   const { gateway } = await fixture(t);
   const session = gateway.createSession(operator, "list", ["code"]);
-  const parsed = gatewayInput('/session "list" /history');
-  assert.equal(parsed.literalSession, true);
-  assert.equal(gatewayInput("/session list").literalSession, undefined);
+  const listed = await gateway.handle("/session list", operator, { requestId: "unquoted-list" });
+  assert.equal(listed.sessionId, undefined);
+  assert.ok(listed.text.includes(`${session.id}  list`));
   const result = await gateway.handle('/session "list" /history', operator, { requestId: "quoted-session" });
   assert.equal(result.sessionId, session.id);
   assert.match(result.text, /暂无历史/);

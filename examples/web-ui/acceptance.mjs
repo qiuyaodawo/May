@@ -85,6 +85,7 @@ async function start() {
     store: new FileSessionStore(join(root, "sessions")),
     catalog: new FileSessionCatalog(join(root, "catalog.jsonl")),
     autoResume: true,
+    requestRecording: "off",
   });
   const code = await startMaybeCodeWebUI(app, { token, port: 3942 });
   const claw = new MaybeClaw({ directory: join(root, "claw"), loadModel: () => model });

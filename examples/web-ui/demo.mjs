@@ -59,6 +59,7 @@ const definition = defineAgent({
   ],
   permissionPolicy: () => "ask",
   sessionHistory: false,
+  requestRecording: "off",
 });
 const app = await AgentWorkspace.open({
   workspace: "离线演示 · 内存会话",

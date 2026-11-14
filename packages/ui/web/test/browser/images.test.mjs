@@ -101,10 +101,17 @@ test("浏览器读取持久图片、保持内容顺序、下载和会话权限",
     .evaluate((image) => ({ width: image.naturalWidth, height: image.naturalHeight }));
   assert.deepEqual(dimensions, { width: 64, height: 32 });
   assert.deepEqual(
-    await page
-      .locator(".message-assistant .message-content")
-      .evaluate((node) => [...node.children].map((child) => child.tagName)),
-    ["DIV", "MAY-IMAGE", "DIV"],
+    await page.locator(".message-assistant .message-content").evaluate((content) => {
+      const walker = document.createTreeWalker(content, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+      const order = [];
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (node.nodeName === "IMG") order.push("image");
+        else if (node.nodeType === Node.TEXT_NODE && ["图片前文", "图片后文"].includes(node.textContent.trim()))
+          order.push(node.textContent.trim());
+      }
+      return order;
+    }),
+    ["图片前文", "image", "图片后文"],
   );
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("link", { name: "下载图片" }).click();

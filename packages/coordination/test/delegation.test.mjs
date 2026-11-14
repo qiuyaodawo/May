@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
+import { createTestDirectory, testOutputRoot } from "@sortedyuan/test-support";
 import { defineAgent } from "@sortedyuan/may";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
@@ -48,11 +47,10 @@ function worker(model, store = new InMemorySessionStore()) {
   });
 }
 async function directory(t) {
-  const parent = resolve(tmpdir());
-  const path = await mkdtemp(join(parent, "may-delegation-"));
+  const parent = resolve(testOutputRoot, "coordination");
+  const path = await createTestDirectory(t, "coordination/delegation");
   const part = relative(parent, resolve(path));
-  assert.ok(!isAbsolute(part) && !part.startsWith("..") && part.startsWith("may-delegation-"));
-  t.after(() => rm(path, { recursive: true, force: true }));
+  assert.ok(!isAbsolute(part) && !part.startsWith("..") && part.startsWith("delegation-"));
   return path;
 }
 

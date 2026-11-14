@@ -95,13 +95,10 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   const sidebar = element("aside", "sidebar");
   sidebar.id = "may-sidebar";
   const brand = element("div", "brand");
-  brand.append(
-    element("span", "brand-mark", "m"),
-    element("span", "brand-name", "May"),
-    element("span", "preview-label", "PREVIEW"),
-  );
-  const closeSidebar = button("×", () => hideSidebar(), "icon-button sidebar-close");
+  brand.append(element("span", "brand-mark", "m"), element("span", "brand-name", "May"));
+  const closeSidebar = button("", () => hideSidebar(), "icon-button sidebar-close");
   closeSidebar.setAttribute("aria-label", "关闭侧边栏");
+  closeSidebar.append(icon("close"));
   brand.append(closeSidebar);
 
   const newButton = button(
@@ -140,7 +137,7 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   const connectionButton = button("连接本地服务", () => dialog.showModal(), "connection-button");
   const connectionDot = element("span", "connection-dot");
   connectionButton.prepend(connectionDot);
-  footer.append(connectionButton, element("span", "local-label", "LOCAL WORKSPACE"));
+  footer.append(connectionButton);
   sidebar.append(
     brand,
     newButton,
@@ -218,9 +215,8 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   };
   mobileQuery.addEventListener("change", onMobileChange);
   const productName = element("span", "product-name", options.title ?? "May");
-  const productTag = element("span", "product-tag", options.kind === "task" ? "任务" : "工作区");
   const headerLeft = element("div", "header-left");
-  headerLeft.append(toggle, productName, productTag);
+  headerLeft.append(toggle, productName);
   const badges = element("div", "status-badges");
   badges.setAttribute("role", "status");
   headerLeft.append(badges);
@@ -246,11 +242,9 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
   header.append(headerLeft, title, versionUI.actions, detailButton);
   const scroll = element("div", "conversation-scroll");
   const welcome = element("section", "welcome");
-  const welcomeMark = element("div", "welcome-mark", "m");
-  const welcomeTitle = element("h1", "", options.kind === "task" ? "把下一件事交给 May" : "从一个想法开始");
-  const welcomeText = element("p", "", "连接本地服务，开始你的工作。");
+  const welcomeText = element("p");
   const suggestions = element("div", "suggestions");
-  welcome.append(welcomeMark, welcomeTitle, welcomeText, suggestions);
+  welcome.append(welcomeText, suggestions);
   const messages = element("div", "messages");
   messages.setAttribute("aria-label", "对话记录");
   const approvals = element("div", "approvals");
@@ -340,7 +334,6 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     connectionDot.className = `connection-dot ${state.connection}`;
     productName.textContent = snapshot?.product.title ?? options.title ?? "May";
     const isTask = (snapshot?.product.resourceKind ?? options.kind) === "task";
-    productTag.textContent = isTask ? "任务" : "工作区";
     badges.replaceChildren(
       ...(snapshot?.badges ?? []).map((badge) =>
         element("span", `product-tag status-badge ${badge.tone === "warning" ? "warning" : "neutral"}`, badge.label),
@@ -364,17 +357,14 @@ export function mountWebUI(root: HTMLElement, client: UiClient, options: WebUiOp
     commandUI.update(state);
     const visibleBlocks = snapshot?.blocks ?? [];
     welcome.hidden = visibleBlocks.length > 0;
-    welcomeTitle.textContent = isTask ? "把下一件事交给 May" : "今天，一起构建什么？";
-    welcomeText.textContent =
-      snapshot?.product.subtitle ?? "连接你的本地 Agent。对话、工具与执行状态，在同一个工作区。";
+    welcomeText.textContent = snapshot?.product.subtitle ?? "";
+    welcomeText.hidden = !welcomeText.textContent;
     const suggestionsKey = JSON.stringify(snapshot?.product.suggestions ?? []);
     if (suggestionsKey !== suggestionSignature) {
       suggestionSignature = suggestionsKey;
       suggestions.replaceChildren();
       for (const text of snapshot?.product.suggestions ?? []) {
-        const suggestion = button("", () => composer.fill(text), "suggestion");
-        suggestion.append(element("span", "", text), icon("arrow"));
-        suggestions.append(suggestion);
+        suggestions.append(button(text, () => composer.fill(text), "suggestion"));
       }
     }
     composer.update(isTask, connected);

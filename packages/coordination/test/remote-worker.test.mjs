@@ -3,21 +3,22 @@ import test from "node:test";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout } from "node:timers/promises";
+import { testOutputRoot } from "@sortedyuan/test-support";
 import { CoordinationRuntime, InMemoryCoordinationStore } from "../dist/index.js";
 import { createRemoteAgent } from "../dist/remote-worker.js";
 
 const token = "offline-test-token-with-at-least-24-characters";
 const policy = { version: "v1", authorize: () => true };
 async function directory(t) {
-  const parent = resolve(tmpdir()),
-    path = await mkdtemp(join(parent, "may-remote-"));
+  const parent = resolve(testOutputRoot, "coordination");
+  await mkdir(parent, { recursive: true });
+  const path = await mkdtemp(join(parent, "remote-worker-"));
   const part = relative(parent, path);
-  assert.ok(!isAbsolute(part) && !part.startsWith("..") && part.startsWith("may-remote-"));
+  assert.ok(!isAbsolute(part) && !part.startsWith("..") && part.startsWith("remote-worker-"));
   const operations = [() => rm(path, { recursive: true, force: true })];
   t.after(async () => {
     const errors = [];

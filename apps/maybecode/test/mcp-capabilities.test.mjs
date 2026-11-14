@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { openMcpClientPool, McpInteractionBroker, McpTaskJournal, InMemoryMcpCredentialStore } from "@sortedyuan/mcp";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
@@ -67,8 +66,7 @@ test(
   async (t) => {
     const fixture = await startTaskServer(t);
     fixture.state.input = true;
-    const directory = await mkdtemp(join(tmpdir(), "may-configured-tasks-"));
-    t.after(() => rm(directory, { recursive: true, force: true }));
+    const directory = await createTestDirectory(t, "maybecode/mcp-configured-tasks");
     const config = {
       path: join(directory, "config.json"),
       providers: { test: { adapter: "deepseek-chat", apiKey: "host-provider-secret" } },
@@ -188,8 +186,7 @@ test(
   { timeout: 10_000 },
   async (t) => {
     const fixture = await startCatalogFixture(t);
-    const directory = await mkdtemp(join(tmpdir(), "may-mcp-content-"));
-    t.after(() => rm(directory, { recursive: true, force: true }));
+    const directory = await createTestDirectory(t, "maybecode/mcp-content");
     const pool = await openMcpClientPool({
       servers: [{ id: "remote", transport: "streamable-http", url: `${fixture.url}/modern`, requestTimeoutMs: 1000 }],
     });
@@ -286,8 +283,7 @@ test(
           },
         };
     };
-    const directory = await mkdtemp(join(tmpdir(), "may-configured-host-"));
-    t.after(() => rm(directory, { recursive: true, force: true }));
+    const directory = await createTestDirectory(t, "maybecode/mcp-configured-host");
     const config = {
       path: join(directory, "config.json"),
       providers: { test: { adapter: "deepseek-chat", apiKey: "host-only-key" } },
@@ -421,8 +417,7 @@ test(
           },
         };
     };
-    const directory = await mkdtemp(join(tmpdir(), "may-mcp-ui-"));
-    t.after(() => rm(directory, { recursive: true, force: true }));
+    const directory = await createTestDirectory(t, "maybecode/mcp-ui");
     const pool = await openMcpClientPool({
       interactions: new McpInteractionBroker(),
       servers: [{ id: "remote", transport: "streamable-http", url: `${fixture.url}/modern` }],

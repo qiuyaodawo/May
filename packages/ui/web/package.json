@@ -27,7 +27,8 @@
     "test:browser": "pnpm --filter @sortedyuan/providers build && pnpm run build && node --test test/browser/*.test.mjs"
   },
   "dependencies": {
-    "@sortedyuan/ui-client": "workspace:*"
+    "@sortedyuan/ui-client": "workspace:*",
+    "lucide": "1.73.0"
   },
   "devDependencies": {
     "@sortedyuan/may": "workspace:*",

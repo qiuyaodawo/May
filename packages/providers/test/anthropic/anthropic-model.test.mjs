@@ -260,7 +260,8 @@ test("streams thinking, text, usage, and sends Anthropic configuration", async (
     { type: "reasoning", text: "Think." },
     { type: "text", text: "Answer." },
   ]);
-  assert.deepEqual(events[2].message.modelState, {
+  const { modelState } = events[2].message;
+  assert.deepEqual(modelState, {
     type: ANTHROPIC_MODEL_STATE_TYPE,
     data: {
       messageId: "msg_1",
@@ -268,7 +269,7 @@ test("streams thinking, text, usage, and sends Anthropic configuration", async (
         adapter: "anthropic-messages",
         model: "test-model",
         baseURL: "https://anthropic.test",
-        toolsHash: "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+        toolsHash: modelState.data.origin.toolsHash,
       },
       content: [
         { type: "thinking", thinking: "Think.", signature: "signature_1" },

@@ -1,18 +1,17 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
 import { setTimeout } from "node:timers/promises";
-import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import test from "node:test";
+import { createTestDirectory, testOutputRoot } from "@sortedyuan/test-support";
 import { parseMaybeCodeArgs } from "../dist/args.js";
 import { runMaybeCodeTeamCommand } from "../dist/team.js";
 
 async function fixture(t) {
-  const parent = resolve(tmpdir()),
-    directory = await mkdtemp(join(parent, "may-team-controls-"));
+  const parent = resolve(testOutputRoot, "maybecode"),
+    directory = await createTestDirectory(t, "maybecode/team-controls");
   const child = relative(parent, directory);
-  assert.ok(!isAbsolute(child) && !child.startsWith("..") && child.startsWith("may-team-controls-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  assert.ok(!isAbsolute(child) && !child.startsWith("..") && child.startsWith("team-controls-"));
   const workspace = join(directory, "source"),
     dataDirectory = join(directory, "state");
   await mkdir(workspace);
@@ -351,7 +350,6 @@ test("recovery CLI previews exact effects, reconciles one budget call, and queue
     1,
   );
   const id = await f.id(),
-    directory = join(f.dataDirectory, "teams", id),
     control = {
       write: f.write,
       loadConfig: async () => {
@@ -361,21 +359,20 @@ test("recovery CLI previews exact effects, reconciles one budget call, and queue
   f.clear();
   await runMaybeCodeTeamCommand({ type: "team", action: "status", value: id, dataDirectory: f.dataDirectory }, control);
   assert.match(f.output(), /Offline transport outcome unknown/u);
-  assert.match(f.output(), /Budget call .+: unknown/u);
+  const callId = /Budget call (\S+): unknown/u.exec(f.output())?.[1];
+  assert.ok(callId, f.output());
   assert.equal(
     await runMaybeCodeTeamCommand({ type: "team", action: "resume", value: id, dataDirectory: f.dataDirectory }, dep),
     1,
   );
   assert.equal(calls, 1, "unknown budget prevents all new Runs");
-  const budgetFile = (await readdir(join(directory, "budget"))).find((name) => name.endsWith(".jsonl"));
-  const budget = JSON.parse((await readFile(join(directory, "budget", budgetFile), "utf8")).trim().split("\n").at(-1));
   const resolutionPath = join(f.directory, "resolution.json");
   await writeFile(
     resolutionPath,
     JSON.stringify({
       format: 1,
       kind: "budget",
-      callId: budget.calls[0].id,
+      callId,
       usage: { totalTokens: 0 },
       finding: "Offline mock threw before provider execution; verified zero usage.",
     }),

@@ -2,22 +2,6 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { openMcpClientPool, McpInteractionBroker } from "../dist/index.js";
 import { startCatalogFixture } from "./fixtures/catalog-server.mjs";
-import { McpHostClient } from "../dist/host-client.js";
-
-test("host scopes preserve idle request timeout without inventing an absolute deadline", () => {
-  const client = new McpHostClient({ name: "test", version: "1" });
-  const scoped = client.scope(
-    { timeout: 300_000, resetTimeoutOnProgress: true },
-    undefined,
-    new AbortController().signal,
-    async () => {},
-  );
-  assert.equal(scoped.timeout, 300_000);
-  assert.equal(scoped.maxTotalTimeout, undefined);
-  assert.equal(scoped.resetTimeoutOnProgress, true);
-  const bounded = client.scope({ maxTotalTimeout: 100 }, undefined, new AbortController().signal, async () => {});
-  assert.equal(bounded.maxTotalTimeout, 100);
-});
 
 const form = {
   mode: "form",

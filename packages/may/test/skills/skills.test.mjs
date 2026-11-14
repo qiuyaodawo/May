@@ -1,15 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, mkdir, writeFile, rm, link, symlink, realpath } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, writeFile, link, symlink, realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { SkillRegistry, SkillSession } from "@sortedyuan/may/skills";
+import { createTestDirectory } from "@sortedyuan/test-support";
 
 const source = (body = "Read references/guide.md and follow the procedure.") =>
   `---\nname: research\ndescription: >-\n  Research a topic\n  using primary sources.\nmetadata:\n  version: "1"\nallowed-tools: shell\n---\n${body}`;
 async function fixture(t) {
-  const root = await realpath(await mkdtemp(join(tmpdir(), "may-skills-")));
-  t.after(() => rm(root, { recursive: true, force: true }));
+  const root = await realpath(await createTestDirectory(t, "may/skills"));
   const directory = join(root, "research");
   await mkdir(join(directory, "references"), { recursive: true });
   await writeFile(join(directory, "SKILL.md"), source());

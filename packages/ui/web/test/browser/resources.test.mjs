@@ -157,7 +157,9 @@ test("资源新增、删除和重命名同步到已加载页面及搜索结果",
 
 async function loaded(page, count, total) {
   await page.waitForFunction(
-    (expected) => document.querySelector(".sidebar > .list-empty")?.textContent === expected,
-    `已加载 ${count} / ${total} 条`,
+    ({ count, expected }) =>
+      document.querySelector(".sidebar > .list-empty")?.textContent === expected &&
+      document.querySelectorAll(".resource-item").length === count,
+    { count, expected: count < total ? `已加载 ${count} / ${total} 条` : "" },
   );
 }

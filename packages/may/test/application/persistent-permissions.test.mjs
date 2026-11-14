@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createTestDirectory } from "@sortedyuan/test-support";
@@ -177,8 +176,7 @@ test("file history validates persistent metadata, approval decisions and rule ev
     { type: "approval.requested", request: { ...events[1].request, persistent: { scopeId, description: "scope" } } },
   ].entries()) {
     const id = `invalid-${index}`;
-    const path = join(root, `${Buffer.from(id).toString("base64url")}.jsonl`);
-    await writeFile(path, `${JSON.stringify({ ...invalid, sessionId: id, seq: 1, timestamp: 100 })}\n`);
+    await store.append({ ...invalid, sessionId: id, seq: 1, timestamp: 100 });
     await assert.rejects(new FileSessionStore(root).read(id), /Invalid session event/);
   }
 });

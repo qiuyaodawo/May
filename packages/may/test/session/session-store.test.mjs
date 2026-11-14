@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
-import { appendFile, mkdtemp, readdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { appendFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { InMemoryContext, May } from "@sortedyuan/may/core";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { InMemorySessionStore, Session } from "@sortedyuan/may/session";
@@ -35,7 +35,7 @@ test("rejects out-of-order events in the in-memory store", async () => {
 });
 
 test("queues file-session deletion with appends for the same session", async (t) => {
-  const directory = await createTempDirectory(t);
+  const directory = await createTestDirectory(t, "may/session");
   const store = new FileSessionStore(directory);
   const sessionId = "delete_queue";
   await store.append({
@@ -52,9 +52,7 @@ test("queues file-session deletion with appends for the same session", async (t)
     timestamp: 2,
     runId: "run",
   });
-  const appendTail = store.tails.get(sessionId);
   const deletion = store.delete(sessionId);
-  assert.notEqual(store.tails.get(sessionId), appendTail);
 
   await append;
   assert.equal(await deletion, true);
@@ -62,7 +60,7 @@ test("queues file-session deletion with appends for the same session", async (t)
 });
 
 test("resumes a file session and continues its context and sequence", async (t) => {
-  const directory = await createTempDirectory(t);
+  const directory = await createTestDirectory(t, "may/session");
   const firstStore = new FileSessionStore(directory);
   const first = await Session.create({
     requestRecording: "off",
@@ -250,7 +248,7 @@ test("replays the latest compacted context without deleting history", async () =
 });
 
 test("reports missing sessions and corrupt session files", async (t) => {
-  const directory = await createTempDirectory(t);
+  const directory = await createTestDirectory(t, "may/session");
   const store = new FileSessionStore(directory);
 
   await assert.rejects(
@@ -304,9 +302,3 @@ test("requires reopen after a durable append fails and preserves the sequence", 
     history.map((_event, index) => index + 1),
   );
 });
-
-async function createTempDirectory(t) {
-  const directory = await mkdtemp(join(tmpdir(), "may-session-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
-  return directory;
-}

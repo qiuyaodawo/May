@@ -9,5 +9,7 @@ allowBuilds:
   esbuild: true
   protobufjs: false
   sharp: true
+minimumReleaseAgeExclude:
+  - lucide@1.73.0
 patchedDependencies:
   vscode-jsonrpc@9.0.2: patches/vscode-jsonrpc@9.0.2.patch

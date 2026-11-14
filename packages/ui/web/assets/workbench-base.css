@@ -45,7 +45,6 @@
   --muted: #727580;
   --accent: #5046d9;
   --accent-soft: #efedff;
-  --shadow: 0 8px 32px #2021390a;
   --danger: #b33d40;
   --ok: #397761;
   font-family: Inter, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -160,7 +159,7 @@ figure {
   color: var(--muted);
 }
 .current-title {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -274,7 +273,6 @@ figure {
     --muted: #a1a2af;
     --accent: #b0a8ff;
     --accent-soft: #302c49;
-    --shadow: 0 8px 32px #0002;
     --danger: #f18e91;
     --ok: #79b69d;
   }

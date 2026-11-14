@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile, appendFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readFile, readdir, symlink, writeFile, appendFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import { FileSharedBudget } from "../dist/shared-budget.js";
 import { FileArtifactStore } from "../dist/artifact-store.js";
 import { TaskWorkspaceManager } from "../dist/task-workspace.js";
@@ -21,11 +21,7 @@ async function consume(model, modelCallId) {
   for await (const event of model.stream(request, { signal, modelCallId })) events.push(event);
   return events;
 }
-async function temporary(t) {
-  const path = await mkdtemp(join(tmpdir(), "may-resources-"));
-  t.after(() => rm(path, { recursive: true, force: true }));
-  return path;
-}
+const temporary = (t) => createTestDirectory(t, "coordination/resources");
 
 test("shared budget reserves concurrent capacity, settles before results, and reconciles unknown usage without replay", async (t) => {
   const directory = await temporary(t);

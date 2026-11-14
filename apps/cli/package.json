@@ -27,6 +27,7 @@
     "@sortedyuan/providers": "workspace:*"
   },
   "devDependencies": {
+    "@sortedyuan/test-support": "workspace:*",
     "@types/node": "^22.0.0"
   },
   "engines": {

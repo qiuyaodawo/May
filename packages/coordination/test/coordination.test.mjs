@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
-import { appendFile, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { appendFile, readFile, writeFile } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
+import { createTestDirectory, testOutputRoot } from "@sortedyuan/test-support";
 import { defineAgent } from "@sortedyuan/may";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
@@ -35,11 +35,10 @@ function agent(model, store = new InMemorySessionStore(), permissionPolicy = () 
   });
 }
 async function directory(t) {
-  const parent = resolve(tmpdir());
-  const path = await mkdtemp(join(parent, "may-coordination-"));
+  const parent = resolve(testOutputRoot, "coordination");
+  const path = await createTestDirectory(t, "coordination/coordination");
   const within = relative(parent, resolve(path));
-  assert.ok(!isAbsolute(within) && !within.startsWith("..") && within.startsWith("may-coordination-"));
-  t.after(() => rm(path, { recursive: true, force: true }));
+  assert.ok(!isAbsolute(within) && !within.startsWith("..") && within.startsWith("coordination-"));
   return path;
 }
 

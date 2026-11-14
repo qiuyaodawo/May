@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import { createTestDirectory } from "@sortedyuan/test-support";
 
 const binPath = fileURLToPath(new URL("../dist/bin.js", import.meta.url));
 const workspacePath = fileURLToPath(new URL("../../..", import.meta.url));
@@ -171,8 +171,7 @@ async function startServer(t, handleRequest) {
 }
 
 async function writeConfig(t, config) {
-  const directory = await mkdtemp(join(tmpdir(), "may-cli-process-"));
-  t.after(() => rm(directory, { recursive: true, force: true }));
+  const directory = await createTestDirectory(t, "cli/process");
   const path = join(directory, "config.json");
   await writeFile(path, JSON.stringify(config));
   return path;

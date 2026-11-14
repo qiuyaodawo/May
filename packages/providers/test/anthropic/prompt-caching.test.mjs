@@ -3,7 +3,29 @@ import test from "node:test";
 import { ANTHROPIC_MODEL_STATE_TYPE, AnthropicModel } from "../../dist/anthropic/index.js";
 import { createBuiltinProviderModel } from "../../dist/index.js";
 
-test("Anthropic request caching uses matching automatic and instruction TTLs", () => {
+async function sentBody(create, request) {
+  const bodies = [];
+  const model = create(async (url, init) => {
+    if (!url.endsWith("/v1/messages")) return new Response("not found", { status: 404 });
+    bodies.push(JSON.parse(init.body));
+    return Response.json(
+      { type: "error", error: { type: "api_error", message: "request body captured" } },
+      { status: 500 },
+    );
+  });
+  await assert.rejects(async () => {
+    for await (const event of model.stream(request, { signal: new AbortController().signal })) void event;
+  }, /request body captured/);
+  assert.equal(bodies.length, 1);
+  return bodies[0];
+}
+
+function anthropic(options) {
+  return (fetch) =>
+    new AnthropicModel({ apiKey: "offline-body-inspection", model: "claude-sonnet-4-6", fetch, ...options });
+}
+
+test("Anthropic request caching uses matching automatic and instruction TTLs", async () => {
   const request = {
     messages: [
       { role: "system", content: [{ type: "text", text: "Instructions" }] },
@@ -23,12 +45,7 @@ test("Anthropic request caching uses matching automatic and instruction TTLs", (
     { ttl: "1h", cacheInstructions: true },
     { ttl: "5m", cacheInstructions: true },
   ]) {
-    const model = new AnthropicModel({
-      apiKey: "offline-body-inspection",
-      model: "claude-sonnet-4-6",
-      ...(promptCaching === undefined ? {} : { promptCaching }),
-    });
-    const body = model.createRequest(request);
+    const body = await sentBody(anthropic(promptCaching === undefined ? {} : { promptCaching }), request);
     if (promptCaching === undefined || promptCaching === false) {
       assert.equal(body.cache_control, undefined);
       assert.equal(body.tools[0].cache_control, undefined);
@@ -47,7 +64,7 @@ test("Anthropic request caching uses matching automatic and instruction TTLs", (
   }
 });
 
-test("Anthropic provider defaults and explicit model overrides construct matching requests", () => {
+test("Anthropic provider defaults and explicit model overrides construct matching requests", async () => {
   for (const [providerCaching, modelCaching, expected] of [
     [{ ttl: "1h", cacheInstructions: true }, undefined, "1h"],
     [{ ttl: "1h", cacheInstructions: true }, false, undefined],
@@ -55,23 +72,26 @@ test("Anthropic provider defaults and explicit model overrides construct matchin
     [{ ttl: "1h" }, {}, "5m"],
     [undefined, undefined, undefined],
   ]) {
-    const wrapped = createBuiltinProviderModel({
-      profile: "offline",
-      provider: "anthropic",
-      adapter: "anthropic-messages",
-      model: "claude-sonnet-4-6",
-      providerConfig: { apiKey: "offline-body-inspection", options: { promptCaching: providerCaching } },
-      options: modelCaching === undefined ? {} : { promptCaching: modelCaching },
-    });
-    const body = wrapped.model.createRequest({
-      messages: [{ role: "user", content: [{ type: "text", text: "Hello" }] }],
-      tools: [],
-    });
+    const body = await sentBody(
+      (fetch) =>
+        createBuiltinProviderModel(
+          {
+            profile: "offline",
+            provider: "anthropic",
+            adapter: "anthropic-messages",
+            model: "claude-sonnet-4-6",
+            providerConfig: { apiKey: "offline-body-inspection", options: { promptCaching: providerCaching } },
+            options: modelCaching === undefined ? {} : { promptCaching: modelCaching },
+          },
+          { fetch },
+        ),
+      { messages: [{ role: "user", content: [{ type: "text", text: "Hello" }] }], tools: [] },
+    );
     assert.equal(body.cache_control?.ttl, expected);
   }
 });
 
-test("automatic caching preserves native thinking and tool continuation content", () => {
+test("automatic caching preserves native thinking and tool continuation content", async () => {
   const nativeContent = [
     { type: "thinking", thinking: "Calculate the sum", signature: "retained-signature" },
     { type: "redacted_thinking", data: "retained-redacted-data" },
@@ -90,12 +110,10 @@ test("automatic caching preserves native thinking and tool continuation content"
     { role: "tool", toolCallId: "call-add", content: [{ type: "text", text: "3" }] },
   ];
   const snapshot = structuredClone(messages);
-  const body = new AnthropicModel({
-    apiKey: "offline-body-inspection",
-    model: "claude-sonnet-4-6",
-    promptCaching: { ttl: "1h", cacheInstructions: true },
-    thinking: { type: "adaptive" },
-  }).createRequest({ messages, tools: [] });
+  const body = await sentBody(
+    anthropic({ promptCaching: { ttl: "1h", cacheInstructions: true }, thinking: { type: "adaptive" } }),
+    { messages, tools: [] },
+  );
   assert.deepEqual(body.cache_control, { type: "ephemeral", ttl: "1h" });
   assert.deepEqual(body.system, [
     { type: "text", text: "First instructions\nSecond instructions", cache_control: body.cache_control },
@@ -110,12 +128,11 @@ test("automatic caching preserves native thinking and tool continuation content"
   assert.deepEqual(messages, snapshot);
 });
 
-test("automatic caching supports requests without system messages or tools", () => {
-  const body = new AnthropicModel({
-    apiKey: "offline-body-inspection",
-    model: "claude-sonnet-4-6",
-    promptCaching: { cacheInstructions: true },
-  }).createRequest({ messages: [{ role: "user", content: [{ type: "text", text: "Hello" }] }], tools: [] });
+test("automatic caching supports requests without system messages or tools", async () => {
+  const body = await sentBody(anthropic({ promptCaching: { cacheInstructions: true } }), {
+    messages: [{ role: "user", content: [{ type: "text", text: "Hello" }] }],
+    tools: [],
+  });
   assert.deepEqual(body.cache_control, { type: "ephemeral", ttl: "5m" });
   assert.equal(body.system, undefined);
   assert.equal(body.tools, undefined);

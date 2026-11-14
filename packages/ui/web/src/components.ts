@@ -1,4 +1,5 @@
 import type { UiBlock, UiInteraction, UiPanel, UiClient, UiClientState, UiDiagnostic } from "@sortedyuan/ui-client";
+import { createElement, icons } from "./icons.js";
 import { markdown } from "./markdown.js";
 
 export function element<K extends keyof HTMLElementTagNameMap>(
@@ -17,54 +18,8 @@ export function button(label: string, action: () => void, className = "button"):
   el.onclick = action;
   return el;
 }
-export function icon(
-  name:
-    | "plus"
-    | "menu"
-    | "send"
-    | "stop"
-    | "panel"
-    | "search"
-    | "arrow"
-    | "code"
-    | "task"
-    | "trash"
-    | "gear"
-    | "users"
-    | "message"
-    | "check"
-    | "filter",
-) {
-  const paths = {
-    plus: "M12 5v14M5 12h14",
-    menu: "M4 6h16M4 12h16M4 18h16",
-    send: "M12 19V5m-6 6 6-6 6 6",
-    stop: "M6 6h12v12H6z",
-    panel: "M4 4h16v16H4zM14 4v16",
-    search: "m16 16 4 4M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0",
-    arrow: "M7 17 17 7M7 7h10v10",
-    code: "m8 6-6 6 6 6m8-12 6 6-6 6m-3-14-2 16",
-    task: "M8 5h12M8 12h12M8 19h12M3 5h.01M3 12h.01M3 19h.01",
-    trash: "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7",
-    gear: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
-    users:
-      "M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2 M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z M23 21v-2a4 4 0 0 0-3-3.87 M16 3.13a4 4 0 0 1 0 7.75",
-    message: "M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z",
-    check: "M20 6 9 17l-5-5",
-    filter: "M22 3H2l8 9.46V19l4 2v-8.54L22 3z",
-  };
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("aria-hidden", "true");
-  svg.setAttribute("fill", "none");
-  svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "1.6");
-  svg.setAttribute("stroke-linecap", "round");
-  svg.setAttribute("stroke-linejoin", "round");
-  const path = document.createElementNS(svg.namespaceURI, "path");
-  path.setAttribute("d", paths[name]);
-  svg.append(path);
-  return svg;
+export function icon(name: keyof typeof icons): SVGElement {
+  return createElement(icons[name], { "aria-hidden": "true", "stroke-width": 1.6 });
 }
 export const statusLabel = (status: string): string =>
   ({
@@ -213,7 +168,7 @@ const statusHint = (status?: string) =>
   status === "unknown"
     ? "缺少可确认的执行结果；操作可能已产生影响。请在宿主中核对，不要直接重跑。"
     : status === "interrupted"
-      ? "执行已中断；已显示的部分内容不代表完整结果。"
+      ? "已显示的部分内容不代表完整结果。"
       : status === "not-started"
         ? "宿主记录此调用未执行。"
         : "";
@@ -243,6 +198,7 @@ export function transcriptBlock(block: UiBlock, extensions: WebUiExtensions = {}
       icon("code"),
       element("span", "tool-name", block.title ?? "工具调用"),
       statusBadge(block.status ?? "unknown"),
+      icon("expand"),
     );
     details.append(summary);
     if (block.runId || block.toolCallId)
@@ -291,7 +247,6 @@ export function transcriptBlock(block: UiBlock, extensions: WebUiExtensions = {}
     article.append(details);
     return article;
   }
-  article.append(element("div", "assistant-label", "May"));
   if (block.reasoning) {
     const reasoning = element("details", "reasoning");
     reasoning.append(element("summary", "", "思考过程"), element("div", "reasoning-text", block.reasoning));
@@ -335,7 +290,6 @@ export function approvalCard(
   const section = element("section", "approval-card");
   section.setAttribute("aria-label", interaction.title);
   section.append(
-    element("span", "eyebrow", "当前待审批"),
     element("h3", "", interaction.title),
     element("p", "execution-reference", `运行 ${interaction.runId} · 调用 ${interaction.toolCallId}`),
     element("pre", "tool-content", interaction.detail),

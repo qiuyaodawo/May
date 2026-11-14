@@ -172,7 +172,17 @@ test("supports a shared custom pricing interface and immutable schedule snapshot
   });
   const meter = new RunBudgetMeter(resolveRunBudget({ pricing, usagePricer, maxCostUsd: 1 }));
   meter.recordUsage({ totalTokens: 100 });
-  assert.deepEqual(meter.snapshot().latestCost, priceUsage({ totalTokens: 100 }, pricing, usagePricer));
+  assert.deepEqual(meter.snapshot().latestCost, {
+    amount: 0.0002,
+    currency: "USD",
+    kind: "estimated",
+    complete: true,
+    missingReasons: [],
+    pricingId: pricing.id,
+    pricingVersion: pricing.version,
+    source: pricing.source,
+    effectiveAt: pricing.effectiveAt,
+  });
   assert.throws(
     () =>
       priceUsage({ totalTokens: 1 }, pricing, () => ({

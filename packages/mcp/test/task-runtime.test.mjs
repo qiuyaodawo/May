@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { createTestDirectory } from "@sortedyuan/test-support";
 import {
   McpTaskJournal,
   InMemoryMcpCredentialStore,
@@ -174,8 +174,7 @@ test(
   "stdio task handles recover across process restart and fail closed on changed definitions, bad results and unknown calls",
   { timeout: 15_000 },
   async (t) => {
-    const directory = await mkdtemp(join(tmpdir(), "may-tasks-runtime-"));
-    t.after(() => rm(directory, { recursive: true, force: true }));
+    const directory = await createTestDirectory(t, "mcp/task-runtime");
     let password;
     const keyring = {
       getPassword: async () => password,

@@ -25,6 +25,25 @@ import {
 
 const credentials = { apiKey: "validation-only", model: "validation-only" };
 
+async function anthropicRequestBody(options, request) {
+  let body;
+  const model = new AnthropicModel({
+    ...credentials,
+    ...options,
+    fetch: async (_url, init) => {
+      body = JSON.parse(init.body);
+      return Response.json(
+        { type: "error", error: { type: "api_error", message: "request body captured" } },
+        { status: 500 },
+      );
+    },
+  });
+  await assert.rejects(async () => {
+    for await (const event of model.stream(request, { signal: new AbortController().signal })) void event;
+  }, /request body captured/);
+  return body;
+}
+
 test("Kimi Formula errors expose explicit usage receipts and preserve error details", () => {
   const usage = { completeness: { status: "partial", reason: "host-search-outcome-unknown" } };
   const cause = new Error("connection interrupted");
@@ -38,7 +57,7 @@ test("Kimi Formula errors expose explicit usage receipts and preserve error deta
   assert.equal(error.fiberId, "fiber");
 });
 
-test("webSearch construction rejects incompatible options without network access", () => {
+test("webSearch construction rejects incompatible options without network access", async () => {
   for (const [adapter, options] of [
     ["anthropic-messages", { allowedDomains: [], blockedDomains: [] }],
     ["openai-responses", { allowedDomains: [], blockedDomains: [] }],
@@ -60,17 +79,21 @@ test("webSearch construction rejects incompatible options without network access
     () => new OpenAIChatCompletionsModel({ ...credentials, model: "gpt-5-search-api", webSearch: false }),
     ProviderConfigurationError,
   );
-  assert.throws(
-    () =>
-      new AnthropicModel({ ...credentials, webSearch: {} }).createRequest({
-        messages: [],
-        tools: [{ name: "web_search", description: "search", inputSchema: {} }],
-      }),
-    TypeError,
-  );
+  const conflicting = new AnthropicModel({
+    ...credentials,
+    webSearch: {},
+    fetch: async () => assert.fail("a request with a conflicting web_search function was sent"),
+  });
+  await assert.rejects(async () => {
+    for await (const event of conflicting.stream(
+      { messages: [], tools: [{ name: "web_search", description: "search", inputSchema: {} }] },
+      { signal: new AbortController().signal },
+    ))
+      void event;
+  }, TypeError);
 });
 
-test("webSearch replacement and request field mapping", () => {
+test("webSearch replacement and request field mapping", async () => {
   const selection = { options: { webSearch: {} }, providerConfig: { options: { webSearch: { maxUses: 4 } } } };
   assert.deepEqual(selectionWebSearch(selection), {});
   assert.equal(selectionWebSearch({ ...selection, options: { webSearch: false } }), false);
@@ -108,11 +131,10 @@ test("webSearch replacement and request field mapping", () => {
     type: "web_search",
     web_search: { enable: true, search_result: true, search_engine: "search_pro", count: 3 },
   });
-  const body = new AnthropicModel({
-    ...credentials,
-    webSearch: {},
-    promptCaching: { cacheInstructions: true },
-  }).createRequest({ messages: [], tools: [{ name: "add", description: "add", inputSchema: {} }] });
+  const body = await anthropicRequestBody(
+    { webSearch: {}, promptCaching: { cacheInstructions: true } },
+    { messages: [], tools: [{ name: "add", description: "add", inputSchema: {} }] },
+  );
   assert.equal(body.tools.at(-1).name, "web_search");
   assert.equal(body.tools.at(-1).cache_control.type, "ephemeral");
 });
@@ -188,10 +210,14 @@ test("Kimi Formula rejects invalid inputs before connecting", async () => {
 
 test("replays recorded Anthropic search including citations, events, usage and native history", async () => {
   const recording = await readFile(new URL("../fixtures/search/anthropic-direct.sse", import.meta.url));
+  const bodies = [];
   const model = new AnthropicModel({
     ...credentials,
     webSearch: {},
-    fetch: async () => new Response(recording, { headers: { "content-type": "text/event-stream" } }),
+    fetch: async (_url, init) => {
+      bodies.push(JSON.parse(init.body));
+      return new Response(recording, { headers: { "content-type": "text/event-stream" } });
+    },
   });
   const events = [];
   for await (const event of model.stream(
@@ -213,8 +239,12 @@ test("replays recorded Anthropic search including citations, events, usage and n
     tokenRelations: { cachedRead: "total", cachedWrite: "total" },
     totalTokens: 12169,
   });
-  const body = model.createRequest({ messages: [completed.message], tools: [] });
-  assert.deepEqual(body.messages[0].content, completed.message.modelState.data.content);
+  for await (const event of model.stream(
+    { messages: [completed.message], tools: [] },
+    { signal: new AbortController().signal },
+  ))
+    void event;
+  assert.deepEqual(bodies[1].messages[0].content, completed.message.modelState.data.content);
 });
 
 test("replays recorded mixed server search and client function calls with original arguments", async () => {

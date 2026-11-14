@@ -263,13 +263,10 @@ describe("MaybeClaw 管理界面", { timeout: 90_000 }, () => {
         .getByRole("dialog")
         .filter({ has: page.getByRole("heading", { name: "服务设置", exact: true }) });
       await dialog.waitFor({ state: "visible" });
-      const scroll = await dialog.locator(".gateway-dialog-form").evaluate((element) => ({
-        clientHeight: element.clientHeight,
-        scrollHeight: element.scrollHeight,
-        overflowY: window.getComputedStyle(element).overflowY,
-      }));
-      assert.ok(scroll.scrollHeight >= scroll.clientHeight, "表单内部内容高度异常");
-      assert.equal(scroll.overflowY, "auto", "表单未配置竖向自动滚动");
+      const overflowY = await dialog
+        .locator(".gateway-dialog-form")
+        .evaluate((element) => window.getComputedStyle(element).overflowY);
+      assert.equal(overflowY, "auto", "表单未配置竖向自动滚动");
       const close = dialog.getByRole("button", { name: "关闭", exact: true });
       await close.scrollIntoViewIfNeeded();
       await close.click();
