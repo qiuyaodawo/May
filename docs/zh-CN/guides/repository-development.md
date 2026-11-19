@@ -48,8 +48,9 @@ Web 服务资源在使用时加载。
 - 测试把临时数据写入被忽略的 `.test-output/`。私有 package `@sortedyuan/test-support` 提供
   `createTestDirectory(t, name)`，它创建 `.test-output/<name>-XXXXXX` 并在测试结束后删除；
   共用的测试目录使用 `testOutputRoot`。
-- `pnpm test`：执行工作目录中的离线测试，继续检查各个 package 后报告失败；
-  package 测试全部通过后执行文件锁检查。
+- `pnpm test` 依次执行工作区各个 package 的离线测试脚本。当前脚本完成构建和测试后，
+  下一个 package 才能重新构建共用的依赖。命令在所有脚本执行结束后报告失败情况，
+  全部通过时继续执行文件锁检查。
 - `pnpm test:locks`：在 `pnpm build` 后运行，通过实际 package 与应用 API 检查
   锁所有权、进程终止、初始化失败和释放。Windows 还通过 PowerShell 与 Windows
   文件 API 控制待删除状态，验证竞争时序。测试数据位于忽略的

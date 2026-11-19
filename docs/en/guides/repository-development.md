@@ -56,8 +56,9 @@ implementation when selected; image codecs and Web server assets load when used.
   `@sortedyuan/test-support` package provides `createTestDirectory(t, name)`, which creates
   `.test-output/<name>-XXXXXX` and removes it after the test, and `testOutputRoot` for
   shared fixture directories.
-- `pnpm test` runs the offline workspace suite and continues through packages
-  before reporting failures. Successful package tests are followed by the file-lock checks.
+- `pnpm test` runs one workspace package's offline test script at a time. This lets each
+  script finish building and testing before the next package can rebuild a shared dependency.
+  The command reports failures after all package scripts finish and runs the file-lock checks if they all pass.
 - `pnpm test:locks`, after `pnpm build`, checks lock ownership, process termination,
   failed initialization and release through actual package and application APIs.
   Windows also runs controlled pending-delete tests using PowerShell and the
