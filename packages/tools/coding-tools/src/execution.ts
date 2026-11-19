@@ -1,9 +1,10 @@
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep, posix, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
+import { promisify } from "node:util";
 import { omitUndefined } from "@sortedyuan/may/core";
 import { CodingToolError } from "./errors.js";
 import { resolveExistingWorkspacePath } from "./workspace-path.js";
@@ -329,12 +330,21 @@ async function terminateHostProcess(pid: number): Promise<void> {
   }
   try {
     process.kill(-pid, "SIGKILL");
-    for (;;) {
-      process.kill(-pid, 0);
-      await delay(10);
-    }
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+    if ((error as NodeJS.ErrnoException).code === "ESRCH") return;
+    throw error;
+  }
+  for (;;) {
+    try {
+      process.kill(-pid, 0);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ESRCH") return;
+      if (process.platform !== "darwin" || code !== "EPERM") throw error;
+      const { stdout } = await promisify(execFile)("/bin/ps", ["-A", "-o", "pgid="]);
+      if (!stdout.split(/\s+/u).includes(String(pid))) return;
+    }
+    await delay(10);
   }
 }
 

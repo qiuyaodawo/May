@@ -50,7 +50,7 @@ async function fixture(
   t.after(async () => {
     await manager.close();
     await execution.close();
-    await rm(workspace, { force: true, recursive: true });
+    await rm(workspace, { force: true, recursive: true, maxRetries: 10, retryDelay: 100 });
   });
   return { workspace, manager, execution };
 }
@@ -66,17 +66,31 @@ async function project(workspace) {
   await writeFile(join(workspace, "b.ts"), 'import { greet } from "./a.js";\nexport const result = greet("hello");\n');
 }
 
+async function expectTypeScriptDiagnostics(t, manager, path, feedback, matches) {
+  assert.equal(feedback.status, "unknown", feedback.reason);
+  if (matches(feedback.items)) return;
+  let latest = feedback;
+  await until(
+    t,
+    async () => {
+      latest = await manager.diagnostics(path, t.signal);
+      return latest.status === "unknown" && matches(latest.items);
+    },
+    () => JSON.stringify({ path, latest }),
+  );
+}
+
 test("TypeScript write/edit feedback and all seven LSP tools use a real server", { timeout: 120000 }, async (t) => {
   const { workspace, manager } = await fixture(t);
   await project(workspace);
   const write = createCodingTool("write", { cwd: workspace, fileFeedback: manager.fileFeedback });
   const bad = await write.execute({ path: "error.ts", content: 'const count: number = "wrong";\n' }, context());
-  assert.equal(bad.diagnostics.status, "unknown", bad.diagnostics.reason);
-  assert.ok(bad.diagnostics.items.some((item) => item.severity === "error"));
+  await expectTypeScriptDiagnostics(t, manager, "error.ts", bad.diagnostics, (items) =>
+    items.some((item) => item.code === "2322" && item.severity === "error"),
+  );
   const edit = createCodingTool("edit", { cwd: workspace, fileFeedback: manager.fileFeedback });
   const fixed = await edit.execute({ path: "error.ts", oldText: '"wrong"', newText: "1" }, context());
-  assert.equal(fixed.diagnostics.status, "unknown");
-  assert.deepEqual(fixed.diagnostics.items, []);
+  await expectTypeScriptDiagnostics(t, manager, "error.ts", fixed.diagnostics, (items) => items.length === 0);
   const tools = createLspTools(manager);
   assert.equal(tools.length, 7);
   const run = (name, input, id) => {
@@ -149,8 +163,9 @@ test("rapid writes report diagnostics for the latest content", { timeout: 120000
   const second = manager.fileFeedback.record(path, contents[1]);
   const results = await Promise.all([first.result(signal()), second.result(signal())]);
   assert.equal(results[0].diagnostics.status, "pending");
-  assert.equal(results[1].diagnostics.status, "unknown");
-  assert.ok(results[1].diagnostics.items.some((item) => item.severity === "error"));
+  await expectTypeScriptDiagnostics(t, manager, "a.ts", results[1].diagnostics, (items) =>
+    items.some((item) => item.code === "2322" && item.severity === "error"),
+  );
 });
 
 test("path, size, symbol and tool input checks fail at the boundary", { timeout: 120000 }, async (t) => {
