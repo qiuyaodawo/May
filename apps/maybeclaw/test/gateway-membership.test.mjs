@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
-import { testOutputRoot } from "@sortedyuan/test-support";
+import { testOutputRoot, until } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { AgentGateway } from "../dist/gateway.js";
 import { GatewayHost } from "../dist/gateway-host.js";
@@ -16,15 +15,6 @@ const example = fileURLToPath(new URL("../examples/rpc-file-agent.mjs", import.m
 const operator = { kind: "operator", id: "membership-verification" };
 const entry = { kind: "group", account: "telegram:42", conversation: "-10012" };
 const member = { kind: "platform", account: entry.account, conversation: entry.conversation, userId: "7" };
-
-async function until(probe) {
-  for (let attempt = 0; attempt < 200; attempt++) {
-    const result = await probe();
-    if (result) return result;
-    await delay(20);
-  }
-  throw new Error("Member access verification timed out");
-}
 
 async function setup(t, noCancel) {
   await mkdir(base, { recursive: true });
@@ -75,7 +65,7 @@ async function setup(t, noCancel) {
   });
   const taskId = receipt.taskIds[0],
     adapter = await gateway.adapter("files");
-  const binding = await until(async () => {
+  const binding = await until(t, async () => {
     const task = gateway.store.get("tasks", taskId),
       binding = gateway.store.get("bindings", `${session.id}:files`);
     return (
@@ -99,7 +89,7 @@ async function setup(t, noCancel) {
   return { gateway, host, directory, session, taskId, adapter, binding, event, joined };
 }
 
-test("无法取消的实际RPC执行保留运行状态，成员撤权不阻止其他入口处理", async (t) => {
+test("无法取消的实际RPC执行保留运行状态，成员撤权不阻止其他入口处理", { timeout: 60_000 }, async (t) => {
   const { gateway, host, directory, session, taskId, adapter, binding, event, joined } = await setup(t, true);
   assert.equal(adapter.capabilities.cancel, false);
   await host.tick();
@@ -121,11 +111,11 @@ test("无法取消的实际RPC执行保留运行状态，成员撤权不阻止�
     /无权访问/,
   );
   await writeFile(join(directory, "ready.txt"), "finished independently");
-  await until(() => gateway.store.get("tasks", taskId).status === "completed");
+  await until(t, () => gateway.store.get("tasks", taskId).status === "completed");
   assert.match(gateway.store.get("tasks", taskId).result, /File is available/);
 });
 
-test("实际RPC进程终止时成员撤权保留待核对结果，并完成其他成员事件", async (t) => {
+test("实际RPC进程终止时成员撤权保留待核对结果，并完成其他成员事件", { timeout: 60_000 }, async (t) => {
   const { gateway, host, session, taskId, adapter, binding, event, joined } = await setup(t, false);
   const { pid } = JSON.parse(await adapter.command(binding.conversationId, "process", []));
   assert.ok(Number.isSafeInteger(pid) && pid !== process.pid);
@@ -134,7 +124,7 @@ test("实际RPC进程终止时成员撤权保留待核对结果，并完成其�
   assert.equal(gateway.canAccess(session, member), false);
   assert.equal(gateway.store.get("inbox", inboxId(event)).state, "done");
   assert.equal(gateway.store.get("inbox", inboxId(joined)).state, "done");
-  await until(() => gateway.store.get("tasks", taskId).status === "recovery-required");
+  await until(t, () => gateway.store.get("tasks", taskId).status === "recovery-required");
   assert.ok(
     gateway
       .messages(session.id, operator)

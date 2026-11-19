@@ -1,5 +1,6 @@
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
 /** Ignored root for all repository test data. */
@@ -24,4 +25,22 @@ export async function createTestDirectory(t, name) {
   const directory = await mkdtemp(`${prefix}-`);
   t.after(() => rm(directory, { recursive: true, force: true }));
   return directory;
+}
+
+/**
+ * Check `probe` every 10 ms until it returns a truthy value, and return that value.
+ * The wait has no deadline of its own: the test's `timeout` option ends a condition that is never reached,
+ * and the wait stops when the test context `t` is cancelled.
+ */
+export async function until(t, probe, describe) {
+  try {
+    for (;;) {
+      t.signal.throwIfAborted();
+      const value = await probe();
+      if (value) return value;
+      await delay(10, undefined, { signal: t.signal });
+    }
+  } finally {
+    if (t.signal.aborted && describe) t.diagnostic(describe());
+  }
 }

@@ -6,7 +6,6 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { setTimeout as delay } from "node:timers/promises";
 import { AgentGateway } from "../dist/gateway.js";
 import { gatewaySettings } from "../dist/gateway-settings.js";
 
@@ -82,15 +81,10 @@ if (process.argv[2] === "--child") {
     await gateway.restore();
     await gateway.maintain();
     assert.deepEqual(gateway.store.get("approvals", saved.id), saved);
-    const updating = gateway.updateAgent("reviewer", operator, { ...reviewer, name: "updated reviewer" });
-    const result = await Promise.race([
-      updating.then(
-        () => ({ completed: true }),
-        (error) => ({ error }),
-      ),
-      delay(1000).then(() => ({ waiting: true })),
-    ]);
-    assert.match(result.error?.message ?? "", /需要核对的审批结果/u);
+    await assert.rejects(
+      gateway.updateAgent("reviewer", operator, { ...reviewer, name: "updated reviewer" }),
+      /需要核对的审批结果/u,
+    );
     await assert.rejects(gateway.resolveApproval(saved.id, operator, "allow"), /审批已经处理/u);
     await gateway.close();
     const reopened = new AgentGateway(options);

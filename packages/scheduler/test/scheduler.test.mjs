@@ -3,10 +3,11 @@ import { once } from "node:events";
 import { readFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
+import { until } from "@sortedyuan/test-support";
 
 import { Scheduler } from "../dist/index.js";
 import { latestTime, nextTime } from "../dist/triggers.js";
-import { event, job, setup, verificationRoot, waitUntil } from "./fixtures/scheduler-setup.mjs";
+import { event, job, setup, verificationRoot } from "./fixtures/scheduler-setup.mjs";
 
 test("opening a scheduler does not execute due jobs until tick", async (t) => {
   const { scheduler, host } = await setup(t, "explicit-start");
@@ -218,7 +219,7 @@ test("stop leaves queued submissions pending and an explicit tick resumes them",
   assert.equal(host.tasks().length, 2);
 });
 
-test("an immediate stop excludes restart until drained and a subsequent start runs the timer", async (t) => {
+test("restart waits for stop to drain and runs the timer", { timeout: 60_000 }, async (t) => {
   const { scheduler, host } = await setup(t, "immediate-restart");
   await scheduler.createJob(
     job("restart-timer", {
@@ -233,7 +234,7 @@ test("an immediate stop excludes restart until drained and a subsequent start ru
   await starting;
   assert.deepEqual(host.tasks(), []);
   await scheduler.start();
-  await waitUntil(async () => (await scheduler.listExecutions()).records[0]?.status === "submitted");
+  await until(t, async () => (await scheduler.listExecutions()).records[0]?.status === "submitted");
   assert.equal(host.tasks().length, 1);
   await scheduler.stop();
 });

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { selectLiveModelProfile, testOutputRoot } from "@sortedyuan/test-support";
+import { selectLiveModelProfile, testOutputRoot, until } from "@sortedyuan/test-support";
 import { execFile } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import { chmod, copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
@@ -7,7 +7,6 @@ import { existsSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
-import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { FileSessionCatalog } from "@sortedyuan/may/session/catalog";
@@ -112,7 +111,7 @@ test(
       page,
       "Change value.txt to exactly FIRST_VERSION followed by a newline. Create extra.txt containing exactly FIRST_EXTRA followed by a newline.",
     );
-    await until(() => existsSync(join(signals, "started")));
+    await until(t, () => existsSync(join(signals, "started")));
     assert.equal(app.isRunning, true);
     const finalizing = await host.snapshot();
     assert.equal(finalizing.commands.includes("session.fork"), false);
@@ -211,7 +210,7 @@ test(
         response.request().postDataJSON()?.name === "changes.restore.apply",
     );
     await page.locator(".workspace-dialog").getByRole("button", { name: "确认恢复文件", exact: true }).click();
-    await until(() => existsSync(join(signals, "started")));
+    await until(t, () => existsSync(join(signals, "started")));
     assert.equal(app.isRunning, true);
     await assert.rejects(() => app.newSession(), /active workspace operation/);
     await assert.rejects(() => app.resumeSession(originalId), /active workspace operation/);
@@ -330,12 +329,4 @@ test(
 async function submit(page, text) {
   await page.getByRole("textbox", { name: "消息输入", exact: true }).fill(text);
   await page.getByRole("button", { name: "发送消息", exact: true }).click();
-}
-
-async function until(condition) {
-  const deadline = Date.now() + 120_000;
-  while (!(await condition())) {
-    if (Date.now() >= deadline) assert.fail("真实工作区操作未在期限内完成。");
-    await delay(25);
-  }
 }

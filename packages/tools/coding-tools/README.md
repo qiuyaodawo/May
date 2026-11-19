@@ -282,7 +282,8 @@ when no cache was supplied. `toEnvironmentPath` and `toHostPath` map workspace
 paths; reverse mapping returns `undefined` outside the workspace.
 `spawn` accepts `stdin: "pipe"` for interactive stdio protocols; the default
 `"cancel"` reserves stdin for process cancellation. Both modes terminate the
-process group on cancellation. Close language-server managers before closing
+process group on cancellation. On macOS and Linux, host `close()` waits for
+each process group it terminated to disappear. Close language-server managers before closing
 their environment. LSP container images need server commands and runtimes,
 plus cached Go/Cargo dependencies and Rust sources. The environment sets
 cache-based `HOME`, `XDG_CACHE_HOME`, and `GOCACHE`, and uses

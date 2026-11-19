@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@sortedyuan/coordination": "workspace:*",
+    "@sortedyuan/test-support": "workspace:*",
     "@types/node": "^22.0.0",
     "@types/picomatch": "^4.0.2",
     "@types/which": "^3.0.4",

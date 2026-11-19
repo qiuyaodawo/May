@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { testOutputRoot } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 
 import { Scheduler } from "../../dist/index.js";
 import { SqliteSchedulerStore } from "../../dist/sqlite-store.js";
@@ -57,12 +56,4 @@ export function event(id, topic = "tasks") {
     occurredAt: new Date().toISOString(),
     payload: { label: id },
   };
-}
-
-export async function waitUntil(predicate, timeoutMs = 3_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (!(await predicate())) {
-    if (Date.now() >= deadline) throw new Error("The operation did not finish before the deadline.");
-    await delay(10);
-  }
 }

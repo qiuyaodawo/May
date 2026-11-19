@@ -79,6 +79,10 @@ configuration enables them.
 
 ## Continuous integration
 
+Set the overall deadline for asynchronous tests with the test runner's `timeout` option.
+Wait for a readiness event or use `until(t, probe)` from `@sortedyuan/test-support` to observe a state change.
+When testing a particular sequence of events, let the test release the waiting operation once it observes the prerequisite state.
+
 The [CI workflow](../../../.github/workflows/ci.yml) runs on pushes, pull requests,
 and manual dispatch from **Actions → CI → Run workflow**. It checks Linux with
 Node.js 22 and 24, and Windows and macOS with Node.js 24.

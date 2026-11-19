@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
-import { testOutputRoot } from "@sortedyuan/test-support";
+import { testOutputRoot, until } from "@sortedyuan/test-support";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { backup, DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
-import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { CoordinationRuntime } from "@sortedyuan/coordination";
 import { AgentGateway } from "../dist/gateway.js";
@@ -57,15 +56,6 @@ async function setup(t) {
   return { directory, settings, open, gateway: open() };
 }
 
-async function until(probe) {
-  for (let attempt = 0; attempt < 200; attempt++) {
-    const result = await probe();
-    if (result) return result;
-    await delay(20);
-  }
-  throw new Error("Gateway recovery condition timed out");
-}
-
 async function queued(gateway, agentId = "healthy", owner = operator) {
   const session = gateway.createSession(
     operator,
@@ -92,8 +82,8 @@ function agentStatus(gateway, id) {
   return gateway.status().agents.find((agent) => agent.id === id).status;
 }
 
-async function completed(gateway, taskId) {
-  const task = await until(() => {
+async function completed(t, gateway, taskId) {
+  const task = await until(t, () => {
     const task = gateway.store.get("tasks", taskId);
     return task && ["completed", "failed", "cancelled", "recovery-required"].includes(task.status) && task;
   });
@@ -101,7 +91,7 @@ async function completed(gateway, taskId) {
   assert.equal(task.result, createHash("sha256").update(content).digest("hex"));
 }
 
-test("撤销权限后的真实运行记录保留待核对状态，其他会话通过RPC进程恢复", async (t) => {
+test("撤销权限后的真实运行记录保留待核对状态，其他会话通过RPC进程恢复", { timeout: 60_000 }, async (t) => {
   const { gateway, directory, settings, open } = await setup(t);
   const session = gateway.createSession(operator, "运行中的成员工作", ["files"], [], entry);
   const receipt = await gateway.handle(JSON.stringify({ operation: "waitForFile", path: "pending.txt" }), actor, {
@@ -109,7 +99,7 @@ test("撤销权限后的真实运行记录保留待核对状态，其他会话�
     sessionId: session.id,
   });
   const taskId = receipt.taskIds[0];
-  await until(async () => {
+  await until(t, async () => {
     const task = gateway.store.get("tasks", taskId),
       binding = gateway.store.get("bindings", `${session.id}:files`);
     return (
@@ -136,11 +126,11 @@ test("撤销权限后的真实运行记录保留待核对状态，其他会话�
   assert.equal(blocked.status, "recovery-required");
   assert.match(blocked.detail, /权限已经撤销/);
   assert.equal(agentStatus(restarted, "files"), "unloaded");
-  await completed(restarted, healthy.taskId);
+  await completed(t, restarted, healthy.taskId);
 });
 
 for (const change of ["agent", "policy"])
-  test(`${change}配置版本变化只阻止所属任务图`, async (t) => {
+  test(`${change}配置版本变化只阻止所属任务图`, { timeout: 60_000 }, async (t) => {
     const { gateway, settings } = await setup(t);
     const blocked = await queued(gateway, "files");
     if (change === "agent") settings.agents[0].name = "updated files";
@@ -151,7 +141,7 @@ for (const change of ["agent", "policy"])
     assert.equal(task.status, "recovery-required");
     assert.match(task.detail, change === "agent" ? /Agent files.*版本/ : /访问配置版本/);
     assert.equal(agentStatus(gateway, "files"), "unloaded");
-    await completed(gateway, healthy.taskId);
+    await completed(t, gateway, healthy.taskId);
   });
 
 test("恢复遇到损坏的持久任务图时直接报告错误", async (t) => {
@@ -167,14 +157,14 @@ test("恢复遇到损坏的持久任务图时直接报告错误", async (t) => {
   );
 });
 
-test("恢复未创建的对话重新请求有效审批，原审批保持失效", async (t) => {
+test("恢复未创建的对话重新请求有效审批，原审批保持失效", { timeout: 60_000 }, async (t) => {
   const { gateway, directory, open } = await setup(t);
   const session = gateway.createSession(operator, "恢复创建审批", ["files"]);
   const receipt = await gateway.handle(`@healthy -- ${operation}`, operator, {
     requestId: "approval-restart",
     sessionId: session.id,
   });
-  const original = await until(() =>
+  const original = await until(t, () =>
     gateway.store.list("approvals").find((item) => item.sessionId === session.id && item.status === "pending"),
   );
   const snapshotDirectory = join(directory, "approval-restarted");
@@ -188,11 +178,11 @@ test("恢复未创建的对话重新请求有效审批，原审批保持失效",
   await gateway.close();
   const restarted = open(snapshotDirectory);
   await restarted.restore();
-  const current = await until(() =>
+  const current = await until(t, () =>
     restarted.store.list("approvals").find((item) => item.sessionId === session.id && item.status === "pending"),
   );
   assert.notEqual(current.id, original.id);
   await assert.rejects(restarted.resolveApproval(original.id, operator, "allow"), /已经处理/);
   await restarted.resolveApproval(current.id, operator, "allow");
-  await completed(restarted, receipt.taskIds[0]);
+  await completed(t, restarted, receipt.taskIds[0]);
 });

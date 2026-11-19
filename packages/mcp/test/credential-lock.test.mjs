@@ -136,7 +136,7 @@ test("credential work errors release both locks and preserve the original error"
   assert.equal(await store.exclusive(key, async () => 42), 42);
 });
 
-test("credential guard acquisition times out without entering work", { timeout: 15_000 }, async (t) => {
+test("credential guard acquisition times out without entering work", { timeout: 60_000 }, async (t) => {
   const { store, start } = await setup(t);
   const holder = start("hold");
   await holder.first;

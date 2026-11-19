@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { testOutputRoot } from "@sortedyuan/test-support";
+import { testOutputRoot, until } from "@sortedyuan/test-support";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -44,15 +44,7 @@ async function fixture(t) {
   return { directory, gateway, configPath, agent };
 }
 
-async function until(probe) {
-  for (let attempt = 0; attempt < 200; attempt++) {
-    if (await probe()) return;
-    await delay(10);
-  }
-  throw new Error("Condition timed out");
-}
-
-test("Agent configuration waits for real execution and prevents new admission", async (t) => {
+test("Agent configuration waits for real execution and prevents new admission", { timeout: 60_000 }, async (t) => {
   const { gateway, directory, agent, configPath } = await fixture(t);
   const session = gateway.createSession(operator, "执行期间更新", ["files"]);
   const receipt = await gateway.handle(JSON.stringify({ operation: "waitForFile", path: "ready.txt" }), operator, {
@@ -60,10 +52,11 @@ test("Agent configuration waits for real execution and prevents new admission", 
     sessionId: session.id,
   });
   const taskId = receipt.taskIds[0];
-  await until(() => gateway.store.get("tasks", taskId)?.status === "running");
+  await until(t, () => gateway.store.get("tasks", taskId)?.status === "running");
   const binding = gateway.store.get("bindings", `${session.id}:files`);
   const adapter = await gateway.adapter("files");
   await until(
+    t,
     async () =>
       (await adapter.inspect(binding.conversationId, gateway.store.get("tasks", taskId).inputId)).status === "running",
   );
@@ -242,14 +235,14 @@ test("all idle conversations release their shared process and preserve conversat
   assert.equal((await reopened.inspectCreation(secondBinding.requestId)).conversationId, secondBinding.conversationId);
 });
 
-test("an active conversation retains the shared process through idle maintenance", async (t) => {
+test("an active conversation retains the shared process through idle maintenance", { timeout: 60_000 }, async (t) => {
   const { gateway, directory } = await fixture(t);
   const session = gateway.createSession(operator, "活动资源", ["files"]);
   const receipt = await gateway.handle(JSON.stringify({ operation: "waitForFile", path: "pending.txt" }), operator, {
     requestId: "pending",
     sessionId: session.id,
   });
-  await until(() => gateway.store.get("tasks", receipt.taskIds[0])?.status === "running");
+  await until(t, () => gateway.store.get("tasks", receipt.taskIds[0])?.status === "running");
   const adapter = await gateway.adapter("files"),
     binding = gateway.store.get("bindings", `${session.id}:files`);
   const { pid } = JSON.parse(await adapter.command(binding.conversationId, "process", []));
@@ -257,10 +250,10 @@ test("an active conversation retains the shared process through idle maintenance
   await gateway.maintain();
   assert.equal(process.kill(pid, 0), true);
   await writeFile(join(directory, "pending.txt"), "finished");
-  await until(() => gateway.store.get("tasks", receipt.taskIds[0])?.status === "completed");
+  await until(t, () => gateway.store.get("tasks", receipt.taskIds[0])?.status === "completed");
 });
 
-test("concurrent shutdown shares completion and cancels execution before waiting for configuration", async (t) => {
+test("shutdown cancels execution before waiting for configuration", { timeout: 60_000 }, async (t) => {
   const { gateway, agent, directory } = await fixture(t);
   gateway.options.settings.shutdownMs = 20;
   const session = gateway.createSession(operator, "关闭期间更新", ["files"]);
@@ -269,10 +262,11 @@ test("concurrent shutdown shares completion and cancels execution before waiting
     sessionId: session.id,
   });
   const taskId = receipt.taskIds[0];
-  await until(() => gateway.store.get("tasks", taskId)?.status === "running");
+  await until(t, () => gateway.store.get("tasks", taskId)?.status === "running");
   const binding = gateway.store.get("bindings", `${session.id}:files`),
     adapter = await gateway.adapter("files");
   await until(
+    t,
     async () =>
       (await adapter.inspect(binding.conversationId, gateway.store.get("tasks", taskId).inputId)).status === "running",
   );

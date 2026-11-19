@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { until } from "@sortedyuan/test-support";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, access } from "node:fs/promises";
@@ -178,7 +179,7 @@ test("preflight rejects malformed input and unavailable environment capabilities
     await rm(context.directory, { recursive: true, force: true });
   }
 });
-test("run budget duration and cancellation stop real executions", async () => {
+test("run budget duration and cancellation stop real executions", { timeout: 60_000 }, async (t) => {
   const limited = await setup("budget-time");
   limited.experiment.variants[0].execution.options = { mode: "hang" };
   limited.experiment.cases[0].limits.runBudget = { maxDurationMs: 700 };
@@ -192,7 +193,7 @@ test("run budget duration and cancellation stop real executions", async () => {
     assert.equal(report.trials[0].executionStatus, "limited");
     assert.ok(report.trials[0].metrics.durationMs.value < 3_000);
     running = runner.run(cancelled.experiment);
-    await waitFor(async () => {
+    await until(t, async () => {
       const state = await cancelled.store.readTrial("cancelled", "trial-1");
       if (state?.endedAt !== undefined)
         throw new Error(`Execution ended before cancellation: ${JSON.stringify(state)}`);
@@ -288,7 +289,7 @@ test("human review revisions and evaluator reruns preserve previous evidence", a
     await rm(context.directory, { recursive: true, force: true });
   }
 });
-test("resume preserves an interrupted execution until its host confirms termination", async () => {
+test("resume waits for host confirmation of interrupted execution termination", { timeout: 60_000 }, async (t) => {
   const context = await setup("interrupted");
   context.experiment.variants[0].execution.options = { mode: "hang" };
   context.experiment.cases[0].evaluators = [{ id: "files", version: "1", required: true }];
@@ -311,7 +312,7 @@ test("resume preserves an interrupted execution until its host confirms terminat
   let processId;
   let environmentId;
   try {
-    await waitFor(async () => {
+    await until(t, async () => {
       const state = await context.store.readTrial("interrupted", "trial-1");
       if (state?.endedAt !== undefined)
         throw new Error(`Execution ended before interruption: ${JSON.stringify(state)}`);
@@ -366,11 +367,3 @@ test("comparison validates source contents and applies only explicit regression 
     await rm(different.directory, { recursive: true, force: true });
   }
 });
-async function waitFor(condition) {
-  const deadline = Date.now() + 10_000;
-  while (Date.now() < deadline) {
-    if (await condition()) return;
-    await new Promise((resolvePromise) => setTimeout(resolvePromise, 25));
-  }
-  throw new Error("Timed out waiting for the real process");
-}

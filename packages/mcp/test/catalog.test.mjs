@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { until } from "@sortedyuan/test-support";
 import { openMcpClientPool } from "../dist/index.js";
 import { startCatalogFixture } from "./fixtures/catalog-server.mjs";
 
@@ -11,17 +12,10 @@ const context = (signal = new AbortController().signal) => ({
   idempotencyKey: "run:call",
   report() {},
 });
-const until = async (condition) => {
-  const deadline = Date.now() + 2500;
-  while (!condition()) {
-    if (Date.now() > deadline) assert.fail("condition timed out");
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
-};
 
 test(
   "catalogs paginate, refresh and reconnect without replacing running tool snapshots or replaying calls",
-  { timeout: 12_000 },
+  { timeout: 60_000 },
   async (t) => {
     const fixture = await startCatalogFixture(t);
     fixture.state.available = false;
@@ -91,11 +85,11 @@ test(
     // Alter annotation back to force a definition revision on both eras.
     fixture.state.version = 1;
     fixture.notify();
-    await until(() => pool.catalog()[0].revision === 3 && !pool.status().some((s) => s.catalogStale));
+    await until(t, () => pool.catalog()[0].revision === 3 && !pool.status().some((s) => s.catalogStale));
     assert.ok(events.some((e) => e.type === "mcp.server.catalog-updated"));
     const abort = new AbortController();
     const pending = pool.tools[0].execute({ hold: true }, context(abort.signal));
-    await until(() => calls() === 2);
+    await until(t, () => calls() === 2);
     await assert.rejects(pool.reconnect("modern"), (e) => e.code === "MCP_CATALOG_ERROR");
     abort.abort();
     await assert.rejects(pending);
@@ -114,7 +108,7 @@ test(
     fixture.state.holdList = true;
     const beforeList = fixture.requests.length;
     const refresh = assert.rejects(pool.refresh("modern"));
-    await until(() => fixture.requests.length > beforeList);
+    await until(t, () => fixture.requests.length > beforeList);
     await pool.close();
     await refresh;
     await eventTask;

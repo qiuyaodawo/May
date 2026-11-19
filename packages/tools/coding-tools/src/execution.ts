@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep, posix, join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { omitUndefined } from "@sortedyuan/may/core";
 import { CodingToolError } from "./errors.js";
 import { resolveExistingWorkspacePath } from "./workspace-path.js";
@@ -254,15 +255,8 @@ export async function openCodingExecutionEnvironment(options: {
             terminations.add(termination);
           } else child.stdin?.end("cancel\n");
         } else if (child.pid !== undefined) {
-          const killer =
-            process.platform === "win32"
-              ? spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" })
-              : spawn("kill", ["-KILL", "--", `-${child.pid}`], { stdio: "ignore" });
-          const termination = new Promise<void>((resolveStop) => {
-            killer.once("error", (error) => {
-              terminationFailure = error;
-            });
-            killer.once("close", () => resolveStop());
+          const termination = terminateHostProcess(child.pid).catch((error: unknown) => {
+            terminationFailure = error;
           });
           stopping.push(termination);
           terminations.add(termination);
@@ -322,6 +316,26 @@ export async function openCodingExecutionEnvironment(options: {
   }
   options.signal?.removeEventListener("abort", abort);
   return environment;
+}
+
+async function terminateHostProcess(pid: number): Promise<void> {
+  if (process.platform === "win32") {
+    const killer = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
+    await new Promise<void>((resolveStop, rejectStop) => {
+      killer.once("error", rejectStop);
+      killer.once("close", () => resolveStop());
+    });
+    return;
+  }
+  try {
+    process.kill(-pid, "SIGKILL");
+    for (;;) {
+      process.kill(-pid, 0);
+      await delay(10);
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+  }
 }
 
 async function docker(args: readonly string[], timeout?: number): Promise<void> {

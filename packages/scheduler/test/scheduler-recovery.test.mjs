@@ -6,11 +6,43 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { until } from "@sortedyuan/test-support";
 
 import { Scheduler } from "../dist/index.js";
 import { SqliteSchedulerStore } from "../dist/sqlite-store.js";
 import { DurableTaskHost, HttpTaskDispatcher } from "./fixtures/durable-host.mjs";
-import { directory, event, job, setup, waitUntil } from "./fixtures/scheduler-setup.mjs";
+import { directory, event, job, setup } from "./fixtures/scheduler-setup.mjs";
+
+function forkScheduler(t, fixture, args) {
+  const child = fork(fileURLToPath(new URL(`./fixtures/${fixture}`, import.meta.url)), args, {
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
+  });
+  let output = "";
+  child.stdout.on("data", (chunk) => {
+    output += chunk;
+  });
+  child.stderr.on("data", (chunk) => {
+    output += chunk;
+  });
+  const exit = once(child, "close");
+  t.after(() => {
+    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+  });
+  return { child, exit, output: () => output };
+}
+
+async function acceptedBeforeExit(host, scheduler) {
+  const result = await Promise.race([
+    once(host, "accepted").then(([receipt]) => ({ receipt })),
+    scheduler.exit.then(([code, signal]) => ({ code, signal })),
+  ]);
+  if (result.receipt === undefined) {
+    assert.fail(
+      `The scheduler process exited (${result.code ?? result.signal}) before the host accepted a task:\n${scheduler.output()}`,
+    );
+  }
+  return result.receipt;
+}
 
 function acknowledgementTimeout(t, host) {
   const controller = new AbortController();
@@ -39,38 +71,24 @@ test("one scheduler storage rejects simultaneous owners and releases ownership o
   await second.close();
 });
 
-test("pending records survive a real scheduler process interruption", async (t) => {
+test("pending records survive a real scheduler process interruption", { timeout: 60_000 }, async (t) => {
   const path = await directory("pending-recovery");
-  const host = await DurableTaskHost.open(join(path, "host"), { acknowledgementDelayMs: 1_000 });
+  const host = await DurableTaskHost.open(join(path, "host"), { holdAcknowledgements: true });
   const endpoint = await host.listen();
   t.after(() => host.close());
   const databasePath = join(path, "scheduler.sqlite");
-  const accepted = once(host, "accepted", { signal: AbortSignal.timeout(5_000) });
-  const child = fork(
-    fileURLToPath(new URL("./fixtures/crash-scheduler.mjs", import.meta.url)),
-    [databasePath, endpoint, "pending"],
-    {
-      stdio: ["ignore", "pipe", "pipe", "ipc"],
-    },
-  );
-  let errors = "";
-  child.stderr.on("data", (chunk) => {
-    errors += chunk;
-  });
-  const exit = once(child, "exit");
-  t.after(() => {
-    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
-  });
-  await accepted;
-  child.kill("SIGKILL");
-  await exit;
+  const crashing = forkScheduler(t, "crash-scheduler.mjs", [databasePath, endpoint, "pending"]);
+  await acceptedBeforeExit(host, crashing);
+  crashing.child.kill("SIGKILL");
+  await crashing.exit;
+  host.releaseAcknowledgements();
   const scheduler = await Scheduler.open({
     store: await SqliteSchedulerStore.open(databasePath),
     dispatcher: host,
   });
   t.after(() => scheduler.close());
   const pending = (await scheduler.listExecutions()).records.find((record) => record.status === "pending");
-  assert.ok(pending, errors);
+  assert.ok(pending, crashing.output());
   assert.equal(pending.status, "pending");
   assert.equal((await scheduler.tick()).submitted, 2);
   assert.equal(host.tasks().length, 2);
@@ -80,27 +98,17 @@ test("pending records survive a real scheduler process interruption", async (t) 
   );
 });
 
-test("a process interruption after host acceptance recovers with the identical executionId", async (t) => {
+test("recovery reuses the executionId after host acceptance", { timeout: 60_000 }, async (t) => {
   const path = await directory("dispatch-recovery");
-  const host = await DurableTaskHost.open(join(path, "host"), { acknowledgementDelayMs: 1_000 });
+  const host = await DurableTaskHost.open(join(path, "host"), { holdAcknowledgements: true });
   const endpoint = await host.listen();
   t.after(() => host.close());
   const databasePath = join(path, "scheduler.sqlite");
-  const accepted = once(host, "accepted", { signal: AbortSignal.timeout(5_000) });
-  const child = fork(
-    fileURLToPath(new URL("./fixtures/crash-scheduler.mjs", import.meta.url)),
-    [databasePath, endpoint],
-    {
-      stdio: ["ignore", "pipe", "pipe", "ipc"],
-    },
-  );
-  const exit = once(child, "exit");
-  t.after(() => {
-    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
-  });
-  const [receipt] = await accepted;
-  child.kill("SIGKILL");
-  await exit;
+  const crashing = forkScheduler(t, "crash-scheduler.mjs", [databasePath, endpoint]);
+  const receipt = await acceptedBeforeExit(host, crashing);
+  crashing.child.kill("SIGKILL");
+  await crashing.exit;
+  host.releaseAcknowledgements();
   const scheduler = await Scheduler.open({
     store: await SqliteSchedulerStore.open(databasePath),
     dispatcher: new HttpTaskDispatcher(endpoint),
@@ -162,7 +170,7 @@ test(
   { timeout: 10_000 },
   async (t) => {
     const path = await directory("http-timeout");
-    const host = await DurableTaskHost.open(join(path, "host"), { acknowledgementDelayMs: 150 });
+    const host = await DurableTaskHost.open(join(path, "host"), { holdAcknowledgements: true });
     const endpoint = await host.listen();
     t.after(() => host.close());
     const databasePath = join(path, "scheduler.sqlite");
@@ -174,6 +182,7 @@ test(
     await scheduler.createJob(job("timeout-task", { type: "event", topic: "tasks" }));
     const input = event("timeout-event");
     await assert.rejects(scheduler.publish(input), { name: "TimeoutError" });
+    host.releaseAcknowledgements();
     const [uncertain] = (await scheduler.listExecutions()).records;
     assert.equal(uncertain.status, "dispatching");
     assert.equal(host.tasks().length, 1);
@@ -192,22 +201,22 @@ test(
   },
 );
 
-test("a real storage failure stops the timer and reports the error to the host", async (t) => {
+test("a real storage failure stops the timer and reports the error to the host", { timeout: 60_000 }, async (t) => {
   const reported = [];
   const { scheduler, host, store } = await setup(t, "storage-failure", {
     onError(error) {
       reported.push(error);
     },
   });
+  await scheduler.start();
   await scheduler.createJob(
     job("storage-failure", {
       type: "at",
       time: new Date(Date.now() + 80).toISOString(),
     }),
   );
-  await scheduler.start();
   store.close();
-  await waitUntil(() => reported.length > 0);
+  await until(t, () => reported.length > 0);
   assert.equal(reported.length, 1);
   assert.match(reported[0].message, /closed/u);
   await assert.rejects(async () => scheduler.start(), /closed/u);
@@ -222,7 +231,7 @@ test(
   { timeout: 10_000 },
   async (t) => {
     const path = await directory("service-transport-error");
-    const host = await DurableTaskHost.open(join(path, "host"), { acknowledgementDelayMs: 150 });
+    const host = await DurableTaskHost.open(join(path, "host"), { holdAcknowledgements: true });
     const endpoint = await host.listen();
     t.after(() => host.close());
     const reported = [];
@@ -241,6 +250,7 @@ test(
     );
     await scheduler.start();
     await assert.rejects(scheduler.publish(event("service-timeout")), { name: "TimeoutError" });
+    host.releaseAcknowledgements();
     assert.equal(reported.length, 1);
     assert.equal(reported[0].name, "TimeoutError");
     const acceptedId = host.tasks()[0].execution_id;
@@ -260,12 +270,12 @@ test(
   },
 );
 
-test("an error callback can immediately restart the scheduler and resume its real timers", async (t) => {
+test("an error callback restarts the scheduler and resumes its timers", { timeout: 60_000 }, async (t) => {
   const path = await directory("callback-restart");
-  const host = await DurableTaskHost.open(join(path, "host"), { acknowledgementDelayMs: 150 });
+  const host = await DurableTaskHost.open(join(path, "host"), { holdAcknowledgements: true });
   const endpoint = await host.listen();
   t.after(() => host.close());
-  const dispatcher = new HttpTaskDispatcher(endpoint, { timeoutMs: 40 });
+  const dispatcher = new HttpTaskDispatcher(endpoint, { signal: acknowledgementTimeout(t, host) });
   const reported = [];
   let restarting;
   const scheduler = await Scheduler.open({
@@ -273,22 +283,23 @@ test("an error callback can immediately restart the scheduler and resume its rea
     dispatcher,
     onError(error) {
       reported.push(error);
-      dispatcher.timeoutMs = undefined;
+      host.releaseAcknowledgements();
+      dispatcher.signal = undefined;
       restarting = scheduler.start();
     },
   });
   t.after(() => scheduler.close());
-  const startedAt = Date.now();
-  const recoveringAt = new Date(startedAt + 80).toISOString();
-  const followingAt = new Date(startedAt + 250).toISOString();
-  await scheduler.createJob(job("timer-recovery", { type: "at", time: recoveringAt }));
-  await scheduler.createJob(job("timer-after-restart", { type: "at", time: followingAt }));
   await scheduler.start();
-  await waitUntil(async () => {
+  const recoveringAt = new Date().toISOString();
+  await scheduler.createJob(job("timer-recovery", { type: "at", time: recoveringAt }));
+  await until(t, () => restarting !== undefined);
+  await restarting;
+  const followingAt = new Date().toISOString();
+  await scheduler.createJob(job("timer-after-restart", { type: "at", time: followingAt }));
+  await until(t, async () => {
     const records = (await scheduler.listExecutions()).records;
     return records.length === 2 && records.every((record) => record.status === "submitted");
   });
-  await restarting;
   assert.equal(reported.length, 1);
   assert.equal(reported[0].name, "TimeoutError");
   const records = (await scheduler.listExecutions()).records;
@@ -304,41 +315,25 @@ test("an error callback can immediately restart the scheduler and resume its rea
   await scheduler.stop();
 });
 
-test("a real error-report write failure terminates the child and preserves recoverable dispatching", async (t) => {
+test("a failed error report terminates the child and allows recovery", { timeout: 60_000 }, async (t) => {
   const path = await directory("error-handler-termination");
-  const host = await DurableTaskHost.open(join(path, "host"), { acknowledgementDelayMs: 150 });
+  const host = await DurableTaskHost.open(join(path, "host"), { holdAcknowledgements: true });
   const endpoint = await host.listen();
   t.after(() => host.close());
   const databasePath = join(path, "scheduler.sqlite");
   const reportPath = join(path, "unwritable-report.json");
   await mkdir(reportPath);
-  const accepted = once(host, "accepted", { signal: AbortSignal.timeout(5_000) });
-  const child = fork(
-    fileURLToPath(new URL("./fixtures/failing-error-handler.mjs", import.meta.url)),
-    [databasePath, endpoint, reportPath],
-    {
-      stdio: ["ignore", "pipe", "pipe", "ipc"],
-    },
-  );
-  let stdout = "";
-  let stderr = "";
-  child.stdout.on("data", (chunk) => {
-    stdout += chunk;
-  });
-  child.stderr.on("data", (chunk) => {
-    stderr += chunk;
-  });
-  const exit = once(child, "exit", { signal: AbortSignal.timeout(5_000) });
-  t.after(() => {
-    if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
-  });
-  const [receipt] = await accepted;
-  const [exitCode, signal] = await exit;
-  assert.equal(signal, null, stderr);
-  assert.ok(exitCode > 0, stderr);
-  assert.match(stderr, /(?:EISDIR|EPERM|EACCES)/u);
-  assert.match(stderr, /unwritable-report\.json/u);
-  assert.match(stderr, /failing-error-handler\.mjs/u);
+  const failing = forkScheduler(t, "failing-error-handler.mjs", [databasePath, endpoint, reportPath]);
+  const receipt = await acceptedBeforeExit(host, failing);
+  host.closeConnections();
+  const [exitCode, signal] = await failing.exit;
+  host.releaseAcknowledgements();
+  const output = failing.output();
+  assert.equal(signal, null, output);
+  assert.ok(exitCode > 0, output);
+  assert.match(output, /(?:EISDIR|EPERM|EACCES)/u);
+  assert.match(output, /unwritable-report\.json/u);
+  assert.match(output, /failing-error-handler\.mjs/u);
   const scheduler = Scheduler.open({
     store: SqliteSchedulerStore.open(databasePath),
     dispatcher: new HttpTaskDispatcher(endpoint),
@@ -359,8 +354,7 @@ test("a real error-report write failure terminates the child and preserves recov
       {
         exitCode,
         signal,
-        stdout,
-        stderr,
+        output,
         interrupted,
         recovered,
         taskArtifactPath: receipt.artifactPath,

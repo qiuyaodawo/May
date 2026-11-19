@@ -138,7 +138,7 @@ const streamOptions = () => ({ signal: new AbortController().signal });
 
 test("通过本地HTTP catalog发现能力并验证缓存数量、并发请求和刷新", async (t) => {
   const service = await startService(t);
-  const resolver = createModelCapabilityResolver({ maxCacheEntries: 1, cacheTtlMs: 40 });
+  const resolver = createModelCapabilityResolver({ maxCacheEntries: 1, cacheTtlMs: 60_000 });
   const selected = selection(service.baseURL);
   const first = await Promise.all([resolver.resolve(selected), resolver.resolve(selected)]);
   assert.equal(service.state.catalogs, 1);
@@ -155,14 +155,11 @@ test("通过本地HTTP catalog发现能力并验证缓存数量、并发请求�
   await resolver.resolve({ ...selected, model: "another-model" });
   await resolver.resolve(selected);
   assert.equal(service.state.catalogs, 4);
-  await delay(50);
-  await resolver.resolve(selected);
-  assert.equal(service.state.catalogs, 5);
   await resolver.resolve({
     ...selected,
     providerConfig: { ...selected.providerConfig, apiKey: "rotated-service-credential" },
   });
-  assert.equal(service.state.catalogs, 6);
+  assert.equal(service.state.catalogs, 5);
   resolver.invalidate(selected);
   service.state.catalogStatus = 503;
   const failed = await resolver.resolve(selected);
@@ -171,6 +168,16 @@ test("通过本地HTTP catalog发现能力并验证缓存数量、并发请求�
   assert.ok(!JSON.stringify(failed).includes("local-service-credential"));
   service.state.catalogStatus = 200;
   assert.equal((await resolver.resolve(selected)).reasoningEffort.status, "known");
+});
+
+test("缓存过期后重新请求本地 HTTP catalog", async (t) => {
+  const service = await startService(t);
+  const resolver = createModelCapabilityResolver({ cacheTtlMs: 1 });
+  const selected = selection(service.baseURL);
+  await resolver.resolve(selected);
+  await delay(10);
+  await resolver.resolve(selected);
+  assert.equal(service.state.catalogs, 2);
 });
 
 test("计算模型、adapter和连接声明的有效范围并在发送前拒绝请求", async (t) => {

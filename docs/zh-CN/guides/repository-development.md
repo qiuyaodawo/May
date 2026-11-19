@@ -68,6 +68,10 @@ Web 服务资源在使用时加载。
 
 ## 持续集成
 
+使用测试的 `timeout` 选项设置异步测试的总时限。等待服务就绪时监听相应的事件，
+等待状态变化时可以使用 `@sortedyuan/test-support` 提供的 `until(t, probe)`。
+测试特定的事件顺序时，由测试观察前一个操作的状态，满足条件后再允许下一个操作继续。
+
 [CI 工作流](../../../.github/workflows/ci.yml) 在推送和 PR 时运行，也支持通过
 **Actions → CI → Run workflow** 手动启动。检查环境包括 Linux 的 Node.js 22 和
 24，以及 Windows、macOS 的 Node.js 24。

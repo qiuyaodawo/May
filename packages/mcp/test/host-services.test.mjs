@@ -3,7 +3,7 @@ import test from "node:test";
 import { realpath } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { createTestDirectory } from "@sortedyuan/test-support";
+import { createTestDirectory, until } from "@sortedyuan/test-support";
 import {
   McpInteractionBroker,
   openMcpClientPool,
@@ -14,6 +14,23 @@ import { startCatalogFixture } from "./fixtures/catalog-server.mjs";
 import { startLegacyHostHttp } from "./fixtures/legacy-host-http.mjs";
 
 const formAnswer = { action: "accept", content: { value: "reviewed" } };
+function waitForExit(t, pid) {
+  return until(
+    t,
+    () => processExited(pid),
+    () => `Waiting for process ${pid} to exit`,
+  );
+}
+
+function processExited(pid) {
+  try {
+    process.kill(pid, 0);
+    return false;
+  } catch (error) {
+    if (error.code === "ESRCH") return true;
+    throw error;
+  }
+}
 const context = (workspaceId, sessionId, signal = new AbortController().signal) => ({
   scope: { workspaceId, sessionId },
   runId: `run-${sessionId}`,
@@ -256,7 +273,7 @@ test("sampling tool proposals are never executed; history/media and provider bud
 
 test(
   "isolated legacy stdio/HTTP requests own exactly one operation, reject unsolicited access and clean up",
-  { timeout: 20_000 },
+  { timeout: 60_000 },
   async (t) => {
     const path = await directory(t);
     const http = await startLegacyHostHttp(t);
@@ -303,7 +320,7 @@ test(
       assert.equal(samples, 1);
       assert.deepEqual(result.startup[0], { roots: [] });
       assert.ok(result.startup[1].error);
-      if (transport === "stdio") assert.throws(() => process.kill(result.pid, 0));
+      if (transport === "stdio") await waitForExit(t, result.pid);
       const abort = new AbortController();
       const first = invoke("B", { mode: "form", label: "B" }, abort.signal);
       void first.catch(() => {});
@@ -317,7 +334,7 @@ test(
       broker.respond(c.id, c.owner, formAnswer);
       const cResult = JSON.parse((await second).content[0].text);
       assert.equal(cResult.input.content.value, "reviewed");
-      if (transport === "stdio") assert.throws(() => process.kill(cResult.pid, 0));
+      if (transport === "stdio") await waitForExit(t, cResult.pid);
       const read = pool.readResource("legacy", "test:///value", {
         owner: { workspaceId: path, sessionId: "resource" },
       });

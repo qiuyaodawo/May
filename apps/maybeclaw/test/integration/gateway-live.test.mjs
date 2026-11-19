@@ -1,10 +1,9 @@
 import assert from "node:assert/strict";
-import { selectLiveModelProfile, testOutputRoot } from "@sortedyuan/test-support";
+import { selectLiveModelProfile, testOutputRoot, until } from "@sortedyuan/test-support";
 import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { loadMayConfig } from "@sortedyuan/may/config";
 import { AgentGateway } from "../../dist/gateway.js";
@@ -18,7 +17,7 @@ test(
   {
     timeout: 240_000,
   },
-  async () => {
+  async (t) => {
     const config = await loadMayConfig();
     await mkdir(base, { recursive: true });
     const directory = await mkdtemp(join(base, "case-"));
@@ -41,18 +40,14 @@ test(
     };
     let gateway = new AgentGateway({ directory, configPath: config.path, settings });
     let verified = false;
-    async function until(check) {
-      const deadline = Date.now() + 130000;
-      while (Date.now() < deadline) {
+    function waitForGateway(check) {
+      return until(t, async () => {
         await gateway.maintain();
-        const result = check();
-        if (result) return result;
-        await delay(100);
-      }
-      throw new Error("Timed out waiting for Gateway state");
+        return check();
+      });
     }
     async function finish(receipt) {
-      const tasks = await until(() => {
+      const tasks = await waitForGateway(() => {
         const values = receipt.taskIds.map((id) => gateway.store.get("tasks", id));
         return (
           values.every(
@@ -64,7 +59,7 @@ test(
       return tasks;
     }
     const approvalFor = (receipt) =>
-      until(() =>
+      waitForGateway(() =>
         gateway.store
           .list("approvals")
           .find((item) => receipt.taskIds.includes(item.taskId) && item.status === "pending"),
@@ -124,7 +119,7 @@ test(
         actor,
         { requestId: "creation-approval", sessionId: approvedSession.id },
       );
-      const creationApproval = await until(() =>
+      const creationApproval = await waitForGateway(() =>
         gateway.store
           .list("approvals")
           .find(

@@ -14,7 +14,7 @@ import { createRemoteAgent } from "../dist/remote-worker.js";
 
 test(
   "independent HTTP worker preserves trace parents and rejects invalid correlation without new execution",
-  { timeout: 15_000 },
+  { timeout: 60_000 },
   async (t) => {
     await mkdir(join(testOutputRoot, "coordination"), { recursive: true });
     const directory = await mkdtemp(join(testOutputRoot, "coordination", "remote-correlation-"));
@@ -72,7 +72,7 @@ test(
         await rm(directory, { recursive: true, force: true });
       }
     });
-    const [ready] = await once(child, "message", { signal: AbortSignal.timeout(5_000) });
+    const [ready] = await once(child, "message", { signal: t.signal });
     assert.equal(ready.type, "ready");
     const url = `http://127.0.0.1:${ready.port}`;
     const remote = createRemoteAgent({
@@ -81,7 +81,6 @@ test(
       agent: "worker",
       version: "v1",
       pollIntervalMs: 10,
-      requestTimeoutMs: 2_000,
     });
     const diagnostics = new DiagnosticsStore();
     const tracer = new BasicTracer({ processor: diagnostics, observer: diagnostics });
@@ -102,7 +101,7 @@ test(
       .getDiagnostics({ taskId: "remote-task" })
       .spans.find((span) => span.name === "may.coordination.dispatch");
     child.send("diagnostics");
-    const [message] = await once(child, "message", { signal: AbortSignal.timeout(2_000) });
+    const [message] = await once(child, "message", { signal: t.signal });
     assert.equal(message.type, "diagnostics");
     const run = message.value.spans.find((span) => span.name === "may.run");
     assert.equal(run.parentSpanId, dispatch.context.spanId);

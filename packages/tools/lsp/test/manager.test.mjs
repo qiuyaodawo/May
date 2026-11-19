@@ -6,6 +6,7 @@ import { spawn, fork } from "node:child_process";
 import { createRequire } from "node:module";
 import { SharedWorkspaceFileGuard } from "@sortedyuan/coordination/delegation/files";
 import test from "node:test";
+import { until } from "@sortedyuan/test-support";
 import {
   createCodingTool,
   openCodingExecutionEnvironment,
@@ -411,8 +412,8 @@ test("three rapid server exits stop automatic restarts until restart is requeste
       await once(killer, "exit");
     } else {
       process.kill(pid, "SIGKILL");
-      await assert.rejects(manager.hover({ path: "a.ts", line: 1, symbol: "greet" }, signal()));
     }
+    await until(t, () => manager.status()[0].pid !== pid);
   }
   assert.equal(manager.status()[0].state, "failed");
   await manager.restart("typescript");

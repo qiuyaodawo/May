@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
 import { mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
-import { setTimeout } from "node:timers/promises";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import test from "node:test";
-import { createTestDirectory, testOutputRoot } from "@sortedyuan/test-support";
+import { createTestDirectory, testOutputRoot, until } from "@sortedyuan/test-support";
 import { parseMaybeCodeArgs } from "../dist/args.js";
 import { runMaybeCodeTeamCommand } from "../dist/team.js";
 
@@ -217,7 +216,7 @@ test("configured coding team checks exact edits, separates acceptance, and appli
   assert.equal(await runMaybeCodeTeamCommand(apply, control), 0, "an acknowledged application is not replayed");
 });
 
-test("host verification consumes terminal cancellation and requires explicit unknown-effect reconciliation", async (t) => {
+test("cancelled host verification requires explicit reconciliation", { timeout: 60_000 }, async (t) => {
   const f = await fixture(t),
     planPath = join(f.directory, "plan.json");
   await writeFile(
@@ -271,12 +270,9 @@ test("host verification consumes terminal cancellation and requires explicit unk
     base = { type: "team", value: id, dataDirectory: f.dataDirectory },
     directory = join(f.dataDirectory, "teams", id);
   const verifying = runMaybeCodeTeamCommand({ ...base, action: "verify" }, dep);
-  // Observe durable pending evidence rather than guessing when the child process starts.
-  for (let i = 0; i < 100; i++) {
-    if ((await readFile(join(directory, "verification", "verification.jsonl"), "utf8")).includes('"status":"pending"'))
-      break;
-    await setTimeout(10);
-  }
+  await until(t, async () =>
+    (await readFile(join(directory, "verification", "verification.jsonl"), "utf8")).includes('"status":"pending"'),
+  );
   await runMaybeCodeTeamCommand({ ...base, action: "cancel" }, dep);
   assert.equal(await verifying, 1);
   f.clear();

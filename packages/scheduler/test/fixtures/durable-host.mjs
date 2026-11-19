@@ -10,10 +10,11 @@ import { isDeepStrictEqual } from "node:util";
 import { TaskRejectedError } from "../../dist/index.js";
 
 export class DurableTaskHost extends EventEmitter {
-  constructor(directory, acknowledgementDelayMs = 0) {
+  constructor(directory, acknowledgementDelayMs = 0, holdAcknowledgements = false) {
     super();
     this.directory = directory;
     this.acknowledgementDelayMs = acknowledgementDelayMs;
+    this.acknowledgements = holdAcknowledgements ? Promise.withResolvers() : undefined;
     this.activeSubmissions = 0;
     this.maxActiveSubmissions = 0;
     this.database = new DatabaseSync(join(directory, "tasks.sqlite"));
@@ -29,9 +30,22 @@ export class DurableTaskHost extends EventEmitter {
     `);
   }
 
-  static async open(directory, { acknowledgementDelayMs = 0 } = {}) {
+  /**
+   * `holdAcknowledgements` keeps every accepted task unacknowledged until `releaseAcknowledgements()`,
+   * so a test controls the "accepted but not acknowledged" state without depending on elapsed time.
+   */
+  static async open(directory, { acknowledgementDelayMs = 0, holdAcknowledgements = false } = {}) {
     await mkdir(directory, { recursive: true });
-    return new DurableTaskHost(directory, acknowledgementDelayMs);
+    return new DurableTaskHost(directory, acknowledgementDelayMs, holdAcknowledgements);
+  }
+
+  /** Break every open client connection, so a waiting dispatcher fails with a communication error. */
+  closeConnections() {
+    this.server.closeAllConnections();
+  }
+
+  releaseAcknowledgements() {
+    this.acknowledgements?.resolve();
   }
 
   async submit(request) {
@@ -65,7 +79,9 @@ export class DurableTaskHost extends EventEmitter {
     try {
       await writeFile(artifactPath, `${JSON.stringify({ taskId, acceptedAt, request }, null, 2)}\n`);
       this.emit("accepted", { taskId, acceptedAt, request, artifactPath });
-      if (this.acknowledgementDelayMs > 0) {
+      if (this.acknowledgements !== undefined) {
+        await this.acknowledgements.promise;
+      } else if (this.acknowledgementDelayMs > 0) {
         await delay(this.acknowledgementDelayMs);
       }
       return { taskId };
@@ -106,6 +122,7 @@ export class DurableTaskHost extends EventEmitter {
   }
 
   async close() {
+    this.releaseAcknowledgements();
     if (this.server !== undefined) {
       this.server.closeAllConnections();
       await new Promise((resolve, reject) =>
@@ -121,19 +138,17 @@ export class DurableTaskHost extends EventEmitter {
 }
 
 export class HttpTaskDispatcher {
-  constructor(endpoint, { timeoutMs, signal } = {}) {
+  constructor(endpoint, { signal } = {}) {
     this.endpoint = endpoint;
-    this.timeoutMs = timeoutMs;
     this.signal = signal;
   }
 
   async submit(request) {
-    const signal = this.signal ?? (this.timeoutMs === undefined ? undefined : AbortSignal.timeout(this.timeoutMs));
     const response = await fetch(this.endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
-      ...(signal === undefined ? {} : { signal }),
+      signal: this.signal,
     });
     const result = await response.json();
     if (response.status === 422) throw new TaskRejectedError(result.message);

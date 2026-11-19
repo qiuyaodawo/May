@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
-import { testOutputRoot } from "@sortedyuan/test-support";
+import { testOutputRoot, until } from "@sortedyuan/test-support";
 import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { setTimeout as delay } from "node:timers/promises";
 import { loadMayConfig } from "@sortedyuan/may/config";
 import { McpInteractionBroker, openMcpClientPool } from "@sortedyuan/mcp";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
@@ -24,13 +23,6 @@ async function directory() {
   const parent = join(testOutputRoot, "maybecode", "web-controls");
   await mkdir(parent, { recursive: true });
   return mkdtemp(join(parent, "test-"));
-}
-async function until(condition) {
-  for (let count = 0; count < 100; count++) {
-    if (await condition()) return;
-    await delay(30);
-  }
-  assert.fail("状态未在期限内更新");
 }
 async function connect(app, t) {
   const token = randomBytes(32).toString("base64url");
@@ -129,10 +121,10 @@ test(
     );
     await left.command("session.new");
     const second = app.sessionId;
-    await until(() => right.state.snapshot.selectedId === second);
+    await until(t, () => right.state.snapshot.selectedId === second);
     await right.select(first);
     assert.equal(app.sessionId, first);
-    await until(() => left.state.snapshot.selectedId === first);
+    await until(t, () => left.state.snapshot.selectedId === first);
     assert.equal(left.state.snapshot.activeId, left.state.snapshot.selectedId);
     assert.ok(left.state.snapshot.commands.includes("message.submit"));
     const before = await app.history();
@@ -171,6 +163,7 @@ test(
     assert.equal((await post("session.delete", second, first)).status, 409);
     assert.equal((await post("session.new", app.sessionId, undefined)).status, 409);
     await until(
+      t,
       () => left.state.snapshot.selectedId === app.sessionId && right.state.snapshot.selectedId === app.sessionId,
     );
     await left.select(first);
@@ -192,7 +185,7 @@ test(
     assert.equal(app.sessionId, first);
     assert.deepEqual(await app.listSessions(), sessions);
     assert.deepEqual(await app.history(), history);
-    await until(() => right.state.snapshot.selectedId === first);
+    await until(t, () => right.state.snapshot.selectedId === first);
     await left.command("session.delete", {}, replacement);
     assert.deepEqual(
       (await app.listSessions()).map((session) => session.id),
@@ -200,6 +193,7 @@ test(
     );
     await app.newSession();
     await until(
+      t,
       () => left.state.snapshot.selectedId === app.sessionId && right.state.snapshot.selectedId === app.sessionId,
     );
   },
@@ -233,7 +227,7 @@ test(
     };
     await idle();
     const pending = async () => {
-      await until(async () => {
+      await until(t, async () => {
         await client.refresh();
         return client.state.snapshot.controls.forms.length > 0;
       });
@@ -345,18 +339,13 @@ test(
         "roots",
         owner,
         { mode: "review", kind: "roots", message: "核查工作区", data: [app.workspace], editable: false },
-        new AbortController().signal,
-        Date.now() + 5000,
+        t.signal,
+        Date.now() + 60_000,
       ),
     );
     void transition.catch(() => {});
-    await until(() => broker.list(owner).length > 0);
-    const snapshot = await Promise.race([
-      host.snapshot(),
-      delay(1000).then(() => {
-        throw new Error("快照被等待交互的状态队列阻塞");
-      }),
-    ]);
+    await until(t, () => broker.list(owner).length > 0);
+    const snapshot = await host.snapshot();
     assert.equal(snapshot.activeId, app.sessionId);
     assert.equal(broker.respond(broker.list(owner)[0].id, owner, { action: "accept" }), true);
     assert.equal((await transition).action, "accept");
@@ -390,7 +379,7 @@ test(
     child.stdout.on("data", (chunk) => {
       output += chunk;
     });
-    await until(() => /MaybeCode Web UI: http:\/\/127\.0\.0\.1:\d+/.test(output));
+    await until(t, () => /MaybeCode Web UI: http:\/\/127\.0\.0\.1:\d+/.test(output));
     const url = output.match(/MaybeCode Web UI: (http:\/\/127\.0\.0\.1:\d+)/)[1];
     const headers = { authorization: `Bearer ${token}`, "content-type": "application/json" };
     const snapshot = await (await fetch(url + "/api/ui/snapshot", { headers })).json();

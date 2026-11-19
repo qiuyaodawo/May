@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { testOutputRoot } from "@sortedyuan/test-support";
+import { testOutputRoot, until } from "@sortedyuan/test-support";
 import { randomBytes, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -8,21 +8,11 @@ import { createServer as createHttpServer } from "node:http";
 import { connect, createServer as createTcpServer } from "node:net";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { setTimeout as delay } from "node:timers/promises";
 import { CoordinationWorker, createRemoteAgent } from "@sortedyuan/coordination/remote";
 import { createGatewayRpcAdapter } from "@sortedyuan/gateway/rpc";
 
 const parent = join(testOutputRoot, "maybeclaw", "worker-cancellation");
 const example = fileURLToPath(new URL("../../../../packages/gateway/examples/rpc-file-agent.mjs", import.meta.url));
-
-export async function until(probe) {
-  const deadline = Date.now() + 5000;
-  while (Date.now() < deadline) {
-    if (await probe()) return;
-    await delay(10);
-  }
-  throw new Error("等待真实组件状态超时");
-}
 
 export async function fixture(t, { disconnectOnAbort = false, cancelSupported = true } = {}) {
   await mkdir(parent, { recursive: true });
@@ -83,6 +73,7 @@ export async function fixture(t, { disconnectOnAbort = false, cancelSupported = 
     await rm(directory, { recursive: true, force: true });
   });
   await until(
+    t,
     () =>
       new Promise((resolve) => {
         const socket = connect(pipe);
@@ -103,8 +94,8 @@ export async function fixture(t, { disconnectOnAbort = false, cancelSupported = 
     await new Promise((resolve, reject) => proxy.close((error) => (error ? reject(error) : resolve())));
   }
   await startProxy();
-  rpc = await createGatewayRpcAdapter("files", { transport: "socket", host: "127.0.0.1", port, timeoutMs: 500 });
-  observer = await createGatewayRpcAdapter("observer", { transport: "socket", path: pipe, timeoutMs: 500 });
+  rpc = await createGatewayRpcAdapter("files", { transport: "socket", host: "127.0.0.1", port, timeoutMs: 30_000 });
+  observer = await createGatewayRpcAdapter("observer", { transport: "socket", path: pipe, timeoutMs: 30_000 });
   const token = randomBytes(32).toString("hex");
   const controlPath = join(directory, "controls.jsonl");
   const bridge = {

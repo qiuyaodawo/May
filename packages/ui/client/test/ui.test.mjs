@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { setTimeout as delay } from "node:timers/promises";
+import { until } from "@sortedyuan/test-support";
 import { AgentWorkspace, defineAgent } from "@sortedyuan/may";
 import { InMemorySessionStore } from "@sortedyuan/may/session";
 import { InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
@@ -10,16 +10,8 @@ import { UiClient } from "../dist/index.js";
 import { UiProjection } from "../dist/projection.js";
 
 const token = "fixture-only-token-0123456789abcdef";
-async function until(probe) {
-  for (let i = 0; i < 100; i++) {
-    const value = await probe();
-    if (value) return value;
-    await delay(20);
-  }
-  throw new Error("Timed out");
-}
 
-test("shared host authenticates, deduplicates commands, restores approvals and survives a client disconnect", async (t) => {
+test("host authenticates, deduplicates, restores approvals and survives disconnect", { timeout: 60_000 }, async (t) => {
   let calls = 0,
     toolCalls = 0;
   const store = new InMemorySessionStore();
@@ -76,7 +68,7 @@ test("shared host authenticates, deduplicates commands, restores approvals and s
       fetch(url, String(url).endsWith("/api/ui/events") ? { ...init, headers: {} } : init),
     );
     await client.connect(token);
-    await until(() => client.state.connection === "disconnected");
+    await until(t, () => client.state.connection === "disconnected");
     assert.match(client.state.error, /连接凭据已失效/);
     await client.disconnect();
   });
@@ -125,7 +117,7 @@ test("shared host authenticates, deduplicates commands, restores approvals and s
   assert.ok(submitted.every((r) => r.status === 200));
   await clients[0].disconnect();
   assert.equal((await request("/api/ui/commands", { ...command, args: { text: "changed" } })).status, 409);
-  const pending = await until(async () => {
+  const pending = await until(t, async () => {
     const s = await (await request("/api/ui/snapshot")).json();
     return s.interactions.length ? s : undefined;
   });
@@ -148,7 +140,7 @@ test("shared host authenticates, deduplicates commands, restores approvals and s
     args: { id: pending.interactions[0].id, decision: "allow" },
   };
   assert.equal((await request("/api/ui/commands", approval)).status, 200);
-  await until(() => !app.isRunning);
+  await until(t, () => !app.isRunning);
   const finished = await (await request("/api/ui/snapshot")).json();
   assert.equal(toolCalls, 1);
   assert.equal(calls, 2);

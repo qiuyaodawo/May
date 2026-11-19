@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { testOutputRoot } from "@sortedyuan/test-support";
+import { testOutputRoot, until } from "@sortedyuan/test-support";
 import { randomBytes } from "node:crypto";
 import { execFile } from "node:child_process";
 import { request as httpRequest } from "node:http";
@@ -7,7 +7,6 @@ import { promisify } from "node:util";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { AgentGateway } from "../dist/gateway.js";
 import { GatewayHost } from "../dist/gateway-host.js";
@@ -245,7 +244,7 @@ test("session request identity survives control server restart", async (t) => {
 
 test(
   "HTTP shutdown cancels actual RPC file work while an Agent configuration request waits",
-  { timeout: 15_000 },
+  { timeout: 60_000 },
   async (t) => {
     const { directory, gateway, request, server, configPath, closeCalls } = await fixture(t);
     gateway.options.settings.shutdownMs = 0;
@@ -267,16 +266,9 @@ test(
       requestId: "waiting",
       sessionId: session.id,
     });
-    const until = async (probe) => {
-      const deadline = Date.now() + 10_000;
-      while (!(await probe())) {
-        assert.ok(Date.now() < deadline, "Gateway state did not become ready");
-        await delay(10);
-      }
-    };
     let update;
     try {
-      await until(async () => {
+      await until(t, async () => {
         const task = gateway.store.list("tasks")[0],
           binding = gateway.store.list("bindings")[0];
         return (
@@ -294,15 +286,10 @@ test(
         (response) => response.text(),
         () => undefined,
       );
-      await until(() => gateway.status().agents.find((value) => value.id === agent.id).status === "reconfiguring");
+      await until(t, () => gateway.status().agents.find((value) => value.id === agent.id).status === "reconfiguring");
       const closing = server.close();
       assert.equal(server.close(), closing);
-      await Promise.race([
-        closing,
-        delay(5000).then(() => {
-          throw new Error("HTTP shutdown did not cancel the file wait");
-        }),
-      ]);
+      await closing;
       await update;
       assert.equal(closeCalls(), 1);
       assert.throws(

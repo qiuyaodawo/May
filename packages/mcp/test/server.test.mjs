@@ -200,7 +200,7 @@ test(
 
 test(
   "independent stdio export binds launcher identity and serves modern or explicitly selected legacy clients",
-  { timeout: 10_000 },
+  { timeout: 60_000 },
   async (t) => {
     for (const [legacy, undefinedInput] of [
       [false, false],

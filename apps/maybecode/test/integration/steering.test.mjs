@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
-import { testOutputRoot } from "@sortedyuan/test-support";
+import { testOutputRoot, until } from "@sortedyuan/test-support";
 import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { loadMayConfig } from "@sortedyuan/may/config";
 import { AgentApplication } from "@sortedyuan/may/application";
@@ -75,7 +74,7 @@ test(
   {
     timeout: 180_000,
   },
-  async () => {
+  async (t) => {
     const base = join(testOutputRoot, "maybecode", "steering");
     await mkdir(base, { recursive: true });
     const directory = await mkdtemp(join(base, "case-")),
@@ -121,16 +120,8 @@ test(
       assert.equal(response.status, 200, receipt.error);
       return receipt;
     }
-    async function until(check) {
-      const deadline = Date.now() + 60000;
-      while (Date.now() < deadline) {
-        const value = await check();
-        if (value) return value;
-        await delay(30);
-      }
-      throw new Error("Expected MaybeCode state was not reached");
-    }
-    const approval = () => until(async () => (await snapshot()).interactions.find((item) => item.kind === "approval"));
+    const approval = () =>
+      until(t, async () => (await snapshot()).interactions.find((item) => item.kind === "approval"));
     try {
       const queued = app.submit({ input: "Do not execute this cancelled queued request." });
       const cancelledQueue = assert.rejects(queued, (error) => error.code === "RUN_CANCELLED");
@@ -175,7 +166,7 @@ test(
         text: "Cancel the previous file request. Do not use tools. Reply exactly NEW_INPUT_CONFIRMED.",
       });
       await rejected;
-      await until(() => !app.isRunning);
+      await until(t, () => !app.isRunning);
       assert.match(JSON.stringify(await app.history()), /NEW_INPUT_CONFIRMED/);
       await assert.rejects(readFile(join(workspace, "interrupted.txt")), (error) => error.code === "ENOENT");
 
@@ -185,12 +176,12 @@ test(
       const stoppedResult = assert.rejects(stopped.result, (error) => error.code === "RUN_CANCELLED");
       await command("console.execute", { text: "/stop" });
       await stoppedResult;
-      await until(() => !app.isRunning);
+      await until(t, () => !app.isRunning);
       assert.equal(app.application.agent.listSteeringInputs().at(-1).status, "cancelled");
       await assert.rejects(readFile(join(workspace, "stopped.txt")), (error) => error.code === "ENOENT");
 
       await command("console.execute", { text: "/steer Reply exactly IDLE_STEERING_CONFIRMED without tools." });
-      await until(() => !app.isRunning);
+      await until(t, () => !app.isRunning);
       assert.equal(app.application.agent.listSteeringInputs().at(-1).status, "delivered");
       assert.match(JSON.stringify(await app.history()), /IDLE_STEERING_CONFIRMED/);
     } finally {

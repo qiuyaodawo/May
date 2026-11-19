@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { testOutputRoot } from "@sortedyuan/test-support";
+import { testOutputRoot, until } from "@sortedyuan/test-support";
 import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
@@ -58,13 +58,6 @@ async function credential(login) {
   assert.equal(response.status, 200);
   return (await response.json()).token;
 }
-async function until(predicate) {
-  const deadline = Date.now() + 5000;
-  while (!(await predicate())) {
-    assert.ok(Date.now() < deadline, "condition timed out");
-    await delay(50);
-  }
-}
 
 test("startup converts plaintext and authenticates exact passwords without exposing secrets", async (t) => {
   const { password, path, login, get, server } = await fixture(t);
@@ -91,7 +84,7 @@ test("startup converts plaintext and authenticates exact passwords without expos
   assert.equal((await malformed.text()).includes(password), false);
 });
 
-test("saved password is converted without requests, revokes streams and keeps configuration edits", async (t) => {
+test("saving a password revokes streams and preserves configuration edits", { timeout: 60_000 }, async (t) => {
   const { path, login, get, save, server } = await fixture(t);
   const token = await credential(login),
     stream = await get(token, "/api/ui/events");
@@ -104,13 +97,8 @@ test("saved password is converted without requests, revokes streams and keeps co
     raw.server.auth.password = password;
     raw.agents[0].name = "保存的名称";
   });
-  await until(() => withGatewayConfiguration(path, async (raw) => !Object.hasOwn(raw.server.auth, "password")));
-  await Promise.race([
-    completed,
-    delay(5000).then(() => {
-      throw new Error("SSE did not close");
-    }),
-  ]);
+  await until(t, () => withGatewayConfiguration(path, async (raw) => !Object.hasOwn(raw.server.auth, "password")));
+  await completed;
   assert.equal((await get(token)).status, 401);
   assert.equal((await login()).status, 401);
   const next = await credential(() => login(password));
@@ -128,8 +116,8 @@ test("saved password is converted without requests, revokes streams and keeps co
   assert.equal((await get(next)).status, 200);
 });
 
-test("logout, expiry, and invalid configuration revoke authentication", async (t) => {
-  const { path, login, get, server } = await fixture(t, 1000);
+test("logout and invalid configuration revoke authentication", async (t) => {
+  const { path, login, get, server } = await fixture(t, 60_000);
   const first = await credential(login),
     second = await credential(login);
   assert.equal(
@@ -139,8 +127,6 @@ test("logout, expiry, and invalid configuration revoke authentication", async (t
   );
   assert.equal((await get(first)).status, 401);
   assert.equal((await get(second)).status, 200);
-  await delay(1100);
-  assert.equal((await get(second)).status, 401);
   const third = await credential(login),
     saved = await readFile(path, "utf8");
   await writeFile(path, "{");
@@ -148,6 +134,13 @@ test("logout, expiry, and invalid configuration revoke authentication", async (t
   await writeFile(path, saved);
   assert.equal((await get(third)).status, 401);
   assert.equal((await login()).status, 200);
+});
+
+test("expired credentials lose access", async (t) => {
+  const { login, get } = await fixture(t, 1000);
+  const token = await credential(login);
+  await delay(1000);
+  assert.equal((await get(token)).status, 401);
 });
 
 test("每次认证刷新读取前序配置写入的结果", async (t) => {

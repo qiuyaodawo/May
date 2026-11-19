@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { testOutputRoot } from "@sortedyuan/test-support";
+import { testOutputRoot, until } from "@sortedyuan/test-support";
 import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -7,7 +7,6 @@ import { access, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { connect } from "node:net";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
 import { createGatewayRpcAdapter, RpcOutcomeUnknownError } from "../dist/gateway-rpc-adapter.js";
 import { AgentGateway } from "../dist/gateway.js";
@@ -30,14 +29,6 @@ const input = (conversationId, inputId, operation, path, signal = new AbortContr
   shouldYield: () => false,
   report: () => {},
 });
-async function until(probe) {
-  for (let attempt = 0; attempt < 100; attempt++) {
-    if (await probe()) return;
-    await delay(20);
-  }
-  throw new Error("Condition timed out");
-}
-
 function fileGateway(path) {
   const configPath = join(path, "config.json");
   const settings = gatewaySettings({
@@ -122,7 +113,7 @@ test("stdio RPC 进程执行实际文件计算并按请求 ID 恢复对话", asy
   assert.equal((await adapter.inspectCreation("request-one")).status, "not-started");
 });
 
-test("取消一个对话的文件等待保持共享 RPC 进程和其他对话可用", async (t) => {
+test("取消一个对话的文件等待保持共享 RPC 进程和其他对话可用", { timeout: 60_000 }, async (t) => {
   const path = await directory(t);
   const adapter = await createGatewayRpcAdapter("files", {
     transport: "stdio",
@@ -135,7 +126,7 @@ test("取消一个对话的文件等待保持共享 RPC 进程和其他对话可
   const cancellation = new AbortController();
   const work = adapter.execute(input(first, "waiting", "waitForFile", "arriving.txt", cancellation.signal));
   const rejected = assert.rejects(work, /Cancelled by Gateway/);
-  await until(async () => (await adapter.inspect(first, "waiting")).status === "running");
+  await until(t, async () => (await adapter.inspect(first, "waiting")).status === "running");
   cancellation.abort();
   await rejected;
   assert.equal((await adapter.inspect(first, "waiting")).status, "cancelled");
@@ -145,12 +136,12 @@ test("取消一个对话的文件等待保持共享 RPC 进程和其他对话可
     createHash("sha256").update("other conversation").digest("hex"),
   );
   const waiting = adapter.execute(input(first, "wait-again", "waitForFile", "arriving.txt"));
-  await until(async () => (await adapter.inspect(first, "wait-again")).status === "running");
+  await until(t, async () => (await adapter.inspect(first, "wait-again")).status === "running");
   await writeFile(join(path, "arriving.txt"), "ready");
   assert.match((await waiting).text, /File is available/);
 });
 
-test("socket RPC 超时保留未知结果，重新连接查询并取消原请求", async (t) => {
+test("socket RPC 超时保留未知结果，重新连接查询并取消原请求", { timeout: 60_000 }, async (t) => {
   const path = await directory(t);
   const socketPath = process.platform === "win32" ? `\\\\.\\pipe\\maybeclaw-${randomUUID()}` : join(path, "agent.sock");
   const child = spawn(
@@ -167,6 +158,7 @@ test("socket RPC 超时保留未知结果，重新连接查询并取消原请求
     }
   });
   await until(
+    t,
     () =>
       new Promise((resolve) => {
         const socket = connect(socketPath);
@@ -197,7 +189,7 @@ test("socket RPC 超时保留未知结果，重新连接查询并取消原请求
   await access(join(path, "state"));
 });
 
-test("外部进程中断后查询自动重新握手并恢复已保存的请求状态", async (t) => {
+test("外部进程中断后查询自动重新握手并恢复已保存的请求状态", { timeout: 60_000 }, async (t) => {
   const path = await directory(t);
   const adapter = await createGatewayRpcAdapter("files", {
     transport: "stdio",
@@ -211,7 +203,7 @@ test("外部进程中断后查询自动重新握手并恢复已保存的请求�
     pending,
     (error) => error instanceof RpcOutcomeUnknownError && error.requestId === "pending-work",
   );
-  await until(async () => (await adapter.inspect(conversation, "pending-work")).status === "running");
+  await until(t, async () => (await adapter.inspect(conversation, "pending-work")).status === "running");
   const { pid } = JSON.parse(await adapter.command(conversation, "process", []));
   assert.ok(Number.isSafeInteger(pid) && pid !== process.pid);
   process.kill(pid);
@@ -225,7 +217,7 @@ test("外部进程中断后查询自动重新握手并恢复已保存的请求�
   assert.notEqual(JSON.parse(await adapter.command(conversation, "process", [])).pid, pid);
 });
 
-test("RPC补充信息保留到文件步骤结束，并提供持久状态查询", async (t) => {
+test("RPC补充信息保留到文件步骤结束，并提供持久状态查询", { timeout: 60_000 }, async (t) => {
   const path = await directory(t),
     options = {
       transport: "stdio",
@@ -236,7 +228,7 @@ test("RPC补充信息保留到文件步骤结束，并提供持久状态查询",
   t.after(() => adapter.close());
   const conversation = await adapter.createConversation("steering-work");
   const waiting = adapter.execute(input(conversation, "wait-step", "waitForFile", "ready.txt"));
-  await until(async () => (await adapter.inspect(conversation, "wait-step")).status === "running");
+  await until(t, async () => (await adapter.inspect(conversation, "wait-step")).status === "running");
   const text = JSON.stringify({ operation: "sha256", path: "ready.txt" });
   assert.equal((await adapter.steer(conversation, text, "follow-up")).status, "pending");
   assert.deepEqual(await adapter.steeringInputs(conversation), [{ inputId: "follow-up", text, status: "pending" }]);

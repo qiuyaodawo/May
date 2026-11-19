@@ -7,7 +7,7 @@ import { HttpTaskDispatcher } from "./durable-host.mjs";
 const [databasePath, endpoint, reportPath] = process.argv.slice(2);
 const scheduler = Scheduler.open({
   store: SqliteSchedulerStore.open(databasePath),
-  dispatcher: new HttpTaskDispatcher(endpoint, { timeoutMs: 40 }),
+  dispatcher: new HttpTaskDispatcher(endpoint),
   onError(error) {
     writeFileSync(reportPath, `${JSON.stringify({ message: error.message })}\n`);
   },

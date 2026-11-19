@@ -80,7 +80,7 @@ test(
       defaultModel: "deepseek",
     });
 
-    const result = await runProcess(["run", "--config", configPath, "Hello", "May"], {
+    const result = await runProcess(t, ["run", "--config", configPath, "Hello", "May"], {
       MAY_CLI_TEST_API_KEY: "local-test-key",
     });
 
@@ -139,7 +139,7 @@ test(
       defaultModel: "deepseek",
     });
 
-    const result = await runProcess(["run", "--config", configPath, "Hello"]);
+    const result = await runProcess(t, ["run", "--config", configPath, "Hello"]);
 
     assert.equal(result.code, 1);
     assert.equal(result.signal, null);
@@ -187,23 +187,17 @@ function sse(values) {
   return values.map((value) => `data: ${typeof value === "string" ? value : JSON.stringify(value)}\n\n`).join("");
 }
 
-function runProcess(args, environment = {}) {
+function runProcess(t, args, environment = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [binPath, ...args], {
       cwd: workspacePath,
       env: { ...process.env, ...environment },
       windowsHide: true,
+      signal: t.signal,
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
     let stderr = "";
-    let finished = false;
-    const timeout = setTimeout(() => {
-      if (finished) return;
-      finished = true;
-      child.kill();
-      reject(new Error("CLI process did not exit within 10 seconds"));
-    }, 10_000);
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
@@ -212,16 +206,8 @@ function runProcess(args, environment = {}) {
     child.stderr.on("data", (chunk) => {
       stderr += chunk;
     });
-    child.once("error", (error) => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timeout);
-      reject(error);
-    });
+    child.once("error", reject);
     child.once("close", (code, signal) => {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timeout);
       resolve({ code, signal, stdout, stderr });
     });
   });
