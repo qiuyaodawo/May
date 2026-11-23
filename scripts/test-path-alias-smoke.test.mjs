@@ -21,7 +21,6 @@ test("path-alias smoke passes a real non-canonical alias directly into coding-to
   const existingFile = join(aliasedWorkspace, "hello.txt");
   await writeFile(existingFile, "ok", "utf8");
 
-  // Relative paths inside an aliased workspace
   const resolvedExisting = await resolveExistingWorkspacePath(aliasedWorkspace, "hello.txt");
   assert.equal(resolvedExisting.absolute, join(canonicalWorkspace, "hello.txt"));
   assert.equal(resolvedExisting.relative, "hello.txt");
@@ -30,7 +29,6 @@ test("path-alias smoke passes a real non-canonical alias directly into coding-to
   assert.equal(resolvedWritable.absolute, join(canonicalWorkspace, "nested", "new.txt"));
   assert.equal(resolvedWritable.relative, "nested/new.txt");
 
-  // Absolute paths rooted under the caller's aliased workspace (read & write)
   const resolvedAbsExisting = await resolveExistingWorkspacePath(aliasedWorkspace, existingFile);
   assert.equal(resolvedAbsExisting.absolute, join(canonicalWorkspace, "hello.txt"));
   assert.equal(resolvedAbsExisting.relative, "hello.txt");
@@ -42,7 +40,6 @@ test("path-alias smoke passes a real non-canonical alias directly into coding-to
   assert.equal(resolvedAbsWritable.absolute, join(canonicalWorkspace, "nested", "abs-new.txt"));
   assert.equal(resolvedAbsWritable.relative, "nested/abs-new.txt");
 
-  // Absolute paths outside the aliased workspace must still be rejected
   await assert.rejects(resolveWritableWorkspacePath(aliasedWorkspace, join(dirname(aliasedWorkspace), "escape.txt")), {
     code: "CODING_TOOL_PATH_OUTSIDE_WORKSPACE",
   });

@@ -27,14 +27,11 @@ test("invariant: nextTime is strictly monotonic and consistent with latestTime a
           `nextTime (${firstIso}) must be strictly > after (${new Date(afterMs).toISOString()})`,
         );
 
-        // latestTime at the exact occurrence timestamp must return that exact occurrence
         assert.equal(latestTime(trigger, afterMs, firstMs), firstIso);
-        // latestTime strictly before the first occurrence must return undefined
         if (firstMs - 1 >= afterMs) {
           assert.equal(latestTime(trigger, afterMs, firstMs - 1), undefined);
         }
 
-        // Subsequent occurrence must strictly advance
         const secondIso = nextTime(trigger, firstMs);
         assert.ok(secondIso !== undefined);
         assert.ok(Date.parse(secondIso) > firstMs, "consecutive cron occurrences must strictly increase");
@@ -83,12 +80,10 @@ test("invariant: concurrent duplicate event publish and ticks dispatch each (job
 
           assert.equal(records.length, expectedDispatches);
           assert.equal(host.tasks().length, expectedDispatches);
-          // Strictly monotonic unique seqs 1..N
           assert.deepEqual(
             records.map((r) => r.seq).sort((a, b) => a - b),
             Array.from({ length: records.length }, (_, i) => i + 1),
           );
-          // Every record reached submitted
           assert.ok(records.every((r) => r.status === "submitted"));
         } finally {
           for (const cleanup of cleanups.reverse()) {

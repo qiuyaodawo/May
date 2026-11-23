@@ -77,7 +77,7 @@ export function createChildAgent(role: MaybeCodeSubagentRole, host: ChildAgentHo
       const contextBudget =
         role.model === undefined ? options.contextBudget : (options.contextBudgetFor?.(role) ?? options.contextBudget);
       const roleBudget = resolveRunBudget(role.runBudget, options.configuration.runBudget);
-      // 角色预算与子 Agent 预算取较小的值；两者都省略 maxSteps 时用子 Agent 默认值。
+      // 角色预算与子 Agent 预算取较小值；都省略 maxSteps 时依次回退到宿主 options.maxSteps 与子 Agent 默认值。
       const maxSteps = roleBudget.maxSteps ?? options.maxSteps ?? SUBAGENT_DEFAULT_MAX_STEPS;
       const childModel = withRequestBudget(host.roleModel(role), () => request.ledger);
       const memory = new HistoryReferenceMemory(options.autoCompactionMode === "history-reference");
@@ -212,7 +212,6 @@ export function createChildAgent(role: MaybeCodeSubagentRole, host: ChildAgentHo
             ? undefined
             : new ModelContextCompactionStrategy(childModel.contextCompactor),
         ),
-        // maxSteps 已确定，角色预算与子 Agent 预算的较小值对子 Run 同样生效。
         maxSteps,
         runBudget: roleBudget,
         traceAttributes: {

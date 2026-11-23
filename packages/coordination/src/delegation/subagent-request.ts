@@ -141,12 +141,12 @@ export class SubagentRequest {
     );
   }
 
-  /** @internal 真实主 Run 的身份，在 Run 启动时捕获。 */
   /** 宿主为第一轮提供的输入身份；普通请求没有额外身份。 */
   inputIdentity(): string | undefined {
     return this.plan.inputId;
   }
 
+  /** @internal 真实主 Run 的身份，在 Run 启动时捕获。 */
   beginMainRun(runId: string, turn: number, result: Promise<RunResult>): void {
     this.observeMainRun(runId, turn, result);
   }

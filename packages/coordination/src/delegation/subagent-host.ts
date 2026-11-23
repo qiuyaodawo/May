@@ -428,7 +428,7 @@ export class SubagentHost {
     return agents;
   }
 
-  /** @inline 宿主对任务创建与委派的授权。 */
+  /** @internal 宿主对任务创建与委派的授权。 */
   policy() {
     const configuration = this.options.configuration;
     return {
@@ -442,7 +442,7 @@ export class SubagentHost {
     };
   }
 
-  /** @inline 一次请求图的执行限制。 */
+  /** @internal 一次请求图的执行限制。 */
   limits(): Partial<CoordinationLimits> {
     const limits = this.options.configuration.limits;
     return {
@@ -456,7 +456,7 @@ export class SubagentHost {
     };
   }
 
-  /** @inline 子 Agent 的模型：角色未声明 profile 时复用主会话模型与 effort。 */
+  /** @internal 子 Agent 的模型：角色未声明 profile 时复用主会话模型与 effort。 */
   roleModel(role: MaybeCodeSubagentRole): Model {
     return role.model === undefined ? this.options.model : (this.options.createRoleModel?.(role) ?? this.options.model);
   }

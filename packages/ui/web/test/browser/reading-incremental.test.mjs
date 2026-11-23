@@ -162,7 +162,6 @@ test("阅读器等长更新未读提示与增量 DOM 渲染真实浏览器集成
   await page.goto(server.createLoginUrl());
   await page.locator(".workbench").waitFor({ state: "visible" });
 
-  // 2. 通过循环点击“加载更早记录”直至全部 450 块完全显示
   await page.waitForFunction(() => document.querySelectorAll(".run-group").length > 0);
   const loadMoreButton = page.getByRole("button", { name: "加载更早记录" });
   while (await loadMoreButton.isVisible()) {
@@ -174,7 +173,7 @@ test("阅读器等长更新未读提示与增量 DOM 渲染真实浏览器集成
   assert.equal(loadedBlockCount, 450, "通过加载更早记录后页面应当展示全部 450 块历史记录");
   console.log(`已加载全部历史记录区块数量: ${loadedBlockCount}`);
 
-  // 3. 将滚动容器滚动离开底部，使阅读器进入非跟随状态（following: false）
+  // 滚离底部以进入非跟随状态（following: false），从而触发未读提示分支。
   await page.evaluate(() => {
     const scrollContainer = document.querySelector(".conversation-scroll");
     if (scrollContainer) {
@@ -184,7 +183,6 @@ test("阅读器等长更新未读提示与增量 DOM 渲染真实浏览器集成
   });
   await page.waitForTimeout(50);
 
-  // 4. 挂载 MutationObserver 观察后续 DOM 变更
   await page.evaluate(() => {
     window.__domMutations = [];
     const observer = new MutationObserver((mutations) => {
@@ -204,7 +202,6 @@ test("阅读器等长更新未读提示与增量 DOM 渲染真实浏览器集成
     }
   });
 
-  // 5. 验证过滤器开关不标记新内容
   const onlyErrorsCheckbox = page.getByLabel("只看异常");
   await onlyErrorsCheckbox.check();
   await page.waitForTimeout(50);
@@ -222,7 +219,6 @@ test("阅读器等长更新未读提示与增量 DOM 渲染真实浏览器集成
     "切换关闭异常过滤器不应标记未读内容",
   );
 
-  // 6. 验证真实 session.rename 命令导致 busy 更新后不标记新内容
   await page.evaluate(async (sid) => {
     await window.__testClient.command("session.rename", { title: "已重命名的历史回放会话" }, sid);
   }, sessionId);
@@ -233,7 +229,6 @@ test("阅读器等长更新未读提示与增量 DOM 渲染真实浏览器集成
     "执行 session.rename 命令导致 busy 更新后不应标记未读内容",
   );
 
-  // 7. 验证重复 HTTP 快照刷新时的 DOM 稳定性
   const baselineBeforeRefresh = await page.evaluate(() => window.__domMutations.length);
   await page.evaluate(async () => {
     await window.__testClient.refresh();
@@ -244,7 +239,7 @@ test("阅读器等长更新未读提示与增量 DOM 渲染真实浏览器集成
   assert.equal(baselineMutations, 0, "重复获取相同快照时原有 DOM 节点应当完全保持稳定");
   console.log(`相同快照刷新后 MutationObserver 记录子节点变动次数: ${baselineMutations}`);
 
-  // 8. 追加等长内容修改（字符总长度完全一致，内容从 ACTIVE_VAL_A 变为 ACTIVE_VAL_B）
+  // 等长替换（ACTIVE_VAL_A -> ACTIVE_VAL_B），确保仅按长度比较无法检测到的变更也能触发未读提示与局部更新。
   assert.equal(
     await page.evaluate(() =>
       window.__testClient.state.snapshot.blocks.some(
@@ -265,26 +260,22 @@ test("阅读器等长更新未读提示与增量 DOM 渲染真实浏览器集成
     data: { status: "ACTIVE_VAL_B" },
   });
 
-  // 通知宿主状态变动，客户端通过真实 HTTP refresh 获取新快照
   host.changed();
   await page.evaluate(async () => {
     await window.__testClient.refresh();
   });
   await page.waitForTimeout(100);
 
-  // 9. 验证“有新内容 · 回到最新”未读提示可见
   const latestButton = page.getByRole("button", { name: "有新内容 · 回到最新", exact: true });
   await latestButton.waitFor({ state: "visible" });
   assert.equal(await latestButton.textContent(), "有新内容 · 回到最新");
 
-  // 10. 测量增量渲染节点变动：输出 MutationObserver 计数
   const totalMutations = await page.evaluate(() => window.__domMutations.length);
   const updateMutations = totalMutations - beforeUpdateMutationCount;
   console.log(`等长更新后 MutationObserver 记录子节点变动次数: ${updateMutations}`);
   assert.ok(updateMutations > 0, "等长内容变动应当触发目标节点 DOM 更新");
   assert.ok(updateMutations < 10, "等长内容变动应当仅替换局部节点，不应重建整个消息列表");
 
-  // 11. 点击“回到最新”按钮，阅读器恢复跟随并关闭提示
   await latestButton.click();
   await latestButton.waitFor({ state: "detached" });
 

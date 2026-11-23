@@ -302,8 +302,10 @@ export class AgentApplication implements SteerableAgentController {
       : undefined;
   }
 
-  /** Persist application-owned session memory; available during tool execution. */
-  /** @experimental */
+  /**
+   * Persist application-owned session memory; available during tool execution.
+   * @experimental
+   */
   recordState(key: string, value: unknown): Promise<void> {
     if (this.stateRecordingClosed) throw new Error("Agent application is closed");
     const writing = this.session.recordState(key, value);
@@ -387,8 +389,10 @@ export class AgentApplication implements SteerableAgentController {
     );
   }
 
-  /** 在当前上下文中继续执行，沿用运行互斥和保存流程。 */
-  /** @experimental */
+  /**
+   * 在当前上下文中继续执行，沿用运行互斥和保存流程。
+   * @experimental
+   */
   continue(options: SessionContinueOptions = {}): Promise<AgentRun> {
     assertSessionInputOptions(options);
     return this.startRun(
@@ -430,8 +434,10 @@ export class AgentApplication implements SteerableAgentController {
     await this.sessionScope.observe(applicationHooks.recoveryResolved, result, this.hookContext());
   }
 
-  /** Retry the latest failed run without adding another user message. */
-  /** @experimental */
+  /**
+   * Retry the latest failed run without adding another user message.
+   * @experimental
+   */
   retry(): Promise<AgentRun> {
     return this.startRun(async () => {
       if (!latestRunFailed(await this.session.history())) {

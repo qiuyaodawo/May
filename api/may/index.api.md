@@ -18,7 +18,6 @@ export class AgentApplication implements SteerableAgentController {
     close(): Promise<void>;
     // (undocumented)
     compactContext(strategy?: ContextCompactionStrategy | undefined): Promise<ContextCompactionResult>;
-    // (undocumented)
     continue(options?: SessionContinueOptions): Promise<AgentRun>;
     // (undocumented)
     createPermissionRule(check: PermissionCheck, options: CreatePermissionRuleOptions): Promise<PersistentPermissionRule>;
@@ -55,13 +54,11 @@ export class AgentApplication implements SteerableAgentController {
     static open(options: AgentApplicationOptions): Promise<AgentApplication>;
     // (undocumented)
     queryHistory(query?: SessionHistoryQuery): Promise<SessionHistoryPage>;
-    // (undocumented)
     recordState(key: string, value: unknown): Promise<void>;
     // (undocumented)
     resolveApproval(requestId: string, decision: ApprovalDecision, options?: ApprovalResolveOptions): Promise<boolean>;
     // (undocumented)
     resolveRecovery(id: string, finding: string): Promise<void>;
-    // (undocumented)
     retry(): Promise<AgentRun>;
     // (undocumented)
     revokePermissionRule(id: string): Promise<boolean>;

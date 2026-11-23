@@ -47,7 +47,7 @@ export interface SharedBudgetCall {
   readonly totalTokens?: number;
   readonly costUsd?: number;
   readonly cost?: UsageCost;
-  /** provider 上报 usage 时为 true；估计值只是宿主给出的保守计账。 */
+  /** 未取得 provider 上报的 usage、按预留值保守估计结账时为 true。 */
   readonly estimated?: boolean;
   readonly exceededReservation?: boolean;
   readonly reconciliation?: string;

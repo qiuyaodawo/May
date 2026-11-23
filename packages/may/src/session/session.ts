@@ -452,8 +452,10 @@ export class Session {
     return this.submit({ ...options, input: input.message, inputId });
   }
 
-  /** Continue the current context without recording a new user input. */
-  /** @experimental */
+  /**
+   * Continue the current context without recording a new user input.
+   * @experimental
+   */
   continue(options: SessionContinueOptions = {}): Promise<RunHandle> {
     assertSessionInputOptions(options);
     return this.enqueueRun(() => this.startContinuation(options));
@@ -986,8 +988,10 @@ export class Session {
     return [...this.recoveries.values()].map((value) => structuredClone(value));
   }
 
-  /** Persist bounded, application-owned state independently of compactable messages. */
-  /** @experimental */
+  /**
+   * Persist bounded, application-owned state independently of compactable messages.
+   * @experimental
+   */
   async recordState(key: string, value: unknown): Promise<void> {
     if (!/^[a-z][a-z0-9._-]{0,127}$/u.test(key)) throw new Error("Invalid session state key");
     const snapshot: unknown = JSON.parse(JSON.stringify(value));
@@ -995,8 +999,10 @@ export class Session {
     await this.record({ type: "state.updated", key, value: snapshot });
   }
 
-  /** The host must verify external effects and describe the finding before continuing. */
-  /** @public */
+  /**
+   * The host must verify external effects and describe the finding before continuing.
+   * @public
+   */
   resolveRecovery(id: string, finding: string): Promise<void> {
     const operation = this.tail.then(async () => {
       if (this.persistenceFailed) throw new Error("Session persistence failed; reopen the session before recovery");

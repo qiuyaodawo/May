@@ -388,12 +388,14 @@ export class SubagentHost {
     get isRunning(): boolean;
     // @internal
     ledger(): SubagentRequestLedger | undefined;
+    // @internal
     limits(): Partial<CoordinationLimits>;
     // (undocumented)
     listRequests(): readonly MaybeCodeDelegationRequest[];
     // (undocumented)
     readonly options: SubagentHostOptions;
     ownedSessions(): readonly string[];
+    // @internal
     policy(): {
         version: string;
         authorize: (task: {
@@ -420,6 +422,7 @@ export class SubagentHost {
         readonly detail: string;
         readonly output?: TaskOutput;
     }): Promise<MaybeCodeDelegationRequest>;
+    // @internal
     roleModel(role: MaybeCodeSubagentRole): Model;
     start(plan: SubagentRequestPlan, mode?: "submit" | "continue"): Promise<MaybeCodeRun>;
     // (undocumented)

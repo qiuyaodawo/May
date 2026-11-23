@@ -29,7 +29,6 @@ async function assertFilesystemContainment(canonicalRoot, target) {
       break;
     } catch (error) {
       if (isMissingOrNonDir(error)) {
-        // Also check dangling symlink at this prefix!
         try {
           const info = await lstat(probe);
           if (info.isSymbolicLink()) {

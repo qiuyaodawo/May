@@ -151,7 +151,6 @@ export class Session {
     cancelSteeringInputs(reason?: string): Promise<void>;
     // (undocumented)
     closeRuntime(): Promise<void>;
-    // (undocumented)
     continue(options?: SessionContinueOptions): Promise<RunHandle>;
     // (undocumented)
     static create(options: SessionOptions): Promise<Session>;
@@ -194,13 +193,11 @@ export class Session {
     readonly recordModelRequest: ModelRequestSink;
     // (undocumented)
     recordPermissionEvent(event: RecordablePermissionEvent): Promise<void>;
-    // (undocumented)
     recordState(key: string, value: unknown): Promise<void>;
     // (undocumented)
     recordToolPresentation(presentation: SessionToolPresentation): Promise<void>;
     // (undocumented)
     replaceRuntime(runtime: AgentRuntime): Promise<void>;
-    // (undocumented)
     resolveRecovery(id: string, finding: string): Promise<void>;
     // (undocumented)
     static resume(options: ResumeSessionOptions): Promise<Session>;
