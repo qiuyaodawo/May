@@ -1,4 +1,4 @@
-import { omitUndefined } from "../core/omit-undefined.js";
+import { omitUndefined } from "../core/index.js";
 import type { PluginDefinition, ServiceDependency } from "../plugin/index.js";
 
 /** @experimental */

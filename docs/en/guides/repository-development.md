@@ -31,9 +31,11 @@ implementation when selected; image codecs and Web server assets load when used.
   `scripts/api-stability.json`, declaration tags and `api/` reports. Run
   `pnpm api:update` after an intentional API change and review the generated
   differences. See [API stability](../reference/stability.md).
-- `pnpm lint --max-warnings 0` runs typed ESLint checks on TypeScript source files under
-  `src/` in every workspace package and app.
+- `pnpm lint --max-warnings 0` runs ESLint across TypeScript source files under
+  `src/` and test files under `test/` in every workspace package and app (including typed async/exhaustiveness checks, anti-pattern rules, and the shrinking baseline `scripts/eslint-ban-hacks-baseline.json`).
   ESLint uses TypeScript 5.9; `tsc -b` uses TypeScript 7. CI runs lint on Ubuntu with Node.js 24.
+- `pnpm boundaries:check` runs `scripts/check-boundaries.mjs` to enforce the 5-layer workspace dependency matrix, public `exports` boundaries, intra-package submodule encapsulation, and zero runtime value cycles (freezing legacy test escapes and type-only cycles in the shrinking `scripts/boundaries-baseline.json`).
+- `pnpm baselines:check` validates the integrity of `scripts/boundaries-baseline.json` and `scripts/eslint-ban-hacks-baseline.json`; PR CI additionally diffs against the base commit so neither baseline can grow.
 - `pnpm format` formats the repository with Prettier (`printWidth: 120`), and
   `pnpm format:check` reports unformatted files without changing them; CI runs the
   check on Linux with Node.js 24.
@@ -53,9 +55,11 @@ implementation when selected; image codecs and Web server assets load when used.
 - `pnpm --filter <package-name> test` checks one package; replace the placeholder
   with its `package.json` name.
 - Tests write temporary data under the ignored `.test-output/`. The private
-  `@sortedyuan/test-support` package provides `createTestDirectory(t, name)`, which creates
-  `.test-output/<name>-XXXXXX` and removes it after the test, and `testOutputRoot` for
-  shared fixture directories.
+  `@sortedyuan/test-support` package provides `createTestDirectory(t, name)` (creates
+  `.test-output/<name>-XXXXXX` and removes it after the test), `trackServer(t, server)` /
+  `closeServer(server)` (cleanly closes test HTTP/Net servers including keep-alive connections),
+  and `testOutputRoot` for shared fixture directories.
+- Workspace `test` scripts launch `node --test` through `scripts/run-node-tests.mjs`, which applies a default per-test timeout (`MAY_TEST_TIMEOUT_MS`, default 120000 ms, overridden by explicit per-test `timeout` options) and preloads `scripts/test-leak-guard.mjs` (if a test worker still has active event-loop handles `MAY_TEST_LEAK_GRACE_MS`, default 5000 ms, after all tests complete, it logs `process.getActiveResourcesInfo()` and fails non-zero instead of hanging).
 - `pnpm test` runs one workspace package's offline test script at a time. This lets each
   script finish building and testing before the next package can rebuild a shared dependency.
   The command reports failures after all package scripts finish and runs the file-lock checks if they all pass.
@@ -65,8 +69,9 @@ implementation when selected; image codecs and Web server assets load when used.
   Windows file API. Test data resides under the ignored `.test-output/file-lock-matrix/`;
   Team patch checks remove the temporary source's application lock files after use.
 - `pnpm test:coverage` runs the available coverage checks.
+- `pnpm test:fuzz` runs the property-based invariant test suites (powered by `fast-check` via `@sortedyuan/test-support`) with higher iteration counts (default `MAY_PBT_RUNS=500`) across core runtime/session, permissions, shared budgets, scheduler, workspace paths, and provider streams.
 - `pnpm test:path-alias` runs the suite with a Windows junction or POSIX symlink
-  for temporary paths to detect canonical-path assumptions.
+  for temporary paths to detect canonical-path assumptions; `pnpm test:path-alias:smoke` runs a fast path-sensitive smoke subset on Windows and macOS PR CI.
 - `pnpm test:package:maybecode`, `pnpm test:package:plugin`, and
   `pnpm test:package:eval` check packed packages in external consumers.
 

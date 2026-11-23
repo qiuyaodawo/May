@@ -1,77 +1,100 @@
 import { open, stat } from "node:fs/promises";
 import type { Stats } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import writeFileAtomic from "write-file-atomic";
-import { withFileAccess, acquireFileLock } from "../storage/index.js";
+import { acquireFileLock, syncDirectory, withFileAccess } from "../storage/index.js";
 
 import { MayConfigFileError, MayConfigParseError, MayConfigWriteError } from "./errors.js";
 import { parseMayConfig } from "./parse.js";
+import { resolveMayConfigTargetPath } from "./target-path.js";
 import type { MayConfig } from "./types.js";
 
 /** Atomically updates only the top-level defaultModel field.
  * @experimental
  */
 export async function updateDefaultMayModel(configPath: string, profile: string): Promise<MayConfig> {
-  const path = resolve(configPath);
+  const requestedPath = resolve(configPath);
+  let targetPath: string;
+  try {
+    targetPath = await resolveMayConfigTargetPath(requestedPath);
+  } catch (error) {
+    throw new MayConfigWriteError(requestedPath, undefined, { cause: error });
+  }
   let lock;
   try {
-    lock = await acquireFileLock(`${path}.lock`);
+    lock = await acquireFileLock(`${targetPath}.lock`);
   } catch (error) {
-    throw new MayConfigWriteError(path, `configuration is being written by another process: ${path}.lock`, {
-      cause: error,
-    });
+    throw new MayConfigWriteError(
+      requestedPath,
+      `configuration is being written by another process: ${targetPath}.lock`,
+      {
+        cause: error,
+      },
+    );
   }
   try {
-    return await withFileAccess(path, "exclusive", () => updateLocked(path, profile));
+    return await withFileAccess(targetPath, "exclusive", () => updateLocked(targetPath, requestedPath, profile));
   } finally {
     await lock.release();
   }
 }
 
-async function updateLocked(path: string, profile: string): Promise<MayConfig> {
-  const { source, information } = await readConfigSnapshot(path);
+async function updateLocked(targetPath: string, requestedPath: string, profile: string): Promise<MayConfig> {
+  const { source, information } = await readConfigSnapshot(targetPath, requestedPath);
   let value: unknown;
   try {
     value = JSON.parse(source);
   } catch (error) {
-    throw new MayConfigParseError(path, { cause: error });
+    throw new MayConfigParseError(requestedPath, { cause: error });
   }
 
-  parseMayConfig(value, path);
+  parseMayConfig(value, requestedPath);
   const updatedValue = {
     ...(value as Record<string, unknown>),
     defaultModel: profile,
   };
-  const updated = parseMayConfig(updatedValue, path);
+  const updated = parseMayConfig(updatedValue, requestedPath);
   const output = serializeLike(source, updatedValue);
-  if (!sameSnapshot(information, await stat(path))) {
-    throw new MayConfigWriteError(path, "the file changed while it was being updated; retry the operation");
+  if (!sameSnapshot(information, await stat(targetPath))) {
+    throw new MayConfigWriteError(requestedPath, "the file changed while it was being updated; retry the operation");
   }
   try {
-    await writeFileAtomic(path, output, { encoding: "utf8", mode: information.mode });
+    await writeFileAtomic(targetPath, output, { encoding: "utf8", mode: information.mode });
   } catch (error) {
-    throw new MayConfigWriteError(path, undefined, { cause: error });
+    throw new MayConfigWriteError(requestedPath, undefined, { cause: error });
+  }
+  try {
+    await syncDirectory(dirname(targetPath));
+  } catch (error) {
+    throw new MayConfigWriteError(
+      requestedPath,
+      "the configuration file was replaced on disk, but directory synchronization failed",
+      { cause: error, replaced: true },
+    );
   }
   return updated;
 }
 
-async function readConfigSnapshot(path: string): Promise<{
+async function readConfigSnapshot(
+  targetPath: string,
+  requestedPath: string,
+): Promise<{
   source: string;
   information: Stats;
 }> {
   let handle: Awaited<ReturnType<typeof open>> | undefined;
   try {
-    handle = await open(path, "r");
+    handle = await open(targetPath, "r");
     const before = await handle.stat();
     const source = await handle.readFile("utf8");
     const information = await handle.stat();
     if (!sameSnapshot(before, information)) {
-      throw new MayConfigWriteError(path, "the file changed while it was being read; retry the operation");
+      throw new MayConfigWriteError(requestedPath, "the file changed while it was being read; retry the operation");
     }
     return { source, information };
   } catch (error) {
     if (error instanceof MayConfigWriteError) throw error;
-    throw new MayConfigFileError(path, { cause: error });
+    throw new MayConfigFileError(requestedPath, { cause: error });
   } finally {
     await handle?.close();
   }

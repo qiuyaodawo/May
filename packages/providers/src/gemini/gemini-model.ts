@@ -11,7 +11,7 @@ import {
   type ToolCall,
   type ServerToolCall,
 } from "@sortedyuan/may/core";
-import { parseRetryAfterMs, readSseData } from "../openai-compatible/http.js";
+import { parseRetryAfterMs, readSseData } from "../http.js";
 import { convertGeminiUsage, isRecord, toGeminiRequestParts } from "./convert.js";
 import { GeminiApiError, GeminiFinishReasonError, GeminiProtocolError } from "./errors.js";
 import {

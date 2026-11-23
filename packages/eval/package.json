@@ -29,8 +29,8 @@
   ],
   "scripts": {
     "build": "tsc -b",
-    "test": "pnpm run build && node --test test/*.test.mjs",
-    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
+    "test": "pnpm run build && node ../../scripts/run-node-tests.mjs test/*.test.mjs",
+    "test:coverage": "pnpm run build && node ../../scripts/run-node-tests.mjs --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
     "@sortedyuan/coordination": "workspace:*",

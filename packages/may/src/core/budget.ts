@@ -147,7 +147,7 @@ function priceFingerprint(pricing: Readonly<TokenPriceSchedule>): string {
 
 /** @experimental */
 export class RunBudgetMeter {
-  private readonly startedAt = Date.now();
+  private readonly startedAt = performance.now();
   private steps = 0;
   private modelCalls = 0;
   private toolCalls = 0;
@@ -161,7 +161,7 @@ export class RunBudgetMeter {
 
   snapshot(): RunBudgetSnapshot {
     return omitUndefined({
-      elapsedMs: Math.max(0, Date.now() - this.startedAt),
+      elapsedMs: Math.max(0, Math.floor(performance.now() - this.startedAt)),
       steps: this.steps,
       modelCalls: this.modelCalls,
       toolCalls: this.toolCalls,

@@ -164,6 +164,7 @@ test("真实模型设置和清除推理强度后继续完成请求", { timeout: 
   });
   const relay = (async () => {
     for await (const _event of app.events) {
+      /* drain */
     }
   })();
   t.after(async () => {

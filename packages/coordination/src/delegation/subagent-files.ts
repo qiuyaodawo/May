@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { Tool } from "@sortedyuan/may/core";
+import { hasErrorCode } from "@sortedyuan/may/storage";
 import {
   createCodingTool,
   workspaceFileKey,
@@ -184,7 +185,7 @@ async function version(path: string): Promise<string> {
   try {
     bytes = await readFile(path);
   } catch (error) {
-    if (error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")) {
+    if (hasErrorCode(error, "ENOENT") || hasErrorCode(error, "ENOTDIR")) {
       return MISSING;
     }
     throw error;

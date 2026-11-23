@@ -6,6 +6,7 @@ import { PassThrough, type Readable, Writable } from "node:stream";
 import { setImmediate as waitImmediate } from "node:timers/promises";
 import TerminalEvents from "tty-events";
 import { TerminalImageSupport } from "./image-support.js";
+import { readlineHistory } from "./readline-compat.js";
 import type { TerminalInput } from "./terminal-driver.js";
 
 /** @experimental */
@@ -128,7 +129,7 @@ export function createNodeTerminal(options: NodeTerminalOptions = {}): TerminalI
       })
       .on("close", onReadlineClose);
   let readline = createReadline(historySize);
-  let history = (readline as unknown as { readonly history: string[] }).history;
+  let history = readlineHistory(readline);
   const replaceReadline = async (size: number) => {
     readline.removeListener("close", onReadlineClose);
     // 等待输入完成暂停，再恢复读取和终端模式。
@@ -137,7 +138,7 @@ export function createNodeTerminal(options: NodeTerminalOptions = {}): TerminalI
     readline.close();
     if (closed || lifetime.signal.aborted) return;
     readline = createReadline(size);
-    history = (readline as unknown as { readonly history: string[] }).history;
+    history = readlineHistory(readline);
   };
   let activePrompt: string | undefined;
   let activeEscape: (() => void) | undefined;

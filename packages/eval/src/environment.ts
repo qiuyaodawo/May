@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { copyFile, lstat, mkdir, readdir, readFile, realpath, rm } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { hasErrorCode } from "@sortedyuan/may/storage";
 import type { EnvironmentPrepareContext, EvalEnvironmentAdapter, JsonValue, EvaluationTarget } from "./types.js";
 
 /** @experimental */
@@ -185,7 +186,7 @@ async function removeWorkspace(root: string, trialRoot: string, workspace: strin
     await lstat(workspace);
     exists = true;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    if (!hasErrorCode(error, "ENOENT")) throw error;
     exists = false;
   }
   if (!exists) return;
@@ -197,7 +198,7 @@ async function potentialPath(path: string): Promise<string> {
   try {
     return await realpath(path);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    if (!hasErrorCode(error, "ENOENT")) throw error;
     const parent = dirname(path);
     if (parent === path) throw error;
     return join(await potentialPath(parent), relative(parent, path));

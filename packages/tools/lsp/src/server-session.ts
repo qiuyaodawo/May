@@ -1,6 +1,7 @@
 import { readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 import type { ChildProcess } from "node:child_process";
+import { hasErrorCode } from "@sortedyuan/may/storage";
 import type {
   ProtocolConnection,
   ServerCapabilities,
@@ -199,8 +200,8 @@ export async function watchedChanges(
     const uri = paths.uri({ absolute, relative: input });
     const exists = await stat(absolute).then(
       (info) => info.isFile(),
-      (error: NodeJS.ErrnoException) => {
-        if (error.code === "ENOENT") return false;
+      (error: unknown) => {
+        if (hasErrorCode(error, "ENOENT")) return false;
         throw error;
       },
     );

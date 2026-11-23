@@ -1,5 +1,4 @@
 import { readRecordedModelRequests, type RecordedModelRequest } from "./requests.js";
-import type { ModelRequestSink } from "../core/request-recording.js";
 import {
   AsyncEventQueue,
   AsyncStateSerializer,
@@ -12,6 +11,7 @@ import {
   omitUndefined,
   type MayEvent,
   type Message,
+  type ModelRequestSink,
   type ContinueOptions,
   type RunHandle,
   type RunOptions,

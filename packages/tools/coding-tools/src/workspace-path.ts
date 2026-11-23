@@ -43,7 +43,15 @@ async function resolveWorkspacePath(
   options: WorkspacePathOptions,
 ): Promise<WorkspacePath> {
   const root = await resolveWorkspaceRoot(cwd);
-  const candidate = resolve(root, inputPath);
+  const resolvedCwd = resolve(cwd);
+  let normalizedInput = inputPath;
+  if (isAbsolute(inputPath)) {
+    const relFromCwd = relative(resolvedCwd, resolve(inputPath));
+    if (relFromCwd !== ".." && !relFromCwd.startsWith(`..${sep}`) && !isAbsolute(relFromCwd)) {
+      normalizedInput = relFromCwd;
+    }
+  }
+  const candidate = resolve(root, normalizedInput);
   assertInside(root, candidate, inputPath);
   const displayPath = toDisplayPath(relative(root, candidate));
 
@@ -118,6 +126,7 @@ async function assertExistingParentInside(root: string, initialParent: string, i
       if (!isMissingPathError(error)) throw error;
     }
 
+    await assertNotUnresolvedSymbolicLink(parent, inputPath);
     const nextParent = dirname(parent);
     if (nextParent === parent) {
       throw new CodingToolError("CODING_TOOL_PATH_OUTSIDE_WORKSPACE", `Path is outside the workspace: ${inputPath}`);

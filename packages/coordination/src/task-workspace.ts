@@ -3,6 +3,7 @@ import { constants } from "node:fs";
 import { lstat, mkdir, open, readdir, realpath, rename } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { isDeepStrictEqual } from "node:util";
+import { hasErrorCode } from "@sortedyuan/may/storage";
 import { ResourceJournal, count, resourceId } from "./resource-journal.js";
 
 /** @experimental */
@@ -399,7 +400,7 @@ async function canonicalPotentialPath(path: string): Promise<string> {
   try {
     return await realpath(path);
   } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+    if (!hasErrorCode(error, "ENOENT")) throw error;
     const parent = resolve(path, "..");
     if (parent === path) throw error;
     return join(await canonicalPotentialPath(parent), relative(parent, path));
@@ -453,7 +454,7 @@ async function quarantineUnpublished(path: string, root: string): Promise<void> 
   try {
     info = await lstat(path);
   } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return;
+    if (hasErrorCode(error, "ENOENT")) return;
     throw error;
   }
   if (!info.isDirectory() || info.isSymbolicLink() || !inside(root, await realpath(path)))

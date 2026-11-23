@@ -6,6 +6,7 @@ export * from "./events.js";
 export * from "./may.js";
 export * from "./hooks.js";
 export * from "./runtime.js";
+export * from "./default-runtime.js";
 export * from "./model.js";
 export * from "./request-recording.js";
 export * from "./tool.js";

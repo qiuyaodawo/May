@@ -2,6 +2,7 @@ import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import which from "which";
+import { hasErrorCode } from "@sortedyuan/may/storage";
 import type { CodingExecutionEnvironment } from "@sortedyuan/coding-tools";
 import type { LanguageServerDefinition } from "./types.js";
 import { LspServerNotFoundError } from "./errors.js";
@@ -111,7 +112,7 @@ export async function resolveServerCommand(
             args: [await npmScript(manifest, definition.command), ...definition.args],
           };
         } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+          if (!hasErrorCode(error, "ENOENT")) throw error;
         }
       } else return { command, args: definition.args };
     }

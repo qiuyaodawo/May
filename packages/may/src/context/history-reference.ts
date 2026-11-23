@@ -5,7 +5,7 @@ import {
   type Message,
   type SystemMessage,
 } from "../core/index.js";
-import { positiveInteger } from "../core/positive-integer.js";
+import { positiveInteger } from "../internal/positive-integer.js";
 
 import type { ContextCompactionOptions, ContextCompactionStrategy } from "./compaction.js";
 

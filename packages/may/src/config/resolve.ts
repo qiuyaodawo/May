@@ -1,4 +1,4 @@
-import { omitUndefined } from "../core/omit-undefined.js";
+import { omitUndefined } from "../core/index.js";
 import { MayConfigResolutionError } from "./errors.js";
 import type { MayConfig, ProviderConfig, ResolvedModelProfile, ResolveProviderOptions } from "./types.js";
 

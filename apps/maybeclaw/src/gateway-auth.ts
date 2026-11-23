@@ -82,7 +82,15 @@ export class GatewayAuth {
   refresh(): Promise<void> {
     if (this.closed) return Promise.reject(new UiError(503, "认证服务已关闭。"));
     const work = withGatewayConfiguration(this.path, async (raw, save) => {
-      const settings = authSettings(raw.server?.auth);
+      const server =
+        typeof raw.server === "object" && raw.server !== null && !Array.isArray(raw.server)
+          ? (raw.server as Record<string, unknown>)
+          : undefined;
+      const existingAuth =
+        typeof server?.auth === "object" && server.auth !== null && !Array.isArray(server.auth)
+          ? (server.auth as Record<string, unknown>)
+          : undefined;
+      const settings = authSettings(server?.auth);
       if (
         settings.password !== undefined ||
         settings.passwordHash !== this.passwordHash ||
@@ -92,10 +100,10 @@ export class GatewayAuth {
         this.passwordHash = "";
         const encoded =
           settings.password === undefined ? settings.passwordHash! : await hash(settings.password, parameters);
-        if (settings.password !== undefined) {
-          raw.server.auth = {
+        if (settings.password !== undefined && server !== undefined) {
+          server.auth = {
             passwordHash: encoded,
-            ...(raw.server.auth.sessionMs === undefined ? {} : { sessionMs: settings.sessionMs }),
+            ...(existingAuth?.sessionMs === undefined ? {} : { sessionMs: settings.sessionMs }),
           };
           await save();
         }

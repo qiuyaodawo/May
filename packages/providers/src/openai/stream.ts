@@ -1,6 +1,6 @@
 import type { AssistantMessage, ContentPart, ModelEvent, ServerToolCall, ToolCall, Usage } from "@sortedyuan/may/core";
 import { omitUndefined } from "@sortedyuan/may/core";
-import { readSseData } from "../openai-compatible/http.js";
+import { readSseData } from "../http.js";
 
 import { OpenAIResponsesError, OpenAIResponsesProtocolError } from "./errors.js";
 import { OPENAI_RESPONSES_MODEL_STATE_TYPE, type OpenAIResponsesUsage } from "./protocol.js";

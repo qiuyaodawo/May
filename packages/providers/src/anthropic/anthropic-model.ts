@@ -1,6 +1,6 @@
 import { executeRecordedRequest, requestEndpoint } from "@sortedyuan/may/core";
 import type { Message, Model, ModelEvent, ModelRequest, ModelStreamOptions } from "@sortedyuan/may/core";
-import { parseRetryAfterMs } from "../openai-compatible/http.js";
+import { parseRetryAfterMs } from "../http.js";
 import { toAnthropicRequestParts, toAnthropicThinking, toAnthropicTools } from "./convert.js";
 import { AnthropicApiError } from "./errors.js";
 import type { AnthropicMessagesRequest, AnthropicReasoningEffort, AnthropicThinkingConfig } from "./protocol.js";

@@ -1,5 +1,5 @@
 import { omitUndefined } from "@sortedyuan/may/core";
-import { OpenAICompatibleChatModel } from "../openai-compatible/chat-model.js";
+import { OpenAICompatibleChatModel } from "../openai-compatible/index.js";
 import { validateWebSearch, webSearchRequest, type WebSearchOptions } from "../web-search.js";
 
 /**

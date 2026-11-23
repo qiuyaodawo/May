@@ -76,6 +76,7 @@ test(
     });
     const relay = (async () => {
       for await (const _event of application.events) {
+        /* drain */
       }
     })();
     t.after(async () => {

@@ -3,8 +3,9 @@
 [English](../../en/reference/configuration.md) | **简体中文**
 
 May 默认读取 `~/.may/config.json`，分别保存命名 Provider 连接、模型配置和应用设置。
-配置读取、默认模型更新与 MaybeClaw 鉴权设置更新通过 `<config-path>.access`
-及 `<config-path>.access.gate` 协调本机不同进程的文件访问。首次访问创建这两个
+配置读取、默认模型更新与 MaybeClaw 鉴权设置更新会先通过 `resolveMayConfigTargetPath(path)`
+解析符号链接和别名目录对应的规范目标文件，再通过 `<target-path>.access`
+及 `<target-path>.access.gate` 协调本机不同进程的文件访问。首次访问创建这两个
 空文件，需要目录写入权限。请将它们与配置文件一起保留。在使用只读配置目录之前，
 使用具有目录写入权限的进程调用一次 `loadMayConfig({ path })`；后续读取只需要
 配置文件及两个 access 文件的读取权限。

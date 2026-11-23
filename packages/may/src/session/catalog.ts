@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
-import { omitUndefined } from "../core/omit-undefined.js";
-import { writeFileDurable } from "../storage/index.js";
+import { mkdir, readFile, readdir, rm } from "node:fs/promises";
+import { omitUndefined } from "../core/index.js";
+import { hasErrorCode, writeFileDurable } from "../storage/index.js";
 import { join, resolve } from "node:path";
 
 /** @experimental */
@@ -75,8 +75,8 @@ export class FileSessionCatalog implements SessionCatalog {
       return Promise.reject(new Error("Catalog compaction requires stopped hosts"));
     return this.enqueue(async () => {
       const sessions = await this.readNow();
-      const names = await readdir(this.operationsDirectory).catch((error: NodeJS.ErrnoException) => {
-        if (error.code === "ENOENT") return [];
+      const names = await readdir(this.operationsDirectory).catch((error: unknown) => {
+        if (hasErrorCode(error, "ENOENT")) return [];
         throw error;
       });
       const absorbed = names.filter((name) => name.endsWith(".json"));
@@ -160,7 +160,7 @@ export class FileSessionCatalog implements SessionCatalog {
     try {
       source = await readFile(this.path, "utf8");
     } catch (error) {
-      if (isNodeError(error, "ENOENT")) return { sessions: [], absorbed: [] };
+      if (hasErrorCode(error, "ENOENT")) return { sessions: [], absorbed: [] };
       throw error;
     }
 
@@ -194,7 +194,7 @@ export class FileSessionCatalog implements SessionCatalog {
         .filter((name) => name.endsWith(".json") && !absorbed.has(name))
         .sort();
     } catch (error) {
-      if (isNodeError(error, "ENOENT")) return [];
+      if (hasErrorCode(error, "ENOENT")) return [];
       throw error;
     }
     const operations: CatalogOperation[] = [];
@@ -219,17 +219,11 @@ export class FileSessionCatalog implements SessionCatalog {
   private async appendOperation(operation: CatalogOperation): Promise<void> {
     await mkdir(this.operationsDirectory, { recursive: true });
     const token = randomUUID();
-    const temporary = join(this.operationsDirectory, `.${process.pid}-${token}.tmp`);
-    try {
-      await writeFile(temporary, `${JSON.stringify(operation)}\n`, "utf8");
-      const timestamp = await this.nextOperationTimestamp();
-      await rename(
-        temporary,
-        join(this.operationsDirectory, `${String(timestamp).padStart(16, "0")}-${process.pid}-${token}.json`),
-      );
-    } finally {
-      await rm(temporary, { force: true });
-    }
+    const timestamp = await this.nextOperationTimestamp();
+    await writeFileDurable(
+      join(this.operationsDirectory, `${String(timestamp).padStart(16, "0")}-${process.pid}-${token}.json`),
+      `${JSON.stringify(operation)}\n`,
+    );
   }
 
   private async nextOperationTimestamp(): Promise<number> {
@@ -329,8 +323,4 @@ function isSessionSummary(value: unknown): value is SessionSummary {
     (!("turnCount" in value) ||
       (Number.isSafeInteger(value.turnCount) && typeof value.turnCount === "number" && value.turnCount >= 0))
   );
-}
-
-function isNodeError(error: unknown, code: string): boolean {
-  return error instanceof Error && "code" in error && error.code === code;
 }

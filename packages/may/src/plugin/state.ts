@@ -1,5 +1,5 @@
 import { satisfies, valid } from "semver";
-import { AsyncStateSerializer } from "../core/state-serializer.js";
+import { AsyncStateSerializer } from "../core/index.js";
 import type { AnyPlugin, PluginState, PluginStateRecord, PluginStateSnapshot } from "./types.js";
 import { validateJson, validateSchema } from "./validation.js";
 

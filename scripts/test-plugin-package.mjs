@@ -1,7 +1,14 @@
-import { spawn } from "node:child_process";
-import { copyFile, mkdir, readFile, readdir, realpath } from "node:fs/promises";
+import { copyFile, mkdir, realpath } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  discoverWorkspacePackages,
+  packWorkspacePackages,
+  resolveConsumerTestDependencies,
+  resolvePublishableRuntimeClosure,
+  runCommand,
+  runPnpm,
+} from "./package-consumer-deps.mjs";
 
 const repository = dirname(dirname(fileURLToPath(import.meta.url)));
 const pnpm = process.env.npm_execpath;
@@ -16,7 +23,8 @@ if (relative(await realpath(repository), actual).startsWith(".."))
   throw new Error("Package verification path must stay in the worktree");
 if (!relative(await realpath(repository), await realpath(consumer)).startsWith(".."))
   throw new Error("The packaged consumer must be outside the repository");
-await runPnpm(["build"], repository);
+
+await runPnpm(pnpm, ["build"], repository);
 const targets = [
   "@sortedyuan/may",
   "@sortedyuan/coordination",
@@ -24,59 +32,32 @@ const targets = [
   "@sortedyuan/observability",
   "@sortedyuan/gateway",
 ];
-const manifests = new Map();
-const packageDirectories = new Map();
-for (const group of ["packages", "packages/tools", "packages/ui"]) {
-  for (const entry of await readdir(join(repository, group), { withFileTypes: true })) {
-    if (!entry.isDirectory()) continue;
-    const directory = join(repository, group, entry.name);
-    if (!(await readdir(directory)).includes("package.json")) continue;
-    const manifest = JSON.parse(await readFile(join(directory, "package.json"), "utf8"));
-    manifests.set(manifest.name, manifest);
-    packageDirectories.set(manifest.name, `${group}/${entry.name}`);
-  }
-}
-const required = new Set();
-function include(name) {
-  if (required.has(name)) return;
-  const manifest = manifests.get(name);
-  if (!manifest || manifest.private) throw new Error(`Runtime dependency is not a public package: ${name}`);
-  required.add(name);
-  for (const dependency of Object.keys({
-    ...manifest.dependencies,
-    ...manifest.optionalDependencies,
-    ...manifest.peerDependencies,
-  })) {
-    if (dependency.startsWith("@sortedyuan/")) include(dependency);
-  }
-}
-targets.forEach(include);
-for (const name of required) {
-  await runPnpm(["--filter", name, "pack", "--pack-destination", packs], repository);
-}
-const tarballs = (await readdir(packs)).filter((name) => name.endsWith(".tgz")).map((name) => join(packs, name));
+const workspacePackages = await discoverWorkspacePackages(repository);
+const required = resolvePublishableRuntimeClosure(workspacePackages, targets);
+const { tarballs, overrides } = await packWorkspacePackages({
+  packages: workspacePackages,
+  names: required,
+  packsDirectory: packs,
+  repository,
+  pnpm,
+  consumer,
+});
+
 await copyFile(join(repository, "packages/may/test/plugin/consumer/package.json"), join(consumer, "package.json"));
 await copyFile(
   join(repository, "packages/may/test/plugin/consumer/pnpm-workspace.yaml"),
   join(consumer, "pnpm-workspace.yaml"),
 );
-const overrides = Object.fromEntries(
-  [...required].map((name) => {
-    const tarball = tarballs.find(
-      (path) => basename(path) === `${name.replace("@", "").replace("/", "-")}-${manifests.get(name).version}.tgz`,
-    );
-    if (!tarball) throw new Error(`Packed runtime dependency is missing: ${name}`);
-    return [name, `file:${relative(consumer, tarball).replaceAll("\\", "/")}`];
-  }),
-);
 await runPnpm(
+  pnpm,
   ["--dir", consumer, "config", "set", "overrides", JSON.stringify(overrides), "--json", "--location", "project"],
   consumer,
 );
-await runPnpm(["--dir", consumer, "add", ...tarballs, "--ignore-scripts"], consumer);
+await runPnpm(pnpm, ["--dir", consumer, "add", ...tarballs, "--ignore-scripts"], consumer);
 await copyFile(join(repository, "packages/may/test/plugin/consumer/index.mjs"), join(consumer, "index.mjs"));
-await run(process.execPath, [join(consumer, "index.mjs")], consumer);
+await runCommand(process.execPath, [join(consumer, "index.mjs")], consumer);
 await copyFile(join(repository, "README.md"), join(consumer, "README.md"));
+
 const subpathTests = [
   "packages/may/test/services/models.test.mjs",
   "packages/may/test/services/runtime.test.mjs",
@@ -85,34 +66,25 @@ const subpathTests = [
   "packages/coordination/test/plugin.test.mjs",
   "packages/may/test/session/history-retrieval-tools.test.mjs",
 ];
-const testDependencies = new Map();
-for (const path of subpathTests) {
-  const owner = [...packageDirectories].find(([, directory]) => path.startsWith(`${directory}/`));
-  if (!owner) throw new Error(`Test file is outside a workspace package: ${path}`);
-  for (const [name, range] of Object.entries(manifests.get(owner[0]).devDependencies ?? {})) {
-    let specifier;
-    if (range.startsWith("workspace:")) {
-      if (required.has(name)) continue;
-      if (!manifests.get(name)?.private)
-        throw new Error(`Test dependency ${name} of ${owner[0]} is a public package outside the packed chain`);
-      specifier = `link:${relative(consumer, join(repository, packageDirectories.get(name))).replaceAll("\\", "/")}`;
-    } else {
-      specifier = `${name}@${range}`;
-    }
-    const existing = testDependencies.get(name);
-    if (existing !== undefined && existing !== specifier)
-      throw new Error(`Test dependency ${name} is declared as both ${existing} and ${specifier}`);
-    testDependencies.set(name, specifier);
-  }
-}
-await runPnpm(["--dir", consumer, "add", "--save-dev", ...testDependencies.values(), "--ignore-scripts"], consumer);
+const testDependencies = resolveConsumerTestDependencies(
+  workspacePackages,
+  required,
+  subpathTests,
+  repository,
+  consumer,
+);
+await runPnpm(
+  pnpm,
+  ["--dir", consumer, "add", "--save-dev", ...testDependencies.values(), "--ignore-scripts"],
+  consumer,
+);
 for (const path of subpathTests) {
   await mkdir(dirname(join(consumer, path)), { recursive: true });
   await copyFile(join(repository, path), join(consumer, path));
 }
-await run(process.execPath, ["--test", ...subpathTests.map((path) => join(consumer, path))], consumer);
+await runCommand(process.execPath, ["--test", ...subpathTests.map((path) => join(consumer, path))], consumer);
 await copyFile(join(repository, "packages/may/test/plugin/consumer/subpaths.ts"), join(consumer, "subpaths.ts"));
-await run(
+await runCommand(
   process.execPath,
   [
     join(repository, "node_modules/typescript/bin/tsc"),
@@ -131,19 +103,5 @@ await run(
   ],
   consumer,
 );
-console.log(`Verified ${targets.length} plugin packages and their ${required.size} packaged runtime dependencies`);
+console.log(`Verified ${targets.length} plugin packages and their ${required.length} packaged runtime dependencies`);
 console.log(`External consumer: ${consumer}`);
-
-function runPnpm(args, cwd, env = process.env) {
-  return /\.[cm]?js$/iu.test(pnpm) ? run(process.execPath, [pnpm, ...args], cwd, env) : run(pnpm, args, cwd, env);
-}
-
-async function run(executable, args, cwd, env = process.env) {
-  await new Promise((accept, reject) => {
-    const child = spawn(executable, args, { cwd, env, stdio: "inherit", windowsHide: true });
-    child.once("error", reject);
-    child.once("exit", (code) =>
-      code === 0 ? accept() : reject(new Error(`Package check command exited with ${code}`)),
-    );
-  });
-}

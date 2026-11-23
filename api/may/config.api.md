@@ -89,9 +89,12 @@ export class MayConfigValidationError extends MayConfigError {
 
 // @public (undocumented)
 export class MayConfigWriteError extends MayConfigError {
-    constructor(path: string, problem?: string, options?: ErrorOptions);
+    constructor(path: string, problem?: string, options?: ErrorOptions & {
+        readonly replaced?: boolean;
+    });
     // (undocumented)
     readonly path: string;
+    readonly replaced: boolean;
 }
 
 // @public (undocumented)
@@ -174,6 +177,9 @@ export interface ResolvedModelProfile {
     // (undocumented)
     readonly providerConfig: ProviderConfig;
 }
+
+// @public
+export function resolveMayConfigTargetPath(path: string): Promise<string>;
 
 // @public (undocumented)
 export function resolveModelProfile(config: MayConfig, name?: string, options?: ResolveProviderOptions): ResolvedModelProfile;

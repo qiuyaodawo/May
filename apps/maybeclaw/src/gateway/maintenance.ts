@@ -161,20 +161,20 @@ export function closeAdapter(
 ): Promise<void> {
   const current = this.adapterClosings.get(id);
   if (current) return current;
-  const close = (async () => {
-    const adapter = await pending;
-    for (const binding of bindings) await adapter.release?.(binding.conversationId!);
-    await (await this.pluginHost()).get(agentAdapterRegistryService).release(id);
-    if (this.adapters.get(id) === pending) this.adapters.delete(id);
-    this.adapterStates.delete(id);
-    this.adapterUsedAt.delete(id);
-  })();
-  this.adapterClosings.set(id, close);
-  void close
-    .finally(() => {
+  let close!: Promise<void>;
+  close = (async () => {
+    try {
+      const adapter = await pending;
+      for (const binding of bindings) await adapter.release?.(binding.conversationId!);
+      await (await this.pluginHost()).get(agentAdapterRegistryService).release(id);
+      if (this.adapters.get(id) === pending) this.adapters.delete(id);
+      this.adapterStates.delete(id);
+      this.adapterUsedAt.delete(id);
+    } finally {
       if (this.adapterClosings.get(id) === close) this.adapterClosings.delete(id);
       this.changed();
-    })
-    .catch(() => undefined);
+    }
+  })();
+  this.adapterClosings.set(id, close);
   return close;
 }

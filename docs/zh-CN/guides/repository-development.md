@@ -30,8 +30,10 @@ Web 服务资源在使用时加载。
   详见 [API 稳定性](../reference/stability.md)。
 
 - `pnpm lint --max-warnings 0`：对每个 workspace package 和应用中 `src/` 下的
-  TypeScript 源文件执行带类型信息的 ESLint 检查。
+  TypeScript 源文件及 `test/` 下的测试文件执行 ESLint 检查（包含带类型信息的异步/穷尽检查、禁止逃生舱口规则与存量基线 `scripts/eslint-ban-hacks-baseline.json`）。
   ESLint 使用 TypeScript 5.9；`tsc -b` 使用 TypeScript 7。CI 在 Ubuntu 和 Node.js 24 上执行 lint。
+- `pnpm boundaries:check`：通过 `scripts/check-boundaries.mjs` 校验 5 层包依赖矩阵、公开 `exports` 出口、包内跨子目录封装和运行时循环依赖（存量测试越界与类型环冻结在只减不增的 `scripts/boundaries-baseline.json`）。
+- `pnpm baselines:check`：校验 `scripts/boundaries-baseline.json` 与 `scripts/eslint-ban-hacks-baseline.json` 的完整性；在 PR CI 中额外对比目标分支基线，拒绝新增任何存量豁免条目。
 - `pnpm format`：使用 Prettier（`printWidth: 120`）格式化仓库；`pnpm format:check` 只报告
   未格式化的文件，不修改文件。CI 在 Linux 和 Node.js 24 上运行这项检查。
 - `pnpm install` 会注册 Husky 的 `pre-commit` 钩子，钩子对暂存的文件运行
@@ -46,8 +48,10 @@ Web 服务资源在使用时加载。
 - `pnpm --filter <package-name> test`：检查一个 package，使用其 `package.json` 中
   的名称替换参数。
 - 测试把临时数据写入被忽略的 `.test-output/`。私有 package `@sortedyuan/test-support` 提供
-  `createTestDirectory(t, name)`，它创建 `.test-output/<name>-XXXXXX` 并在测试结束后删除；
-  共用的测试目录使用 `testOutputRoot`。
+  `createTestDirectory(t, name)`（创建 `.test-output/<name>-XXXXXX` 并在测试结束后删除）、
+  `trackServer(t, server)` / `closeServer(server)`（安全关闭测试 HTTP/Net 服务并断开长连接），
+  以及用于共用目录的 `testOutputRoot`。
+- 工作区 `test` 脚本统一通过 `scripts/run-node-tests.mjs` 启动 `node --test`，默认启用单测超时（`MAY_TEST_TIMEOUT_MS`，默认 120000 ms，可被单个用例的 `timeout` 覆盖）以及 `scripts/test-leak-guard.mjs` 活跃句柄泄漏护栏（所有用例结束后若子进程在 `MAY_TEST_LEAK_GRACE_MS`，默认 5000 ms 内未自然退出，则打印 `process.getActiveResourcesInfo()` 并以非零状态失败）。
 - `pnpm test` 依次执行工作区各个 package 的离线测试脚本。当前脚本完成构建和测试后，
   下一个 package 才能重新构建共用的依赖。命令在所有脚本执行结束后报告失败情况，
   全部通过时继续执行文件锁检查。
@@ -56,8 +60,9 @@ Web 服务资源在使用时加载。
   文件 API 控制待删除状态，验证竞争时序。测试数据位于忽略的
   `.test-output/file-lock-matrix/`；Team patch 检查结束后清理临时来源目录对应的应用锁文件。
 - `pnpm test:coverage`：执行各个 package 提供的覆盖率检查。
+- `pnpm test:fuzz`：通过 `fast-check`（由 `@sortedyuan/test-support` 导出）以更高迭代次数（默认 `MAY_PBT_RUNS=500`）运行核心状态机、权限、预算、调度器、路径沙箱与流式协议属性测试。
 - `pnpm test:path-alias`：通过 Windows junction 或 POSIX symlink 使用临时目录，
-  检查代码对规范路径的假设。
+  检查代码对规范路径的假设；`pnpm test:path-alias:smoke` 运行快速冒烟子集并在 PR CI 的 Windows/macOS 上自动执行。
 - `pnpm test:package:maybecode`、`pnpm test:package:plugin` 和
   `pnpm test:package:eval`：在仓库外检查打包后的 package。
 

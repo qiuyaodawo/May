@@ -24,7 +24,7 @@
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
-    "test:browser": "pnpm --filter @sortedyuan/providers build && pnpm run build && node --test test/browser/*.test.mjs"
+    "test:browser": "pnpm --filter @sortedyuan/providers build && pnpm run build && node ../../../scripts/run-node-tests.mjs test/browser/*.test.mjs"
   },
   "dependencies": {
     "@sortedyuan/ui-client": "workspace:*",

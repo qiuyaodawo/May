@@ -1,5 +1,6 @@
 import type { CoordinationSnapshot } from "@sortedyuan/coordination";
 import type { AgentGateway } from "../gateway.js";
+import { PostRenameDurabilityError } from "../config-file-write.js";
 import { withGatewayConfiguration } from "../gateway-config.js";
 import { gatewayEntry } from "../gateway-settings.js";
 import type { GatewayStore } from "../gateway-store.js";
@@ -167,15 +168,23 @@ export async function setSessionAdmins(
   if (actor.kind !== "operator") throw new Error("配置会话管理员需要服务管理员权限。");
   this.session(id, actor);
   if (keys.some((key) => !key.trim())) throw new Error("管理员身份不能为空。");
-  await saveConfiguration.call(this, (raw) => {
-    const access = raw.access as Record<string, unknown> | undefined;
-    raw.access = {
-      ...access,
-      sessionAdmins: { ...((access?.sessionAdmins as object) ?? {}), [id]: [...new Set(keys)] },
-    };
-  });
-  this.options.settings.access.sessionAdmins[id] = [...new Set(keys)];
+  const nextKeys = [...new Set(keys)];
+  let durabilityError: PostRenameDurabilityError | undefined;
+  try {
+    await saveConfiguration.call(this, (raw) => {
+      const access = raw.access as Record<string, unknown> | undefined;
+      raw.access = {
+        ...access,
+        sessionAdmins: { ...((access?.sessionAdmins as object) ?? {}), [id]: nextKeys },
+      };
+    });
+  } catch (error) {
+    if (!(error instanceof PostRenameDurabilityError)) throw error;
+    durabilityError = error;
+  }
+  this.options.settings.access.sessionAdmins[id] = nextKeys;
   this.changed();
+  if (durabilityError) throw durabilityError;
 }
 
 export async function updateAgent(
@@ -250,17 +259,37 @@ export async function updateAgent(
     )
       throw new Error(`Agent ${id} 仍有等待或需要核对的任务，请完成或停止协作任务后修改配置。`);
     if (this.closing) throw new Error("Gateway 正在关闭，尚未应用 Agent 配置。");
-    await saveConfiguration.call(this, (raw) => {
-      if (raw.agents !== undefined && !Array.isArray(raw.agents)) throw new Error("agents 必须为列表。");
-      const currentAgents = (raw.agents ?? []) as GatewayAgentConfig[];
-      raw.agents = currentAgents.filter((agent) => agent.id !== id).concat(config ? [config] : []);
-    });
+    let durabilityError: PostRenameDurabilityError | undefined;
+    try {
+      await saveConfiguration.call(this, (raw) => {
+        if (raw.agents !== undefined && !Array.isArray(raw.agents)) throw new Error("agents 必须为列表。");
+        const currentAgents = (raw.agents ?? []) as GatewayAgentConfig[];
+        raw.agents = currentAgents.filter((agent) => agent.id !== id).concat(config ? [config] : []);
+      });
+    } catch (error) {
+      if (!(error instanceof PostRenameDurabilityError)) throw error;
+      durabilityError = error;
+    }
     const previous = this.adapters.get(id);
-    if (previous) await this.closeAdapter(id, previous);
+    if (previous) this.adapters.delete(id);
     this.adapterStates.delete(id);
     const index = this.options.settings.agents.findIndex((agent) => agent.id === id);
     if (index >= 0) this.options.settings.agents.splice(index, 1);
     if (config) this.options.settings.agents.push(config);
+    this.changed();
+    let closeError: unknown;
+    if (previous) {
+      try {
+        await this.closeAdapter(id, previous);
+      } catch (error) {
+        closeError = error;
+      }
+    }
+    if (durabilityError && closeError !== undefined) {
+      throw new AggregateError([durabilityError, closeError], durabilityError.message);
+    }
+    if (durabilityError) throw durabilityError;
+    if (closeError !== undefined) throw closeError;
   } finally {
     finishConfiguration();
     this.configurationJobs.delete(configurationJob);

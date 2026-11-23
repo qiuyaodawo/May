@@ -19,8 +19,8 @@
     "build": "tsc -b",
     "clean": "tsc -b --clean",
     "start": "pnpm run build && node dist/bin.js",
-    "test": "pnpm run build && node --test test/*.test.mjs",
-    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*.test.mjs"
+    "test": "pnpm run build && node ../../scripts/run-node-tests.mjs test/*.test.mjs",
+    "test:coverage": "pnpm run build && node ../../scripts/run-node-tests.mjs --experimental-test-coverage test/*.test.mjs"
   },
   "dependencies": {
     "@sortedyuan/may": "workspace:*",

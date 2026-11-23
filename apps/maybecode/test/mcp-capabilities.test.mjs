@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { join } from "node:path";
-import { createTestDirectory } from "@sortedyuan/test-support";
+import { createTestDirectory, until } from "@sortedyuan/test-support";
 import { openMcpClientPool, McpInteractionBroker, McpTaskJournal, InMemoryMcpCredentialStore } from "@sortedyuan/mcp";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { InMemorySessionCatalog } from "@sortedyuan/may/session/catalog";
@@ -238,13 +238,8 @@ test(
       /ma-completed/,
     );
     await command("/mcp watch remote test:///first");
-    const notice = new Promise((resolve) => {
-      const poll = () =>
-        observed.some((event) => event.type === "mcp.resource.updated") ? resolve() : setTimeout(poll, 5);
-      poll();
-    });
     fixture.update("test:///first");
-    await notice;
+    await until(t, () => observed.some((event) => event.type === "mcp.resource.updated"));
     assert.equal(requests.length, 2, "notifications never attach changed resources automatically");
     await command("/mcp unwatch remote test:///first");
     const oldSession = app.sessionId;

@@ -1,5 +1,5 @@
-import { omitUndefined } from "../core/omit-undefined.js";
-import { positiveInteger } from "../core/positive-integer.js";
+import { omitUndefined } from "../core/index.js";
+import { positiveInteger } from "../internal/positive-integer.js";
 import type { SessionEvent } from "./events.js";
 import type { SessionStore } from "./store.js";
 import { validateSessionHistory } from "./store.js";

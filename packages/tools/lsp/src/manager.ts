@@ -1,6 +1,7 @@
 import { watch, type FSWatcher } from "node:fs";
 import { stat } from "node:fs/promises";
 import { extname, join } from "node:path";
+import { hasErrorCode } from "@sortedyuan/may/storage";
 import {
   createProtocolConnection,
   type ServerCapabilities,
@@ -453,8 +454,8 @@ class Manager implements LanguageServerManager {
       signal.throwIfAborted();
       const exists = await stat(document.path.absolute).then(
         () => true,
-        (error: NodeJS.ErrnoException) => {
-          if (error.code === "ENOENT") return false;
+        (error: unknown) => {
+          if (hasErrorCode(error, "ENOENT")) return false;
           throw error;
         },
       );

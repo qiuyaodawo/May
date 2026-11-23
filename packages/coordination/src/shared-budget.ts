@@ -397,8 +397,9 @@ export class FileSharedBudget {
           ? estimatedTotals(call.reservation)
           : usageTotals(usage, this.limits, this.usagePricer, preparedCost);
         return {
-          ...call,
+          id: call.id,
           status: "settled" as const,
+          reservation: call.reservation,
           usage: { ...usage },
           ...actual,
           ...(estimated ? { estimated: true } : {}),
@@ -413,7 +414,9 @@ export class FileSharedBudget {
   private async markUnknown(id: string): Promise<void> {
     await this.journal.transact((state) => ({
       ...state,
-      calls: state.calls.map((call) => (call.id === id ? { ...call, status: "unknown" as const } : call)),
+      calls: state.calls.map((call) =>
+        call.id === id ? { id: call.id, status: "unknown" as const, reservation: call.reservation } : call,
+      ),
     }));
   }
 }

@@ -1,6 +1,7 @@
 import { lstat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { hasErrorCode } from "@sortedyuan/may/storage";
 import type { MaybeCodeStartCommand } from "./args.js";
 
 export async function missingMaybeCodeConfig(command: MaybeCodeStartCommand): Promise<string | undefined> {
@@ -9,7 +10,7 @@ export async function missingMaybeCodeConfig(command: MaybeCodeStartCommand): Pr
     await lstat(path);
     return undefined;
   } catch (error) {
-    if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+    if (!hasErrorCode(error, "ENOENT")) throw error;
   }
   if (command.ui === "web" && !/^[\x21-\x7e]{32,256}$/u.test(process.env.MAYBECODE_CONTROL_TOKEN ?? "")) {
     throw new Error("Set MAYBECODE_CONTROL_TOKEN (32..256 printable ASCII characters) before starting --ui web.");

@@ -1,5 +1,6 @@
 import type { WorkspacePath } from "./workspace-path.js";
 import { stat } from "node:fs/promises";
+import { isMissingPathError } from "./missing-path.js";
 
 /**
  * 一次受保护的文件操作。工具已经解析并校验过路径，宿主无需再自行解析。
@@ -39,7 +40,7 @@ export async function assertFileExistence(path: WorkspacePath, signal?: AbortSig
     const information = await stat(path.absolute);
     return information.isFile();
   } catch (error) {
-    if (error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")) {
+    if (isMissingPathError(error)) {
       return false;
     }
     throw error;

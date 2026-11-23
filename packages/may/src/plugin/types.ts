@@ -107,6 +107,7 @@ export interface PluginDefinition<C = unknown> {
 }
 
 /** @experimental */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Contravariant collection of differently typed PluginDefinition<TConfig> entries.
 export type AnyPlugin = PluginDefinition<any>;
 
 /** @experimental */

@@ -1,5 +1,4 @@
-import type { HookContext, HookDefinition, HookDispatcher } from "../core/index.js";
-import { AsyncStateSerializer } from "../core/state-serializer.js";
+import { AsyncStateSerializer, type HookContext, type HookDefinition, type HookDispatcher } from "../core/index.js";
 import { satisfies } from "semver";
 import { asError, handlerContext, HookRegistry, immutable, orderHandlers, withDeadline } from "./hooks.js";
 import { StateStore } from "./state.js";

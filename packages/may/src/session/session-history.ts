@@ -1,6 +1,6 @@
 import { omitUndefined, type Tool } from "../core/index.js";
-import { positiveInteger } from "../core/positive-integer.js";
-import { utf8Bytes } from "../core/utf8-bytes.js";
+import { positiveInteger } from "../internal/positive-integer.js";
+import { utf8Bytes } from "../internal/utf8-bytes.js";
 import {
   SESSION_EVENT_TYPES,
   sessionToolResultContent,

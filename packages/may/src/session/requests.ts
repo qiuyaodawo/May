@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { canonicalize } from "json-canonicalize";
-import { omitUndefined } from "../core/omit-undefined.js";
-import type { ModelRequestRecord } from "../core/request-recording.js";
+import { omitUndefined, type ModelRequestRecord, type Usage } from "../core/index.js";
 import type { SessionEvent } from "./events.js";
 
 /** @experimental */
@@ -33,7 +32,7 @@ export type SessionRequestEvent =
       modelCallId: string;
       attempt: number;
       durationMs: number;
-      usage?: import("../core/types.js").Usage;
+      usage?: Usage;
     }
   | {
       type: "model.attempt.failed";

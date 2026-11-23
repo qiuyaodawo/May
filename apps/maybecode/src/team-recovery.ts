@@ -10,6 +10,7 @@ import {
 } from "@sortedyuan/coordination";
 import { FileCoordinationStore } from "@sortedyuan/coordination/file-store";
 import type { Usage } from "@sortedyuan/may/core";
+import { hasErrorCode } from "@sortedyuan/may/storage";
 import { FileSessionStore } from "@sortedyuan/may/session/file-store";
 import { TeamVerificationStore } from "./team-verification.js";
 
@@ -190,7 +191,7 @@ async function optional<T>(read: () => Promise<T>): Promise<T | undefined> {
   try {
     return await read();
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return undefined;
+    if (hasErrorCode(error, "ENOENT")) return undefined;
     throw error;
   }
 }

@@ -4,6 +4,7 @@ import { MaybeCodeUsageError } from "./errors.js";
 import { parsePermissionMode, type MaybeCodePermissionMode } from "./policy.js";
 
 import type { AgentStateTransitionOptions } from "@sortedyuan/may";
+import { MayConfigWriteError } from "@sortedyuan/may/config";
 import { observabilityService } from "@sortedyuan/observability/plugin";
 import type { DiagnosticQuery, DiagnosticResult } from "@sortedyuan/observability";
 import {
@@ -871,7 +872,15 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
           throw new Error("The active MaybeCode configuration is not writable");
         }
 
-        await persist(profile);
+        let durabilityError: MayConfigWriteError | undefined;
+        try {
+          await persist(profile);
+        } catch (error) {
+          if (!(error instanceof MayConfigWriteError && error.replaced)) {
+            throw error;
+          }
+          durabilityError = error;
+        }
         this.state.options = {
           ...this.state.options,
           modelProfiles: profiles.map((candidate) => ({
@@ -880,6 +889,9 @@ export class MaybeCodeWorkspace implements MaybeCodeController {
           })),
         };
         this.manager.emit({ type: "model.default.changed", profile });
+        if (durabilityError !== undefined) {
+          throw durabilityError;
+        }
       },
       { requireIdle: false },
     );

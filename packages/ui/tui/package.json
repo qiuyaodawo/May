@@ -45,8 +45,8 @@
     "build": "tsc -b",
     "clean": "tsc -b --clean",
     "demo": "pnpm run build && node dist/demo.js",
-    "test": "pnpm run build && node --test test/*.test.mjs test/keybindings/*.test.mjs",
-    "test:sixel": "pnpm run build && node --test test/terminal/*.test.mjs"
+    "test": "pnpm run build && node ../../../scripts/run-node-tests.mjs test/*.test.mjs test/keybindings/*.test.mjs",
+    "test:sixel": "pnpm run build && node ../../../scripts/run-node-tests.mjs test/terminal/*.test.mjs"
   },
   "dependencies": {
     "@sortedyuan/coding-tools": "workspace:*",

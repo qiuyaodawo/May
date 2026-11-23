@@ -1,5 +1,4 @@
-import { omitUndefined } from "../core/index.js";
-import type { ModelRequestSink } from "../core/request-recording.js";
+import { omitUndefined, type ModelRequestSink } from "../core/index.js";
 import type { SessionEventPayload } from "./events.js";
 import { requestReferences, requestValueId } from "./requests.js";
 

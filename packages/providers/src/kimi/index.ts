@@ -1,5 +1,5 @@
 import { omitUndefined } from "@sortedyuan/may/core";
-import { OpenAICompatibleChatModel } from "../openai-compatible/chat-model.js";
+import { OpenAICompatibleChatModel } from "../openai-compatible/index.js";
 import type { WebSearchOptions } from "../web-search.js";
 export { createKimiFormulaTools, KimiFormulaError, KimiFormulaRawInputError } from "./formula.js";
 export type { KimiFormulaToolsOptions } from "./formula.js";

@@ -1,10 +1,10 @@
-import { emitKeypressEvents } from "node:readline";
 import { PassThrough, type Writable } from "node:stream";
 import TerminalEvents from "tty-events";
 import { keyStroke, type KeyStroke } from "./keybindings/index.js";
 import type { PointerEvent, RenderSize } from "./component.js";
 import type { TerminalWriter } from "./renderer.js";
 import { TerminalImageSupport } from "./image-support.js";
+import { emitKeypressEventsWithEscapeTimeout } from "./readline-compat.js";
 
 /** @experimental */
 export interface TerminalInput extends NodeJS.ReadableStream {
@@ -85,9 +85,7 @@ export class NodeTerminalDriver implements TerminalWriter {
     this.previousRawMode = this.input.isRaw === true;
     this.inputWasPaused = this.input.isPaused();
     if (!this.keypressInitialized) {
-      emitKeypressEvents(this.decodedInput, { escapeCodeTimeout: 30 } as unknown as Parameters<
-        typeof emitKeypressEvents
-      >[1]);
+      emitKeypressEventsWithEscapeTimeout(this.decodedInput, 30);
       this.keypressInitialized = true;
     }
     this.inputDecoder.reset();

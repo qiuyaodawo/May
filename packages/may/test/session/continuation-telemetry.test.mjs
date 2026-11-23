@@ -11,6 +11,7 @@ test("reopened Session continuation creates a fresh Run and references durable p
   let calls = 0;
   const server = createServer(async (request, response) => {
     for await (const _chunk of request) {
+      /* drain */
     }
     calls += 1;
     response.writeHead(200, { "content-type": "text/event-stream" });

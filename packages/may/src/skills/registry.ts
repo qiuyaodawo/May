@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, opendir, realpath } from "node:fs/promises";
-import { omitUndefined } from "../core/omit-undefined.js";
+import { omitUndefined } from "../core/index.js";
 import { hasErrorCode } from "../storage/index.js";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { parseDocument } from "yaml";

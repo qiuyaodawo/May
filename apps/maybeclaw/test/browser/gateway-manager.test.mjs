@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { testOutputRoot } from "@sortedyuan/test-support";
+import { testOutputRoot, until } from "@sortedyuan/test-support";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join, relative } from "node:path";
@@ -31,7 +31,7 @@ describe("MaybeClaw 管理界面", { timeout: 90_000 }, () => {
     return dialog;
   };
 
-  before(async () => {
+  before(async (t) => {
     await mkdir(base, { recursive: true });
     directory = await mkdtemp(join(base, "manager-"));
     const path = join(directory, "config.json");
@@ -77,12 +77,9 @@ describe("MaybeClaw 管理界面", { timeout: 90_000 }, () => {
     gateway = new AgentGateway({ directory, configPath: path, settings: gatewaySettings(config) });
     session = gateway.createSession(operator, "真实文件计算会话", ["file-agent"]);
     await gateway.handle(inputMessage, operator, { requestId: "req-compute-1", sessionId: session.id });
-    for (let attempt = 0; attempt < 100 && completedTask === undefined; attempt++) {
-      completedTask = gateway.store
-        .list("tasks")
-        .find((task) => task.sessionId === session.id && task.status === "completed");
-      if (completedTask === undefined) await new Promise((resolve) => setTimeout(resolve, 50));
-    }
+    completedTask = await until(t, () =>
+      gateway.store.list("tasks").find((task) => task.sessionId === session.id && task.status === "completed"),
+    );
     server = await startGatewayServer({ gateway, port: 0 });
     browser = await chromium.launch({
       headless: true,

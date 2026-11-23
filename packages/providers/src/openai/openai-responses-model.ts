@@ -7,7 +7,7 @@ import type {
   ModelRequest,
   ModelStreamOptions,
 } from "@sortedyuan/may/core";
-import { parseRetryAfterMs } from "../openai-compatible/http.js";
+import { parseRetryAfterMs } from "../http.js";
 import {
   executeRecordedRequest,
   executeRecordedOperation,

@@ -1,13 +1,13 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { createServer, type Server } from "node:http";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import type { AddressInfo } from "node:net";
 import { parseMayConfig } from "@sortedyuan/may/config";
-import { withFileAccess } from "@sortedyuan/may/storage";
-import { acquireFileLock } from "@sortedyuan/may/storage";
+import { acquireFileLock, hasErrorCode, withFileAccess } from "@sortedyuan/may/storage";
 import { UiError } from "@sortedyuan/ui-client";
 import { authorized, secureHeaders, sendJson, trustedRequest } from "@sortedyuan/ui-client/server";
+import { PostRenameDurabilityError, resolveConfigTargetPath, writeDurableIfUnchanged } from "./config-file-write.js";
 import { gatewaySettings } from "./gateway-settings.js";
 import { hashAdministratorPassword } from "./gateway-auth.js";
 
@@ -15,26 +15,31 @@ async function source(path: string): Promise<string | undefined> {
   try {
     return await readFile(path, "utf8");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    if (hasErrorCode(error, "ENOENT")) return undefined;
     throw error;
   }
 }
 
 export async function inspectGatewaySetup(path: string) {
+  const targetPath = await resolveConfigTargetPath(path);
   let original: string | undefined;
   try {
-    original = await withFileAccess(path, "shared", () => source(path));
+    original = await withFileAccess(targetPath, "shared", () => source(targetPath));
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    if (!hasErrorCode(error, "ENOENT")) throw error;
   }
-  return parseGatewaySetup(path, original);
+  return parseGatewaySetup(targetPath, original);
 }
 
 function parseGatewaySetup(path: string, original: string | undefined) {
-  let config: Record<string, any> = { providers: {} };
+  let config: Record<string, unknown> = { providers: {} };
   if (original !== undefined) {
     try {
-      config = JSON.parse(original);
+      const parsedJson: unknown = JSON.parse(original);
+      if (typeof parsedJson !== "object" || parsedJson === null || Array.isArray(parsedJson)) {
+        throw new Error("配置文件需要有效的 JSON 对象。");
+      }
+      config = parsedJson as Record<string, unknown>;
     } catch {
       throw new Error("配置文件需要有效的 JSON。");
     }
@@ -43,7 +48,7 @@ function parseGatewaySetup(path: string, original: string | undefined) {
   const raw = parsed.apps?.maybeclaw;
   if (raw && Object.keys(raw).length && raw.version !== 2)
     throw new Error("MaybeClaw 配置需要 version: 2。原配置保持不变。");
-  const candidate: Record<string, any> = { version: 2, agents: [], ...raw };
+  const candidate: Record<string, unknown> = { version: 2, agents: [], ...raw };
   gatewaySettings({ ...parsed, apps: { ...parsed.apps, maybeclaw: candidate } });
   const needsSetup = candidate.server === undefined || (candidate.server as Record<string, unknown>).auth === undefined;
   return { original, config, candidate, needsSetup };
@@ -54,7 +59,7 @@ export async function startGatewaySetup(options: {
   port?: number;
   activate: (server: Server) => Promise<void>;
 }) {
-  const path = resolve(options.path);
+  const path = await resolveConfigTargetPath(options.path);
   await mkdir(dirname(path), { recursive: true });
   const lock = await acquireFileLock(`${path}.initialize.lock`);
   const launchPath = `${path}.${randomUUID()}.initialize.html`;
@@ -73,6 +78,8 @@ export async function startGatewaySetup(options: {
   let origin = "";
   const requests = new Set<Promise<void>>();
   const server = createServer((req, res) => {
+    let terminalFailure: unknown;
+    let ownsCompletion = false;
     const work = (async () => {
       secureHeaders(res);
       if (!trustedRequest(req, origin)) throw new UiError(403, "请求来源无效。");
@@ -118,34 +125,71 @@ export async function startGatewaySetup(options: {
           throw new UiError(400, "两次输入的密码需要一致。");
         const passwordHash = await hashAdministratorPassword(data.password);
         if (closing) throw new UiError(503, "初始化服务正在关闭。");
-        await withFileAccess(path, "exclusive", async () => {
-          if (closing) throw new UiError(503, "初始化服务正在关闭。");
-          const current = parseGatewaySetup(path, await source(path));
-          if (!current.needsSetup) throw new UiError(409, "管理员密码已经配置，禁止重复初始化。");
-          const config = current.config;
-          config.apps = {
-            ...config.apps,
-            maybeclaw: {
-              ...current.candidate,
-              server: { ...(current.candidate.server as object), auth: { passwordHash } },
-            },
-          };
-          gatewaySettings(parseMayConfig(config, path));
-          const temporary = `${path}.${randomUUID()}.pending`;
+        let postRenameFailure: PostRenameDurabilityError | undefined;
+        const postRenameCleanupErrors: unknown[] = [];
+        try {
+          await withFileAccess(path, "exclusive", async () => {
+            if (closing) throw new UiError(503, "初始化服务正在关闭。");
+            const current = parseGatewaySetup(path, await source(path));
+            if (!current.needsSetup) throw new UiError(409, "管理员密码已经配置，禁止重复初始化。");
+            const config = current.config;
+            const existingApps =
+              typeof config.apps === "object" && config.apps !== null && !Array.isArray(config.apps)
+                ? (config.apps as Record<string, unknown>)
+                : {};
+            config.apps = {
+              ...existingApps,
+              maybeclaw: {
+                ...current.candidate,
+                server: { ...(current.candidate.server as object), auth: { passwordHash } },
+              },
+            };
+            gatewaySettings(parseMayConfig(config, path));
+            const serialized = JSON.stringify(config, null, 2) + "\n";
+            try {
+              await writeDurableIfUnchanged(path, serialized, async () => {
+                if ((await source(path)) !== current.original) {
+                  throw new UiError(409, "配置已被其他操作修改，请重试。");
+                }
+              });
+            } catch (error) {
+              if (error instanceof PostRenameDurabilityError) {
+                // Rename already succeeded; immediately claim setup completion ownership and
+                // preserve the original durability error before any lock unlock or cleanup runs.
+                consumed = true;
+                ownsCompletion = true;
+                postRenameFailure = error;
+                terminalFailure = error;
+                return;
+              }
+              throw error;
+            }
+          });
+        } catch (error) {
+          if (!postRenameFailure) throw error;
+          postRenameCleanupErrors.push(error);
+        }
+        if (postRenameFailure) {
           try {
-            await writeFile(temporary, JSON.stringify(config, null, 2) + "\n", { flag: "wx", mode: 0o600 });
-            if ((await source(path)) !== current.original) throw new UiError(409, "配置已被其他操作修改，请重试。");
-            await rename(temporary, path);
-          } finally {
-            await rm(temporary, { force: true });
+            await release();
+          } catch (releaseError) {
+            postRenameCleanupErrors.push(releaseError);
           }
-        });
+          if (postRenameCleanupErrors.length > 0) {
+            terminalFailure = new AggregateError(
+              [postRenameFailure, ...postRenameCleanupErrors],
+              postRenameFailure.message,
+            );
+          }
+          throw new UiError(500, "管理员密码已写入但目录同步失败，请检查存储状态后重新启动控制台。");
+        }
         consumed = true;
+        ownsCompletion = true;
         try {
           await options.activate(server);
           transferred = true;
         } catch (error) {
-          fail(error);
+          terminalFailure = error;
           throw error;
         }
         await release();
@@ -155,13 +199,20 @@ export async function startGatewaySetup(options: {
         busy = false;
       }
     })()
-      .catch((error) => {
-        if (consumed) fail(error);
-        if (res.headersSent) res.destroy();
-        else
+      .catch(async (error) => {
+        if (res.headersSent) {
+          res.destroy();
+        } else {
+          const finished = new Promise<void>((resolve) => {
+            res.once("finish", resolve);
+            res.once("close", resolve);
+          });
           sendJson(res, error instanceof UiError ? error.status : 400, {
             error: error instanceof Error ? error.message : "初始化失败。",
           });
+          if (!res.writableFinished && !res.destroyed) await finished;
+        }
+        if (ownsCompletion) fail(terminalFailure ?? error);
       })
       .finally(() => requests.delete(work));
     requests.add(work);

@@ -1,4 +1,3 @@
-import { withModelRequestRecording } from "../core/request-recording.js";
 import {
   ModelContextCompactionStrategy,
   type ContextController,
@@ -8,6 +7,7 @@ import {
   HookExecutionError,
   omitUndefined,
   RUNTIME_HOOKS,
+  withModelRequestRecording,
   type HookContext,
   type HookDispatcher,
   type Message,

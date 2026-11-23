@@ -3,6 +3,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { assistantMessage, temporaryDirectory } from "./fixtures/application.mjs";
 
+import { MayConfigWriteError } from "@sortedyuan/may/config";
 import { InMemoryContextFactory } from "@sortedyuan/may/context";
 
 import { openConfiguredMaybeCode } from "../dist/index.js";
@@ -87,6 +88,73 @@ test("switches configured model profiles by prefix without changing sessions", a
   assert.equal((await (await app.submit({ input: "after" })).result).message.content[0].text, "cliproxy-low");
   assert.equal((await executeMaybeCodeSlashCommand("/model", app)).type, "model.selection.requested");
   await app.close();
+});
+
+test("setDefaultModel updates in-memory default and emits event on post-rename directory sync error, but not on pre-rename error", async (t) => {
+  const directory = await temporaryDirectory(t);
+  const configPath = join(directory, "config.json");
+  let nextError;
+  const app = await openConfiguredMaybeCode(
+    { git: false, workspace: directory, dataDirectory: join(directory, "data"), autoResume: false },
+    {
+      async loadConfig() {
+        return {
+          path: configPath,
+          providers: { local: { adapter: "openai-responses", apiKey: "test" } },
+          models: {
+            first: { provider: "local", model: "m1" },
+            second: { provider: "local", model: "m2" },
+          },
+          defaultModel: "first",
+          apps: { maybecode: { retry: false, requestRecording: "off" } },
+        };
+      },
+      createModel(selection) {
+        return {
+          async *stream() {
+            yield { type: "response.completed", message: assistantMessage(selection.profile) };
+          },
+        };
+      },
+      async persistDefaultModel() {
+        if (nextError !== undefined) throw nextError;
+      },
+    },
+  );
+  const defaultEvents = [];
+  const eventReader = (async () => {
+    for await (const event of app.events) {
+      if (event.type === "model.default.changed") defaultEvents.push(event.profile);
+    }
+  })();
+  try {
+    // Pre-rename failure (replaced: false) must NOT update in-memory default or emit event.
+    nextError = new MayConfigWriteError(configPath, "lock conflict", { replaced: false });
+    await assert.rejects(
+      app.setDefaultModel("second"),
+      (error) => error instanceof MayConfigWriteError && !error.replaced,
+    );
+    assert.deepEqual(
+      (await app.listModels()).filter((model) => model.isDefault).map((model) => model.name),
+      ["first"],
+    );
+    assert.deepEqual(defaultEvents, []);
+
+    // Post-rename directory sync failure (replaced: true) MUST sync in-memory default & emit event, then rethrow.
+    nextError = new MayConfigWriteError(configPath, "directory sync failed", { replaced: true });
+    await assert.rejects(
+      app.setDefaultModel("second"),
+      (error) => error instanceof MayConfigWriteError && error.replaced,
+    );
+    assert.deepEqual(
+      (await app.listModels()).filter((model) => model.isDefault).map((model) => model.name),
+      ["second"],
+    );
+  } finally {
+    await app.close();
+    await eventReader;
+  }
+  assert.deepEqual(defaultEvents, ["second"]);
 });
 
 test("switches supported reasoning effort without duplicating model profiles", async (t) => {

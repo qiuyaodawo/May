@@ -1,0 +1,284 @@
+{
+  "relativeEscapes": [
+    "apps/maybeclaw/test/gateway-channel-media.test.mjs -> ../../../packages/media/test/fixture.mjs",
+    "apps/maybeclaw/test/images.test.mjs -> ../../../packages/media/test/fixture.mjs",
+    "apps/maybeclaw/test/model-telemetry.test.mjs -> ../../../packages/providers/test/fixtures/local-telemetry-service.mjs",
+    "apps/maybecode/test/integration/instructions.test.mjs -> ../../../../packages/may/dist/application/index.js",
+    "apps/maybecode/test/integration/instructions.test.mjs -> ../../../../packages/may/dist/config/index.js",
+    "apps/maybecode/test/integration/instructions.test.mjs -> ../../../../packages/may/dist/core/index.js",
+    "apps/maybecode/test/integration/instructions.test.mjs -> ../../../../packages/may/dist/plugin/index.js",
+    "apps/maybecode/test/integration/instructions.test.mjs -> ../../../../packages/may/dist/session/index.js",
+    "apps/maybecode/test/integration/instructions.test.mjs -> ../../../../packages/may/dist/skills/index.js",
+    "apps/maybecode/test/integration/instructions.test.mjs -> ../../../../packages/providers/dist/index.js",
+    "apps/maybecode/test/mcp-capabilities.test.mjs -> ../../../packages/mcp/test/fixtures/catalog-server.mjs",
+    "apps/maybecode/test/mcp-capabilities.test.mjs -> ../../../packages/mcp/test/fixtures/task-server.mjs",
+    "apps/maybecode/test/media-history.test.mjs -> ../../../packages/media/test/fixture.mjs",
+    "apps/maybecode/test/model-telemetry.test.mjs -> ../../../packages/providers/test/fixtures/local-telemetry-service.mjs",
+    "apps/maybecode/test/team-file-access.test.mjs -> ../../../packages/coordination/dist/validation.js",
+    "examples/web-ui/acceptance.mjs -> ../../apps/maybeclaw/dist/index.js",
+    "examples/web-ui/acceptance.mjs -> ../../apps/maybecode/dist/index.js",
+    "examples/web-ui/live-acceptance.mjs -> ../../apps/maybeclaw/dist/index.js",
+    "examples/web-ui/live-acceptance.mjs -> ../../apps/maybecode/dist/index.js",
+    "examples/web-ui/live-acceptance.mjs -> ../../packages/providers/dist/index.js",
+    "packages/coordination/test/correlation.test.mjs -> ../../observability/dist/index.js",
+    "packages/coordination/test/delegation/invalid-response-budget.test.mjs -> ../../../providers/dist/index.js",
+    "packages/coordination/test/delegation/model-refresh.test.mjs -> ../../../providers/dist/index.js",
+    "packages/coordination/test/fixtures/attached-continuation-crash.mjs -> ../../../providers/dist/index.js",
+    "packages/coordination/test/fixtures/correlated-http-worker.mjs -> ../../../observability/dist/index.js",
+    "packages/coordination/test/remote-correlation.test.mjs -> ../../observability/dist/index.js",
+    "packages/eval/test/adapters.test.mjs -> ../../observability/dist/index.js",
+    "packages/mcp/test/apps.test.mjs -> ../../../apps/maybecode/dist/slash-command-execution.js",
+    "packages/mcp/test/plugin/read-server.mjs -> ../../../tools/coding-tools/dist/index.js",
+    "packages/observability/test/model-failure-accounting.test.mjs -> ../../coordination/dist/index.js",
+    "packages/observability/test/model-failure-accounting.test.mjs -> ../../providers/dist/index.js",
+    "packages/observability/test/model-preflight.test.mjs -> ../../providers/dist/index.js",
+    "packages/observability/test/model-response-validation.test.mjs -> ../../providers/dist/index.js",
+    "packages/observability/test/telemetry-provider-attempts.test.mjs -> ../../providers/dist/index.js",
+    "packages/observability/test/telemetry-provider-attempts.test.mjs -> ../../providers/test/fixtures/local-telemetry-service.mjs",
+    "packages/providers/test/openai/images.test.mjs -> ../../../media/test/fixture.mjs",
+    "packages/scheduler/test/correlation.test.mjs -> ../../observability/dist/index.js",
+    "packages/ui/client/test/steering-history.test.mjs -> ../../../may/dist/session/steering.js",
+    "packages/ui/client/test/telemetry.test.mjs -> ../../../observability/dist/index.js",
+    "packages/ui/tui/test/images.test.mjs -> ../../../media/test/fixture.mjs",
+    "packages/ui/tui/test/sixel.test.mjs -> ../../../media/test/fixture.mjs",
+    "packages/ui/tui/test/steering-history.test.mjs -> ../../../may/dist/session/steering.js",
+    "packages/ui/tui/test/terminal/maybecode-selection.test.mjs -> ../../../../../apps/maybecode/dist/ui/terminal-view.js",
+    "packages/ui/tui/test/terminal/sixel.test.mjs -> ../../../../media/test/fixture.mjs",
+    "packages/ui/web/test/browser/images.test.mjs -> ../../../../media/test/fixture.mjs",
+    "packages/ui/web/test/browser/workspace-session-fork.test.mjs -> ../../../../../apps/maybecode/dist/web-ui.js",
+    "packages/ui/web/test/browser/workspace-session-fork.test.mjs -> ../../../../../apps/maybecode/dist/workspace.js",
+    "packages/ui/web/test/browser/workspace-session-fork.test.mjs -> ../../../../providers/dist/index.js",
+    "packages/ui/web/test/browser/workspace-session-fork.test.mjs -> ../../../tui/dist/index.js",
+    "packages/ui/web/test/browser/workspace-session-fork.test.mjs -> ../../../tui/dist/keybindings/index.js",
+    "packages/ui/web/test/browser/workspace-versions.test.mjs -> ../../../../providers/dist/index.js"
+  ],
+  "typeOnlyCycleEdges": {
+    "apps/maybeclaw/src/gateway-host.ts": ["apps/maybeclaw/src/plugins/services.ts"],
+    "apps/maybeclaw/src/gateway-repository.ts": ["apps/maybeclaw/src/gateway.ts"],
+    "apps/maybeclaw/src/gateway-run.ts": ["apps/maybeclaw/src/run.ts"],
+    "apps/maybeclaw/src/gateway-ui-commands.ts": ["apps/maybeclaw/src/gateway-ui.ts"],
+    "apps/maybeclaw/src/gateway-ui.ts": ["apps/maybeclaw/src/gateway-ui-commands.ts"],
+    "apps/maybeclaw/src/gateway.ts": [
+      "apps/maybeclaw/src/gateway-repository.ts",
+      "apps/maybeclaw/src/gateway/approvals.ts",
+      "apps/maybeclaw/src/gateway/coordination.ts",
+      "apps/maybeclaw/src/gateway/input.ts",
+      "apps/maybeclaw/src/gateway/maintenance.ts",
+      "apps/maybeclaw/src/gateway/management.ts",
+      "apps/maybeclaw/src/gateway/messages.ts",
+      "apps/maybeclaw/src/gateway/tasks.ts"
+    ],
+    "apps/maybeclaw/src/gateway/approvals.ts": ["apps/maybeclaw/src/gateway.ts"],
+    "apps/maybeclaw/src/gateway/coordination.ts": ["apps/maybeclaw/src/gateway.ts"],
+    "apps/maybeclaw/src/gateway/input.ts": [
+      "apps/maybeclaw/src/gateway-repository.ts",
+      "apps/maybeclaw/src/gateway.ts",
+      "apps/maybeclaw/src/gateway/submission.ts"
+    ],
+    "apps/maybeclaw/src/gateway/maintenance.ts": ["apps/maybeclaw/src/gateway.ts"],
+    "apps/maybeclaw/src/gateway/management.ts": [
+      "apps/maybeclaw/src/gateway-repository.ts",
+      "apps/maybeclaw/src/gateway.ts"
+    ],
+    "apps/maybeclaw/src/gateway/messages.ts": ["apps/maybeclaw/src/gateway-repository.ts"],
+    "apps/maybeclaw/src/gateway/submission.ts": [
+      "apps/maybeclaw/src/gateway.ts",
+      "apps/maybeclaw/src/gateway/input.ts"
+    ],
+    "apps/maybeclaw/src/gateway/tasks.ts": [
+      "apps/maybeclaw/src/gateway-repository.ts",
+      "apps/maybeclaw/src/gateway.ts"
+    ],
+    "apps/maybeclaw/src/plugins/services.ts": ["apps/maybeclaw/src/gateway-host.ts"],
+    "apps/maybeclaw/src/run.ts": ["apps/maybeclaw/src/gateway-run.ts"],
+    "apps/maybecode/src/application-open.ts": [
+      "apps/maybecode/src/application.ts",
+      "apps/maybecode/src/controller.ts",
+      "apps/maybecode/src/plugins/application.ts",
+      "apps/maybecode/src/plugins/instructions.ts"
+    ],
+    "apps/maybecode/src/application.ts": [
+      "apps/maybecode/src/application-open.ts",
+      "apps/maybecode/src/controller.ts",
+      "apps/maybecode/src/events.ts",
+      "apps/maybecode/src/plugins/application.ts"
+    ],
+    "apps/maybecode/src/configured-options.ts": ["apps/maybecode/src/configured-resolvers.ts"],
+    "apps/maybecode/src/configured-resolvers.ts": ["apps/maybecode/src/configured-options.ts"],
+    "apps/maybecode/src/controller.ts": ["apps/maybecode/src/application.ts", "apps/maybecode/src/events.ts"],
+    "apps/maybecode/src/events.ts": ["apps/maybecode/src/controller.ts"],
+    "apps/maybecode/src/mcp-commands.ts": ["apps/maybecode/src/slash-commands.ts"],
+    "apps/maybecode/src/model-transition.ts": [
+      "apps/maybecode/src/workspace-state.ts",
+      "apps/maybecode/src/workspace.ts"
+    ],
+    "apps/maybecode/src/plugins/application.ts": ["apps/maybecode/src/application-open.ts"],
+    "apps/maybecode/src/plugins/instructions.ts": ["apps/maybecode/src/runtime-instructions.ts"],
+    "apps/maybecode/src/runtime-instructions.ts": ["apps/maybecode/src/application-open.ts"],
+    "apps/maybecode/src/session-navigation.ts": ["apps/maybecode/src/workspace-state.ts"],
+    "apps/maybecode/src/slash-commands.ts": ["apps/maybecode/src/mcp-commands.ts"],
+    "apps/maybecode/src/team-check-runner.ts": ["apps/maybecode/src/team-verification.ts"],
+    "apps/maybecode/src/team-verification-journal.ts": ["apps/maybecode/src/team-verification.ts"],
+    "apps/maybecode/src/team-verification-tools.ts": [
+      "apps/maybecode/src/team-check-runner.ts",
+      "apps/maybecode/src/team-verification.ts"
+    ],
+    "apps/maybecode/src/team-verification.ts": [
+      "apps/maybecode/src/team-check-runner.ts",
+      "apps/maybecode/src/team-verification-journal.ts",
+      "apps/maybecode/src/team-verification-tools.ts"
+    ],
+    "apps/maybecode/src/ui/session-prompt.ts": [
+      "apps/maybecode/src/ui/terminal-prompts.ts",
+      "apps/maybecode/src/ui/terminal-view.ts"
+    ],
+    "apps/maybecode/src/ui/terminal-prompts.ts": ["apps/maybecode/src/ui/terminal-view.ts"],
+    "apps/maybecode/src/ui/terminal-view.ts": [
+      "apps/maybecode/src/ui/session-prompt.ts",
+      "apps/maybecode/src/ui/terminal-prompts.ts"
+    ],
+    "apps/maybecode/src/workspace-configuration.ts": [
+      "apps/maybecode/src/model-transition.ts",
+      "apps/maybecode/src/workspace-state.ts",
+      "apps/maybecode/src/workspace.ts"
+    ],
+    "apps/maybecode/src/workspace-mcp.ts": ["apps/maybecode/src/workspace-state.ts", "apps/maybecode/src/workspace.ts"],
+    "apps/maybecode/src/workspace-state.ts": ["apps/maybecode/src/workspace.ts"],
+    "apps/maybecode/src/workspace.ts": [
+      "apps/maybecode/src/model-transition.ts",
+      "apps/maybecode/src/session-navigation.ts",
+      "apps/maybecode/src/workspace-configuration.ts",
+      "apps/maybecode/src/workspace-mcp.ts",
+      "apps/maybecode/src/workspace-state.ts"
+    ],
+    "packages/coordination/src/delegation/subagent-child-agent.ts": [
+      "packages/coordination/src/delegation/subagent-host.ts",
+      "packages/coordination/src/delegation/subagent-request.ts"
+    ],
+    "packages/coordination/src/delegation/subagent-host.ts": [
+      "packages/coordination/src/delegation/subagent-child-agent.ts",
+      "packages/coordination/src/delegation/subagent-request.ts"
+    ],
+    "packages/coordination/src/delegation/subagent-request.ts": [
+      "packages/coordination/src/delegation/subagent-host.ts"
+    ],
+    "packages/eval/src/registry.ts": ["packages/eval/src/types.ts"],
+    "packages/eval/src/types.ts": ["packages/eval/src/registry.ts"],
+    "packages/may/src/application/application.ts": [
+      "packages/may/src/application/controller.ts",
+      "packages/may/src/application/opening-plugins.ts",
+      "packages/may/src/application/opening-session.ts",
+      "packages/may/src/application/opening-tools.ts",
+      "packages/may/src/application/plugins.ts",
+      "packages/may/src/application/runtime-assembly.ts",
+      "packages/may/src/application/session-navigation.ts"
+    ],
+    "packages/may/src/application/controller.ts": [
+      "packages/may/src/application/plugins.ts",
+      "packages/may/src/application/workspace.ts"
+    ],
+    "packages/may/src/application/opening-plugins.ts": [
+      "packages/may/src/application/application.ts",
+      "packages/may/src/application/plugin-access.ts",
+      "packages/may/src/application/plugin-composition.ts",
+      "packages/may/src/application/plugins.ts",
+      "packages/may/src/application/session-navigation.ts"
+    ],
+    "packages/may/src/application/opening-session.ts": [
+      "packages/may/src/application/application.ts",
+      "packages/may/src/application/plugins.ts",
+      "packages/may/src/application/session-navigation.ts"
+    ],
+    "packages/may/src/application/opening-tools.ts": [
+      "packages/may/src/application/application.ts",
+      "packages/may/src/application/plugins.ts"
+    ],
+    "packages/may/src/application/plugin-access.ts": ["packages/may/src/application/controller.ts"],
+    "packages/may/src/application/plugin-composition.ts": [
+      "packages/may/src/application/application.ts",
+      "packages/may/src/application/plugin-access.ts",
+      "packages/may/src/application/plugins.ts"
+    ],
+    "packages/may/src/application/plugins.ts": ["packages/may/src/application/plugin-access.ts"],
+    "packages/may/src/application/runtime-assembly.ts": [
+      "packages/may/src/application/application.ts",
+      "packages/may/src/application/plugins.ts"
+    ],
+    "packages/may/src/application/session-navigation.ts": [
+      "packages/may/src/application/application.ts",
+      "packages/may/src/application/plugins.ts"
+    ],
+    "packages/may/src/application/workspace.ts": [
+      "packages/may/src/application/application.ts",
+      "packages/may/src/application/controller.ts"
+    ],
+    "packages/may/src/context/compaction.ts": ["packages/may/src/context/controller.ts"],
+    "packages/may/src/context/controller.ts": ["packages/may/src/context/compaction.ts"],
+    "packages/may/src/core/may.ts": ["packages/may/src/core/runtime.ts"],
+    "packages/may/src/core/model.ts": ["packages/may/src/core/request-recording.ts"],
+    "packages/may/src/core/request-recording.ts": ["packages/may/src/core/model.ts"],
+    "packages/may/src/core/runtime.ts": ["packages/may/src/core/may.ts"],
+    "packages/may/src/history-memory/index.ts": ["packages/may/src/history-memory/plugin.ts"],
+    "packages/may/src/history-memory/plugin.ts": ["packages/may/src/history-memory/index.ts"],
+    "packages/may/src/session/branching.ts": ["packages/may/src/session/session.ts"],
+    "packages/may/src/session/events.ts": [
+      "packages/may/src/session/requests.ts",
+      "packages/may/src/session/steering.ts"
+    ],
+    "packages/may/src/session/replay.ts": ["packages/may/src/session/session.ts"],
+    "packages/may/src/session/requests.ts": ["packages/may/src/session/events.ts"],
+    "packages/may/src/session/session.ts": [
+      "packages/may/src/session/branching.ts",
+      "packages/may/src/session/replay.ts"
+    ],
+    "packages/may/src/session/steering.ts": ["packages/may/src/session/events.ts"],
+    "packages/mcp/src/apps.ts": [
+      "packages/mcp/src/content.ts",
+      "packages/mcp/src/tasks.ts",
+      "packages/mcp/src/types.ts"
+    ],
+    "packages/mcp/src/connection-tools.ts": ["packages/mcp/src/connection.ts"],
+    "packages/mcp/src/connection.ts": ["packages/mcp/src/connection-tools.ts"],
+    "packages/mcp/src/content.ts": ["packages/mcp/src/types.ts"],
+    "packages/mcp/src/host-client.ts": ["packages/mcp/src/task-wire.ts", "packages/mcp/src/tasks.ts"],
+    "packages/mcp/src/oauth.ts": ["packages/mcp/src/types.ts"],
+    "packages/mcp/src/task-journal-records.ts": ["packages/mcp/src/task-journal.ts", "packages/mcp/src/tasks.ts"],
+    "packages/mcp/src/task-journal.ts": ["packages/mcp/src/task-journal-records.ts", "packages/mcp/src/tasks.ts"],
+    "packages/mcp/src/task-runtime.ts": [
+      "packages/mcp/src/content.ts",
+      "packages/mcp/src/host-client.ts",
+      "packages/mcp/src/task-journal.ts",
+      "packages/mcp/src/tasks.ts"
+    ],
+    "packages/mcp/src/task-wire.ts": ["packages/mcp/src/content.ts", "packages/mcp/src/tasks.ts"],
+    "packages/mcp/src/tasks.ts": ["packages/mcp/src/content.ts"],
+    "packages/mcp/src/types.ts": [
+      "packages/mcp/src/apps.ts",
+      "packages/mcp/src/oauth.ts",
+      "packages/mcp/src/task-journal.ts",
+      "packages/mcp/src/task-runtime.ts"
+    ],
+    "packages/providers/src/builtin-capabilities.ts": [
+      "packages/providers/src/capabilities.ts",
+      "packages/providers/src/capability-values.ts"
+    ],
+    "packages/providers/src/capabilities.ts": [
+      "packages/providers/src/builtin-capabilities.ts",
+      "packages/providers/src/capability-values.ts",
+      "packages/providers/src/model-list-discovery.ts"
+    ],
+    "packages/providers/src/capability-values.ts": ["packages/providers/src/capabilities.ts"],
+    "packages/providers/src/model-list-discovery.ts": [
+      "packages/providers/src/capabilities.ts",
+      "packages/providers/src/capability-values.ts"
+    ],
+    "packages/ui/tui/src/agent/tool-renderers.ts": ["packages/ui/tui/src/agent/transcript-store.ts"],
+    "packages/ui/tui/src/agent/transcript-item-view.ts": ["packages/ui/tui/src/agent/transcript-view.ts"],
+    "packages/ui/tui/src/agent/transcript-store.ts": ["packages/ui/tui/src/agent/tool-renderers.ts"],
+    "packages/ui/tui/src/agent/transcript-view.ts": ["packages/ui/tui/src/agent/transcript-item-view.ts"],
+    "packages/ui/tui/src/component.ts": ["packages/ui/tui/src/text-selection.ts"],
+    "packages/ui/tui/src/text-selection.ts": ["packages/ui/tui/src/component.ts"],
+    "packages/ui/web/src/connection-dialog.ts": ["packages/ui/web/src/index.ts"],
+    "packages/ui/web/src/index.ts": ["packages/ui/web/src/connection-dialog.ts"]
+  }
+}

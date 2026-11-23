@@ -69,11 +69,7 @@ export interface MetricRecord {
 
 /** @experimental */
 export function recordMetric(tracer: Tracer | undefined, record: MetricRecord): void {
-  try {
-    tracer?.recordMetric?.(record);
-  } catch {
-    /* 遥测失败由组件的诊断接口记录。 */
-  }
+  failOpen(() => tracer?.recordMetric?.(record));
 }
 
 /** Start a span without allowing a third-party tracer failure to affect May.
@@ -85,44 +81,28 @@ export function startTraceSpan(
   options?: TraceSpanStartOptions,
 ): TraceSpan | undefined {
   if (tracer === undefined) return undefined;
-  try {
-    return protectSpan(tracer.startSpan(name, options));
-  } catch {
-    return undefined;
-  }
+  return failOpenValue(() => protectSpan(tracer.startSpan(name, options)), undefined);
 }
 
 /** Set attributes without putting telemetry on the execution failure path.
  * @experimental
  */
 export function setTraceAttributes(span: TraceSpan | undefined, attributes: TraceAttributes): void {
-  try {
-    span?.setAttributes(attributes);
-  } catch {
-    // Observability is deliberately fail-open.
-  }
+  failOpen(() => span?.setAttributes(attributes));
 }
 
 /** Add an instantaneous span event without affecting Agent execution.
  * @experimental
  */
 export function addTraceEvent(span: TraceSpan | undefined, name: string, attributes?: TraceAttributes): void {
-  try {
-    span?.addEvent(name, attributes);
-  } catch {
-    // Observability is deliberately fail-open.
-  }
+  failOpen(() => span?.addEvent(name, attributes));
 }
 
 /** End a span without allowing exporter or processor failures to escape.
  * @experimental
  */
 export function endTraceSpan(span: TraceSpan | undefined, options?: TraceSpanEndOptions): void {
-  try {
-    span?.end(options);
-  } catch {
-    // Observability is deliberately fail-open.
-  }
+  failOpen(() => span?.end(options));
 }
 
 /** Convert an arbitrary failure into content-free trace error metadata.
@@ -135,37 +115,38 @@ export function traceError(error: unknown): TraceError {
 }
 
 function protectSpan(span: TraceSpan): TraceSpan {
-  let context: TraceContext;
-  try {
-    context = span.context;
-  } catch {
-    return inertSpan();
-  }
+  const context = failOpenValue(() => span.context, undefined);
+  if (context === undefined) return inertSpan();
 
   return {
     context,
     setAttributes(attributes) {
-      try {
-        span.setAttributes(attributes);
-      } catch {
-        // Observability is deliberately fail-open.
-      }
+      failOpen(() => span.setAttributes(attributes));
     },
     addEvent(name, attributes) {
-      try {
-        span.addEvent(name, attributes);
-      } catch {
-        // Observability is deliberately fail-open.
-      }
+      failOpen(() => span.addEvent(name, attributes));
     },
     end(options) {
-      try {
-        span.end(options);
-      } catch {
-        // Observability is deliberately fail-open.
-      }
+      failOpen(() => span.end(options));
     },
   };
+}
+
+function failOpen(action: () => void): void {
+  try {
+    action();
+  } catch {
+    // Observability is deliberately fail-open; failures are reported via component diagnostics.
+    return;
+  }
+}
+
+function failOpenValue<T>(action: () => T, fallback: T): T {
+  try {
+    return action();
+  } catch {
+    return fallback;
+  }
 }
 
 function inertSpan(): TraceSpan {

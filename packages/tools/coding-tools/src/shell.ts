@@ -4,6 +4,7 @@ import { delimiter, join } from "node:path";
 import { omitUndefined, type Tool, type ToolProgressUpdate } from "@sortedyuan/may/core";
 import { CodingToolError } from "./errors.js";
 import type { CodingExecutionEnvironment } from "./execution.js";
+import { getHostProcessCloseTimeoutMs, onHostChildAbandoned } from "./process-termination.js";
 import { optionalPositiveInteger, requireObject, requirePositiveIntegerOption, requireString } from "./input.js";
 import { resolveExistingWorkspacePath } from "./workspace-path.js";
 
@@ -243,6 +244,18 @@ function executeCommand(
     const stop = () => {
       if (options.execution !== undefined) {
         executionAbort.abort();
+        if (options.execution.isolation.mode === "host") {
+          drainTimer ??= setTimeout(() => {
+            childStdout.destroy();
+            childStderr.destroy();
+            fail(
+              new CodingToolError(
+                cancelled ? "CODING_TOOL_CANCELLED" : "CODING_TOOL_COMMAND_TIMEOUT",
+                "shell: command stopped; process-tree termination could not be confirmed",
+              ),
+            );
+          }, getHostProcessCloseTimeoutMs() + 500);
+        }
         return;
       }
       terminateProcessTree(child);
@@ -280,12 +293,13 @@ function executeCommand(
       stop();
     };
     abortSignal.addEventListener("abort", abort, { once: true });
-    if (abortSignal.aborted) abort();
 
+    let unsubscribeAbandoned: (() => void) | undefined;
     const cleanup = () => {
       clearTimeout(timeout);
       if (drainTimer !== undefined) clearTimeout(drainTimer);
       abortSignal.removeEventListener("abort", abort);
+      unsubscribeAbandoned?.();
     };
     const fail = (error: unknown) => {
       if (settled) return;
@@ -293,6 +307,41 @@ function executeCommand(
       cleanup();
       reject(error);
     };
+
+    if (options.execution?.isolation.mode === "host") {
+      unsubscribeAbandoned = onHostChildAbandoned(child, (error) => {
+        childStdout.destroy();
+        childStderr.destroy();
+        if (cancelled) {
+          fail(
+            new CodingToolError(
+              "CODING_TOOL_CANCELLED",
+              "shell: command stopped; process-tree termination could not be confirmed",
+              { cause: error },
+            ),
+          );
+          return;
+        }
+        if (timedOut) {
+          fail(
+            new CodingToolError(
+              "CODING_TOOL_COMMAND_TIMEOUT",
+              `shell: command exceeded ${timeoutMs}ms; process-tree termination could not be confirmed`,
+              { cause: error },
+            ),
+          );
+          return;
+        }
+        fail(
+          new CodingToolError(
+            "CODING_TOOL_COMMAND_FAILED",
+            "shell: execution environment abandoned command before process exit",
+            { cause: error },
+          ),
+        );
+      });
+    }
+    if (abortSignal.aborted) abort();
 
     child.once("error", (error) => {
       fail(

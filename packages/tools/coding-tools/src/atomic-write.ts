@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { open, rename, rm, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
+import { hasErrorCode } from "@sortedyuan/may/storage";
 
 /**
  * Commit complete contents, never truncate the destination on cancellation.
@@ -10,8 +11,8 @@ export async function atomicWriteText(path: string, text: string, signal: AbortS
   signal.throwIfAborted();
   const mode = await stat(path).then(
     (info) => info.mode & 0o777,
-    (error: NodeJS.ErrnoException) => {
-      if (error.code !== "ENOENT") throw error;
+    (error: unknown) => {
+      if (!hasErrorCode(error, "ENOENT")) throw error;
       return undefined;
     },
   );

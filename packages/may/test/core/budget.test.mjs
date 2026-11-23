@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { May, InMemoryContext, parallelToolScheduler } from "@sortedyuan/may/core";
+import { May, InMemoryContext, RunBudgetMeter, parallelToolScheduler } from "@sortedyuan/may/core";
 
 const assistant = (toolCalls = []) => ({ role: "assistant", content: [], toolCalls });
 const tool = {
@@ -180,4 +180,48 @@ test("deadline closes interrupted tool calls before continuation", async () => {
   await assert.rejects(run.result, { code: "RUN_BUDGET_EXCEEDED" });
   assert.equal((await context.snapshot()).messages.filter((m) => m.role === "tool").length, 2);
   assert.equal((await events).filter((e) => e.type === "tool.failed").length, 2);
+});
+
+test("duration budget uses a monotonic clock immune to forward and backward Date.now jumps within the same run", async () => {
+  const originalDateNow = Date.now;
+  let offsetMs = 0;
+  Date.now = () => originalDateNow() + offsetMs;
+  try {
+    // Directly exercise a single RunBudgetMeter across both +10m and -10m wall-clock jumps.
+    const meter = new RunBudgetMeter({ maxDurationMs: 5_000 });
+    const s1 = meter.snapshot();
+    offsetMs = 600_000;
+    meter.checkTime();
+    const s2 = meter.snapshot();
+    offsetMs = -600_000;
+    meter.checkTime();
+    const s3 = meter.snapshot();
+    assert.ok(s1.elapsedMs >= 0 && s1.elapsedMs <= s2.elapsedMs && s2.elapsedMs <= s3.elapsedMs);
+    assert.ok(s3.elapsedMs < 5_000, `expected monotonic elapsedMs < 5000, got ${s3.elapsedMs}`);
+
+    // Also exercise a single multi-step May run spanning both forward and backward Date.now jumps.
+    offsetMs = 0;
+    let step = 0;
+    const may = new May({
+      context: new InMemoryContext(),
+      tools: [tool],
+      runBudget: { maxDurationMs: 5_000 },
+      model: {
+        async *stream() {
+          step += 1;
+          offsetMs = step === 1 ? 600_000 : -600_000;
+          yield {
+            type: "response.completed",
+            message: assistant(step === 1 ? [calls[0]] : []),
+            usage: { totalTokens: 1 },
+          };
+        },
+      },
+    });
+    const result = await may.run({ input: "go" }).result;
+    assert.equal(step, 2);
+    assert.ok(result.budget.elapsedMs >= 0 && result.budget.elapsedMs < 5_000);
+  } finally {
+    Date.now = originalDateNow;
+  }
 });

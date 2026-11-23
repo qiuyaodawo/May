@@ -1,5 +1,5 @@
 import type { AssistantMessage, Message, ModelEvent, ServerToolCall, ToolCall, Usage } from "@sortedyuan/may/core";
-import { readSseData } from "../openai-compatible/http.js";
+import { readSseData } from "../http.js";
 import { AnthropicFinishReasonError, AnthropicProtocolError, AnthropicStreamError } from "./errors.js";
 import {
   ANTHROPIC_MODEL_STATE_TYPE,

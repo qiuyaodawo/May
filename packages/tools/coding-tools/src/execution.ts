@@ -1,12 +1,11 @@
-import { execFile, spawn, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep, posix, join } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
-import { promisify } from "node:util";
 import { omitUndefined } from "@sortedyuan/may/core";
 import { CodingToolError } from "./errors.js";
+import { getHostProcessCloseTimeoutMs, notifyHostChildAbandoned, terminateHostProcess } from "./process-termination.js";
 import { resolveExistingWorkspacePath } from "./workspace-path.js";
 
 /** @experimental */
@@ -47,6 +46,8 @@ const supervisor =
 interface ProcessRecord {
   readonly child: ChildProcess;
   readonly done: Promise<void>;
+  readonly abandoned: Promise<void>;
+  readonly isClosed: () => boolean;
   readonly stop: () => void;
   readonly stopping: Promise<void>[];
 }
@@ -147,7 +148,7 @@ export async function openCodingExecutionEnvironment(options: {
       if (removeBeforeWait) await docker(["rm", "--force", name]);
       await Promise.all(
         active.map(async (record) => {
-          await record.done;
+          await Promise.race([record.done, record.abandoned]);
           await Promise.all(record.stopping);
         }),
       );
@@ -228,15 +229,20 @@ export async function openCodingExecutionEnvironment(options: {
               }),
             )
           : spawn("docker", dockerArgs, { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+      let abandonDone!: () => void;
+      const abandoned = new Promise<void>((resolveAbandon) => {
+        abandonDone = resolveAbandon;
+      });
       const stopping: Promise<void>[] = [];
       child.stdin?.on("error", (error: Error) => {
         terminationFailure = error;
       });
       let stopped = false;
+      let childClosed = false;
       const stop = () => {
-        if (stopped || child.exitCode !== null || child.signalCode !== null) return;
-        stopped = true;
         if (isolation.mode === "container") {
+          if (stopped || child.exitCode !== null || child.signalCode !== null) return;
+          stopped = true;
           if (pipe) {
             const termination = docker(
               [
@@ -255,10 +261,36 @@ export async function openCodingExecutionEnvironment(options: {
             stopping.push(termination);
             terminations.add(termination);
           } else child.stdin?.end("cancel\n");
-        } else if (child.pid !== undefined) {
-          const termination = terminateHostProcess(child.pid).catch((error: unknown) => {
-            terminationFailure = error;
-          });
+        } else {
+          // Even if the direct child already exited (exitCode !== null), descendants in its
+          // POSIX process group can still be alive holding stdout/stderr pipes open until close.
+          // On Windows, however, do not run taskkill against an already-exited PID because the OS
+          // may have reused that PID for an unrelated process; proceed directly to bounded pipe wait.
+          if (stopped || childClosed) return;
+          stopped = true;
+          const totalBudgetMs = getHostProcessCloseTimeoutMs();
+          const deadline = performance.now() + totalBudgetMs;
+          const skipWindowsExitedPid =
+            process.platform === "win32" && (child.exitCode !== null || child.signalCode !== null);
+          const termination = (
+            child.pid === undefined || skipWindowsExitedPid
+              ? Promise.resolve()
+              : terminateHostProcess(child.pid, totalBudgetMs)
+          )
+            .then(async () => {
+              const remainingMs = Math.max(1, deadline - performance.now());
+              await waitForHostRecordClose(record, remainingMs, (error) => {
+                terminationFailure ??= error;
+                records.delete(record);
+                abandonDone();
+              });
+            })
+            .catch((error: unknown) => {
+              terminationFailure ??= error;
+              abandonChild(child, error);
+              records.delete(record);
+              abandonDone();
+            });
           stopping.push(termination);
           terminations.add(termination);
         }
@@ -268,6 +300,7 @@ export async function openCodingExecutionEnvironment(options: {
           terminationFailure = error;
         });
         child.once("close", () => {
+          childClosed = true;
           spawnOptions.signal.removeEventListener("abort", stop);
           records.delete(record);
           if (isolation.mode === "container" && pipe) {
@@ -280,7 +313,7 @@ export async function openCodingExecutionEnvironment(options: {
           } else resolveDone();
         });
       });
-      const record = { child, done, stop, stopping };
+      const record = { child, done, abandoned, isClosed: () => childClosed, stop, stopping };
       records.add(record);
       spawnOptions.signal.addEventListener("abort", stop, { once: true });
       if (spawnOptions.signal.aborted) stop();
@@ -319,32 +352,41 @@ export async function openCodingExecutionEnvironment(options: {
   return environment;
 }
 
-async function terminateHostProcess(pid: number): Promise<void> {
-  if (process.platform === "win32") {
-    const killer = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
-    await new Promise<void>((resolveStop, rejectStop) => {
-      killer.once("error", rejectStop);
-      killer.once("close", () => resolveStop());
-    });
-    return;
-  }
+function abandonChild(child: ChildProcess, error?: unknown): void {
+  child.stdin?.destroy();
+  child.stdout?.destroy();
+  child.stderr?.destroy();
+  child.unref();
+  notifyHostChildAbandoned(child, error);
+}
+
+async function waitForHostRecordClose(
+  record: ProcessRecord,
+  timeoutMs: number,
+  onTimeout: (error: CodingToolError) => void,
+): Promise<void> {
+  if (record.isClosed()) return;
+  const limitMs = Math.max(1, Math.ceil(timeoutMs));
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    process.kill(-pid, "SIGKILL");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ESRCH") return;
-    throw error;
-  }
-  for (;;) {
-    try {
-      process.kill(-pid, 0);
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code;
-      if (code === "ESRCH") return;
-      if (process.platform !== "darwin" || code !== "EPERM") throw error;
-      const { stdout } = await promisify(execFile)("/bin/ps", ["-A", "-o", "pgid="]);
-      if (!stdout.split(/\s+/u).includes(String(pid))) return;
-    }
-    await delay(10);
+    await Promise.race([
+      record.done,
+      record.abandoned,
+      new Promise<void>((resolveTimeout) => {
+        timer = setTimeout(() => {
+          const timeoutError = new CodingToolError(
+            "CODING_EXECUTION_TERMINATION_TIMEOUT",
+            `Host process ${String(record.child.pid)} pipes did not close within ${limitMs}ms`,
+          );
+          abandonChild(record.child, timeoutError);
+          onTimeout(timeoutError);
+          resolveTimeout();
+        }, limitMs);
+        timer.unref();
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
 }
 

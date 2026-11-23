@@ -17,8 +17,8 @@
   ],
   "scripts": {
     "build": "tsc -b",
-    "test": "pnpm --filter @sortedyuan/coordination run build && pnpm run build && node --test test/*.test.mjs",
-    "test:integration": "pnpm run build && node --test test/integration/*.test.mjs"
+    "test": "pnpm --filter @sortedyuan/coordination run build && pnpm run build && node ../../../scripts/run-node-tests.mjs test/*.test.mjs",
+    "test:integration": "pnpm run build && node ../../../scripts/run-node-tests.mjs test/integration/*.test.mjs"
   },
   "dependencies": {
     "@sortedyuan/coding-tools": "workspace:*",

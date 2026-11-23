@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -10,6 +10,7 @@ import {
   MayConfigParseError,
   MayConfigResolutionError,
   MayConfigValidationError,
+  MayConfigWriteError,
   parseMayConfig,
   resolveModelProfile,
   resolveProviderConfig,
@@ -326,3 +327,36 @@ test("parses maybeclaw configuration with empty or omitted agents", () => {
   });
   assert.equal(omittedAgents.apps?.maybeclaw?.agents, undefined);
 });
+
+test(
+  "updateDefaultMayModel reports replaced=true when real POSIX directory sync fails with EACCES",
+  { skip: process.platform === "win32" || process.getuid?.() === 0 },
+  async (t) => {
+    const directory = await createTestDirectory(t, "may/config-sync-fail");
+    const cfgDir = join(directory, "cfg");
+    await mkdir(cfgDir, { recursive: true });
+    const path = join(cfgDir, "config.json");
+    await writeFile(
+      path,
+      JSON.stringify({
+        providers: { local: { adapter: "openai-responses", apiKey: "test" } },
+        models: { first: { provider: "local", model: "first" }, second: { provider: "local", model: "second" } },
+        defaultModel: "first",
+      }),
+      { mode: 0o600 },
+    );
+
+    // Owner wx-only directory lets lock, atomic temp write, and rename succeed, while
+    // syncDirectory's open(cfgDir, "r") fails with real kernel EACCES after rename.
+    await chmod(cfgDir, 0o300);
+    try {
+      await assert.rejects(
+        updateDefaultMayModel(path, "second"),
+        (error) => error instanceof MayConfigWriteError && error.replaced === true && error.cause?.code === "EACCES",
+      );
+      assert.equal(JSON.parse(await readFile(path, "utf8")).defaultModel, "second");
+    } finally {
+      await chmod(cfgDir, 0o700);
+    }
+  },
+);

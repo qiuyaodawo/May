@@ -6,7 +6,7 @@ import {
   omitUndefined,
 } from "../core/index.js";
 import type { Context, ContextSnapshot, Message, Usage } from "../core/index.js";
-import { utf8Bytes } from "../core/utf8-bytes.js";
+import { utf8Bytes } from "../internal/utf8-bytes.js";
 
 import type {
   ContextCompactionDetails,

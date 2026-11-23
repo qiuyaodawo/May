@@ -1,7 +1,13 @@
-import { spawn } from "node:child_process";
-import { copyFile, mkdir, readFile, realpath } from "node:fs/promises";
+import { copyFile, mkdir, realpath } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  discoverWorkspacePackages,
+  packWorkspacePackages,
+  resolvePublishableRuntimeClosure,
+  runCommand,
+  runPnpm,
+} from "./package-consumer-deps.mjs";
 
 const repository = dirname(dirname(fileURLToPath(import.meta.url)));
 const pnpm = process.env.npm_execpath;
@@ -16,52 +22,25 @@ if (relative(await realpath(repository), await realpath(destination)).startsWith
 if (!relative(await realpath(repository), await realpath(consumer)).startsWith(".."))
   throw new Error("The consumer must be outside the repository");
 
-await runPnpm(["--filter", "@sortedyuan/scheduler", "build"], repository);
-const packages = ["@sortedyuan/may", "@sortedyuan/scheduler"];
-const versions = new Map();
-for (const name of packages)
-  versions.set(
-    name,
-    JSON.parse(await readFile(join(repository, `packages/${name.slice("@sortedyuan/".length)}/package.json`), "utf8"))
-      .version,
-  );
-for (const name of packages) await runPnpm(["--filter", name, "pack", "--pack-destination", packs], repository);
+await runPnpm(pnpm, ["--filter", "@sortedyuan/scheduler", "build"], repository);
+const workspacePackages = await discoverWorkspacePackages(repository);
+const requiredNames = resolvePublishableRuntimeClosure(workspacePackages, ["@sortedyuan/scheduler"]);
+const { tarballs, overrides } = await packWorkspacePackages({
+  packages: workspacePackages,
+  names: requiredNames,
+  packsDirectory: packs,
+  repository,
+  pnpm,
+});
+
 await copyFile(join(repository, "packages/scheduler/test/consumer/package.json"), join(consumer, "package.json"));
 await copyFile(join(repository, "packages/scheduler/test/consumer/index.mjs"), join(consumer, "index.mjs"));
 await runPnpm(
-  [
-    "config",
-    "set",
-    "overrides",
-    JSON.stringify({
-      "@sortedyuan/may": `file:${join(packs, `sortedyuan-may-${versions.get("@sortedyuan/may")}.tgz`).replaceAll("\\", "/")}`,
-    }),
-    "--json",
-    "--location",
-    "project",
-  ],
+  pnpm,
+  ["config", "set", "overrides", JSON.stringify(overrides), "--json", "--location", "project"],
   consumer,
 );
-await runPnpm(
-  [
-    "add",
-    ...packages.map((name) => join(packs, `${name.replace("@", "").replace("/", "-")}-${versions.get(name)}.tgz`)),
-    "--ignore-scripts",
-  ],
-  consumer,
-);
-await run(process.execPath, [join(consumer, "index.mjs")], consumer);
-console.log(`Verified ${packages.join(", ")} and its installed runtime dependencies`);
+await runPnpm(pnpm, ["add", ...tarballs, "--ignore-scripts"], consumer);
+await runCommand(process.execPath, [join(consumer, "index.mjs")], consumer);
+console.log(`Verified ${requiredNames.join(", ")} and its installed runtime dependencies`);
 console.log(`External consumer: ${consumer}`);
-
-function runPnpm(args, cwd) {
-  return /\.[cm]?js$/iu.test(pnpm) ? run(process.execPath, [pnpm, ...args], cwd) : run(pnpm, args, cwd);
-}
-
-async function run(executable, args, cwd) {
-  await new Promise((accept, reject) => {
-    const child = spawn(executable, args, { cwd, stdio: "inherit", windowsHide: true });
-    child.once("error", reject);
-    child.once("exit", (code) => (code === 0 ? accept() : reject(new Error(`Package check exited with ${code}`))));
-  });
-}

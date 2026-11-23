@@ -15,7 +15,7 @@
   ],
   "scripts": {
     "build": "tsc -b",
-    "test": "pnpm run build && node --test test/*.test.mjs"
+    "test": "pnpm run build && node ../../scripts/run-node-tests.mjs test/*.test.mjs"
   },
   "dependencies": {
     "@sortedyuan/may": "workspace:*",

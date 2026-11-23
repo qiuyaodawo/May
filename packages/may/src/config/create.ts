@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { lstat, mkdir, open, link, unlink } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
-import { withFileAccess } from "../storage/index.js";
+import { hasErrorCode, withFileAccess } from "../storage/index.js";
 import { MayConfigWriteError } from "./errors.js";
 import { parseMayConfig } from "./parse.js";
 import type { MayConfig } from "./types.js";
@@ -27,7 +27,7 @@ export async function createMayConfig(
       try {
         await lstat(path);
       } catch (error) {
-        if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+        if (!hasErrorCode(error, "ENOENT")) throw error;
         exists = false;
       }
       if (exists) throw new MayConfigWriteError(path, "the file already exists; reload it before continuing");

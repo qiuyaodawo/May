@@ -11,6 +11,7 @@ import {
   type ModelRequest,
   type ModelStreamOptions,
 } from "@sortedyuan/may/core";
+import { nextSleepChunkMs } from "./sleep-chunks.js";
 
 const RETRYABLE_STATUSES = new Set([408, 409, 429]);
 const RETRYABLE_CODES = new Set([
@@ -268,21 +269,31 @@ function retryAfterMs(error: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 }
 
-function abortableSleep(delayMs: number, signal: AbortSignal): Promise<void> {
-  if (signal.aborted) return Promise.reject(abortReason(signal));
-  if (delayMs === 0) return Promise.resolve();
+async function abortableSleep(delayMs: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) throw abortReason(signal);
+  if (delayMs <= 0) return;
 
-  return new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve();
-    }, delayMs);
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(abortReason(signal));
-    };
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
+  const deadline = performance.now() + delayMs;
+  for (;;) {
+    const remaining = deadline - performance.now();
+    if (remaining <= 0) return;
+    const chunkMs = nextSleepChunkMs(remaining);
+    await new Promise<void>((resolve, reject) => {
+      if (signal.aborted) {
+        reject(abortReason(signal));
+        return;
+      }
+      const timer = setTimeout(() => {
+        signal.removeEventListener("abort", onAbort);
+        resolve();
+      }, chunkMs);
+      const onAbort = () => {
+        clearTimeout(timer);
+        reject(abortReason(signal));
+      };
+      signal.addEventListener("abort", onAbort, { once: true });
+    });
+  }
 }
 
 function abortReason(signal: AbortSignal): Error {

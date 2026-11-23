@@ -6,8 +6,9 @@ May reads `~/.may/config.json` by default. The configuration separates named
 provider connections, selectable model profiles, and application settings.
 
 Configuration loads, default-model updates, and MaybeClaw authentication updates
-coordinate across local processes using `<config-path>.access` and
-`<config-path>.access.gate`. First access creates these empty files and requires
+first resolve symbolic links and aliased directories through `resolveMayConfigTargetPath(path)`,
+then coordinate across local processes using `<target-path>.access` and
+`<target-path>.access.gate`. First access creates these empty files and requires
 directory write permission. Keep them beside
 the configuration. Before serving configuration from a read-only directory,
 call `loadMayConfig({ path })` once with directory write permission; later loads

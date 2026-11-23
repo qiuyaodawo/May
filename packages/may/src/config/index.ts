@@ -4,5 +4,6 @@ export * from "./load.js";
 export * from "./parse.js";
 export * from "./resolve.js";
 export * from "./schema.js";
+export * from "./target-path.js";
 export * from "./types.js";
 export * from "./update.js";

@@ -1,4 +1,4 @@
-import { May, type ContinueOptions, type MayOptions, type RunHandle, type RunOptions } from "./may.js";
+import type { ContinueOptions, MayOptions, RunHandle, RunOptions } from "./may.js";
 import type { HookDefinition } from "./hooks.js";
 import type { Message } from "./types.js";
 
@@ -28,9 +28,6 @@ export type RuntimeFactory = (options: MayOptions) => AgentRuntime | Promise<Age
 
 /** @experimental */
 export const DEFAULT_RUNTIME_DESCRIPTOR: RuntimeDescriptor = Object.freeze({ id: "may", version: "1" });
-
-/** @experimental */
-export const defaultRuntimeFactory: RuntimeFactory = (options) => new May(options);
 
 /** @experimental */
 export function validateRuntimeDescriptor(value: RuntimeDescriptor): void {

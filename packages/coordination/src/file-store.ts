@@ -61,7 +61,7 @@ export class FileCoordinationStore implements CoordinationStore {
         }
       });
     } catch (error) {
-      if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined;
+      if (hasErrorCode(error, "ENOENT")) return undefined;
       throw error;
     }
   }

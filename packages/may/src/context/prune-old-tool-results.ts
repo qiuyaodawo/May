@@ -1,6 +1,6 @@
 import type { ContextSnapshot, Message, ToolMessage } from "../core/index.js";
 import { pendingServerToolInteractionIndex } from "../core/index.js";
-import { utf8Bytes } from "../core/utf8-bytes.js";
+import { utf8Bytes } from "../internal/utf8-bytes.js";
 
 import type { ContextCompactionStrategy } from "./compaction.js";
 

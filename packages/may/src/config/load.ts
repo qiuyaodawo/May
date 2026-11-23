@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { withFileAccess } from "../storage/index.js";
 import { MayConfigFileError, MayConfigParseError } from "./errors.js";
 import { parseMayConfig } from "./parse.js";
+import { resolveMayConfigTargetPath } from "./target-path.js";
 import type { LoadMayConfigOptions, MayConfig } from "./types.js";
 
 /** @experimental */
@@ -17,7 +18,8 @@ export async function loadMayConfig(options: LoadMayConfigOptions = {}): Promise
   let source: string;
 
   try {
-    source = await withFileAccess(path, "shared", () => readFile(path, "utf8"));
+    const targetPath = await resolveMayConfigTargetPath(path);
+    source = await withFileAccess(targetPath, "shared", () => readFile(targetPath, "utf8"));
   } catch (error) {
     throw new MayConfigFileError(path, { cause: error });
   }

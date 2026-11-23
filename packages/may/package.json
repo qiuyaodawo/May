@@ -114,10 +114,10 @@
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
-    "test": "pnpm run build && node --test test/*/*.test.mjs",
-    "test:coverage": "pnpm run build && node --test --experimental-test-coverage test/*/*.test.mjs",
-    "test:package": "pnpm run build && node --test test/application/git-workspace-package.test.mjs",
-    "test:integration": "pnpm run build && node --test test/*/integration/*.test.mjs"
+    "test": "pnpm run build && node ../../scripts/run-node-tests.mjs test/*/*.test.mjs",
+    "test:coverage": "pnpm run build && node ../../scripts/run-node-tests.mjs --experimental-test-coverage test/*/*.test.mjs",
+    "test:package": "pnpm run build && node ../../scripts/run-node-tests.mjs test/application/git-workspace-package.test.mjs",
+    "test:integration": "pnpm run build && node ../../scripts/run-node-tests.mjs test/*/integration/*.test.mjs"
   },
   "dependencies": {
     "@standard-schema/spec": "^1.1.0",

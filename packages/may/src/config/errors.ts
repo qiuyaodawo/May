@@ -22,14 +22,17 @@ export class MayConfigFileError extends MayConfigError {
 /** @experimental */
 export class MayConfigWriteError extends MayConfigError {
   readonly path: string;
+  /** True when the configuration file was replaced on disk before a post-rename durability step (such as directory `fsync`) failed. */
+  readonly replaced: boolean;
 
-  constructor(path: string, problem?: string, options?: ErrorOptions) {
+  constructor(path: string, problem?: string, options?: ErrorOptions & { readonly replaced?: boolean }) {
     super(
       "MAY_CONFIG_WRITE_ERROR",
       `Unable to update May config at ${path}${problem === undefined ? "" : `: ${problem}`}`,
       options,
     );
     this.path = path;
+    this.replaced = options?.replaced === true;
   }
 }
 

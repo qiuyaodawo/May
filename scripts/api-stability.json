@@ -6002,6 +6002,14 @@
   {
     "package": "@sortedyuan/may",
     "entrypoint": "./config",
+    "symbol": "resolveMayConfigTargetPath",
+    "stability": "experimental",
+    "since": "0.3.0",
+    "docs": "docs/en/reference/stability.md"
+  },
+  {
+    "package": "@sortedyuan/may",
+    "entrypoint": "./config",
     "symbol": "updateDefaultMayModel",
     "stability": "experimental",
     "since": "0.1.0",
